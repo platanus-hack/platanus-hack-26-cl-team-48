@@ -17,12 +17,12 @@ Nodomics es un editor visual de flujos de datos (nodos) que corre en la web, con
 
 ## 1. Invariantes de arquitectura (no negociables)
 
-1. **La interfaz solo habla el protocolo (NEP).** `apps/web` depende únicamente de `@nodomics/protocol`, `@nodomics/client` y `@nodomics/ui` (design system). Nunca importa DuckDB, Pyodide, el coordinador ni ningún ejecutor.
+1. **La interfaz solo habla el protocolo (NEP).** `apps/web` depende únicamente de `@nodomics/protocol`, `@nodomics/client`, `@nodomics/ui` (design system) y `@nodomics/hub` (ADR 0018). Nunca importa DuckDB, Pyodide, el coordinador ni ningún ejecutor.
 2. **Los datos viven en el motor.** La interfaz recibe referencias y páginas, nunca tablas completas.
 3. **Los nodos son datos.** Un nodo es un manifiesto JSON (+ plantilla SQL o código Python en texto). Ningún nodo es una función de TypeScript.
 4. **El coordinador se escribe una vez** (TypeScript puro, sin DOM). Los ejecutores son pequeños y no conocen el grafo.
 5. **El protocolo es el contrato.** `packages/protocol` solo cambia con aprobación del líder y un ADR. Si necesitas algo que el protocolo no tiene, repórtalo; no lo agregues por tu cuenta.
-6. **Las dependencias apuntan hacia adentro:** `apps → client → rpc + protocol`, `apps → ui`, `engine-* → coordinator + executor-* → rpc + protocol`. Nada importa desde `apps`. `protocol`, `rpc` y `ui` no importan paquetes internos.
+6. **Las dependencias apuntan hacia adentro:** `apps → client → rpc + protocol`, `apps → ui`, `apps → hub → protocol`, `engine-* → coordinator + executor-* → rpc + protocol`. Nada importa desde `apps`. `protocol`, `rpc` y `ui` no importan paquetes internos.
 7. **La interfaz usa el design system.** Ningún color, tamaño, radio o fuente se escribe a mano: todo sale de los tokens de `@nodomics/ui` (variables CSS). Guía: `packages/ui/README.md`.
 
 Si tu cambio rompe un invariante, está mal aunque funcione.
@@ -32,11 +32,12 @@ Si tu cambio rompe un invariante, está mal aunque funcione.
 1. **Entender.** Lee la tarea completa y los documentos de la tabla. Enumera los criterios de aceptación antes de tocar código.
 2. **Buscar antes de crear.** Antes de escribir una función, tipo, componente o utilidad, busca si ya existe (`grep -r` por concepto y por sinónimos en `packages/` y `apps/`, revisa los `index.ts` de los paquetes y `docs/decisions/`). Si existe, reúsalo o extiéndelo. Si existe algo parecido en otro paquete, repórtalo en vez de duplicar.
 3. **Planear en pequeño.** Lista los pasos. Si son más de ~5 archivos o cruzan paquetes que no son tuyos, pide confirmación.
-4. **TDD estricto: rojo → verde → refactor.**
-   - Escribe un test que falle por la razón correcta y **ejecútalo para verlo fallar**.
-   - Escribe el mínimo código para que pase.
-   - Refactoriza con los tests en verde.
-   - Un bug se corrige escribiendo primero el test que lo reproduce.
+4. **TDD estricto con tests de otro agente: rojo → verde → refactor.**
+   - **Quien implementa no escribe sus propios tests.** Los escribe un agente distinto (`.claude/agents/test-writer.md`), a partir del encargo, los criterios de aceptación y la API pública acordada, **sin ver la implementación**. Así los tests no quedan sesgados por el código.
+   - El implementador recibe los tests, **los ejecuta para verlos fallar** por la razón correcta, escribe el mínimo código para que pasen y refactoriza en verde.
+   - El implementador **no edita ni borra tests ajenos**. Si un test le parece incorrecto o le falta un caso, lo reporta al líder, que se lo pide de nuevo al agente de tests.
+   - Un bug se corrige pidiendo primero al agente de tests el test que lo reproduce.
+   - Esto aplica también a la sesión principal (el líder): cuando implementa, los tests los escribe otro agente.
 5. **Verificar.** `pnpm check` (y `uv run pytest` si tocaste Python) debe pasar completo. No entregues trabajo con checks en rojo.
 6. **Autorrevisar** con la checklist de la sección 7.
 7. **Reportar con honestidad** usando la plantilla de `workflow.md`: qué hiciste, la salida en rojo y luego en verde de los tests, lo que no hiciste y por qué, y las dudas abiertas. Nunca digas "funciona" sin haberlo ejecutado.
@@ -109,7 +110,7 @@ Cada agente trabaja **solo en el paquete asignado**. Si necesitas un cambio en o
 
 ## 7. Checklist antes de entregar (Definition of Done)
 
-- [ ] Cada comportamiento nuevo tiene un test que vi fallar antes de implementarlo.
+- [ ] Cada comportamiento nuevo tiene un test, escrito por otro agente, que vi fallar antes de implementarlo; no edité tests ajenos.
 - [ ] `pnpm check` pasa completo (tipos, lint, límites entre paquetes, tests, formato).
 - [ ] Busqué si ya existía algo antes de crearlo; no hay duplicación.
 - [ ] Ninguna función mezcla niveles de abstracción (SLAP).
