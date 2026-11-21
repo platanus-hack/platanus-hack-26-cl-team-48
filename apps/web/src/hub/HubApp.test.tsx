@@ -82,6 +82,26 @@ const sharedFlowIn = (url: string) => {
 
 const hubHeader = () => screen.getByRole("banner");
 
+const hubSearch = () => within(hubHeader()).getByRole("searchbox", { name: "Buscar en el hub" });
+
+const PUBLISHED_TITLES = ["Limpiar texto", "Ventas por región"];
+
+/** The titles of the listed cards, in alphabetical order. */
+const cardTitles = () =>
+  PUBLISHED_TITLES.filter((title) =>
+    screen
+      .queryAllByRole("article")
+      .some((card) => within(card).queryByRole("link", { name: title }) !== null),
+  );
+
+const HUB_ROUTES: ReadonlyArray<{ readonly name: string; readonly route: HubRoute }> = [
+  { name: "hub", route: { page: "hub" } },
+  { name: "profile", route: { page: "profile", handle: "ana" } },
+  { name: "publication", route: { page: "publication", handle: "ana", slug: "ventas" } },
+];
+
+const filtersSidebar = () => screen.queryByRole("complementary", { name: "Filtros del hub" });
+
 /** The version loads after the page, so pressing is retried until the expectation holds. */
 async function pressUntil(name: string, expectation: () => void) {
   const user = userEvent.setup();
@@ -291,5 +311,121 @@ describe("HubApp adding a node", () => {
     });
 
     expect(stores.flowStore.getState().state.flow).toBe(before);
+  });
+});
+
+describe("HubApp search", () => {
+  it.each(HUB_ROUTES)("offers exactly one hub search on the $name route", async ({ route }) => {
+    await renderHubApp(route);
+
+    expect(screen.getAllByRole("searchbox", { name: "Buscar en el hub" })).toHaveLength(1);
+  });
+
+  it.each(HUB_ROUTES)(
+    "keeps the hub search in the header on the $name route",
+    async ({ route }) => {
+      await renderHubApp(route);
+
+      expect(hubSearch()).toBeTruthy();
+    },
+  );
+
+  it("hints what can be searched", async () => {
+    await renderHubApp({ page: "hub" });
+
+    expect(hubSearch().getAttribute("placeholder")).toBe("Buscar flujos, nodos o personas…");
+  });
+
+  it("narrows the hub results as the user types", async () => {
+    await renderHubApp({ page: "hub" });
+    await screen.findByRole("link", { name: "Ventas por región" });
+
+    await userEvent.type(hubSearch(), "limpiar");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto"]);
+    });
+  });
+
+  it("heads the hub results Resultados once the user types", async () => {
+    await renderHubApp({ page: "hub" });
+
+    await userEvent.type(hubSearch(), "limpiar");
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Resultados" })).toBeTruthy();
+  });
+
+  it.each([
+    { name: "profile", route: { page: "profile", handle: "ana" } },
+    { name: "publication", route: { page: "publication", handle: "ana", slug: "ventas" } },
+  ] satisfies ReadonlyArray<{ name: string; route: HubRoute }>)(
+    "goes to the hub when the user types on the $name page",
+    async ({ route }) => {
+      await renderHubApp(route);
+
+      await userEvent.type(hubSearch(), "limpiar");
+
+      await waitFor(() => {
+        expect(window.location.pathname).toBe("/hub");
+      });
+    },
+  );
+
+  it.each([
+    { name: "profile", route: { page: "profile", handle: "ana" } },
+    { name: "publication", route: { page: "publication", handle: "ana", slug: "ventas" } },
+  ] satisfies ReadonlyArray<{ name: string; route: HubRoute }>)(
+    "shows the results for the text typed on the $name page",
+    async ({ route }) => {
+      await renderHubApp(route);
+
+      await userEvent.type(hubSearch(), "limpiar");
+
+      await waitFor(() => {
+        expect({
+          hub: screen.queryByRole("heading", { level: 1, name: "Hub" }) !== null,
+          titles: cardTitles(),
+        }).toEqual({ hub: true, titles: ["Limpiar texto"] });
+      });
+    },
+  );
+});
+
+describe("HubApp filters sidebar", () => {
+  it("shows the hub filters on the hub route", async () => {
+    await renderHubApp({ page: "hub" });
+
+    expect(await screen.findByRole("complementary", { name: "Filtros del hub" })).toBeTruthy();
+  });
+
+  it.each(["Explorar", "Tipo"])("groups the %s options in the hub filters", async (name) => {
+    await renderHubApp({ page: "hub" });
+
+    const sidebar = await screen.findByRole("complementary", { name: "Filtros del hub" });
+
+    expect(within(sidebar).getByRole("radiogroup", { name })).toBeTruthy();
+  });
+
+  it("keeps the Etiquetas in the hub filters", async () => {
+    await renderHubApp({ page: "hub" });
+    const sidebar = await screen.findByRole("complementary", { name: "Filtros del hub" });
+
+    expect(await within(sidebar).findByRole("group", { name: "Etiquetas" })).toBeTruthy();
+  });
+
+  it("does not show the hub filters on a profile page", async () => {
+    await renderHubApp({ page: "profile", handle: "ana" });
+
+    await screen.findByRole("heading", { level: 1, name: "Ana Pérez" });
+
+    expect(filtersSidebar()).toBeNull();
+  });
+
+  it("does not show the hub filters on a publication page", async () => {
+    await renderHubApp({ page: "publication", handle: "ana", slug: "ventas" });
+
+    await screen.findByRole("heading", { level: 1, name: "Ventas por región" });
+
+    expect(filtersSidebar()).toBeNull();
   });
 });

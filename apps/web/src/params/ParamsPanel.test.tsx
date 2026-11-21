@@ -1,5 +1,6 @@
 import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { statusLabel } from "@nodomics/ui";
 import { useState } from "react";
 import { expect, it } from "vitest";
 import { createAppStores } from "../app-stores.ts";
@@ -251,4 +252,35 @@ it("has no node detail tabs without a selected node", () => {
   renderWithStores(<Panel />, stores);
 
   expect(screen.queryByRole("tablist", { name: "Detalle del nodo" })).toBeNull();
+});
+
+it("shows the selected node's run status with the node card's label", () => {
+  const stores = createAppStores(flowOf([nodeOf("s", SAMPLE.id)]));
+  const { dispatch } = stores.engineStore.getState();
+  dispatch({ type: "catalog.loaded", nodes: CATALOG });
+  stores.selectionStore.getState().select(["s"]);
+  renderWithStores(<Panel />, stores);
+
+  act(() => {
+    dispatch({ type: "run.requested", rev: 0 });
+    dispatch({ type: "run.started", rev: 0, runId: "r" });
+    dispatch({ type: "node.status", payload: { rev: 0, runId: "r", nodeId: "s", state: "done" } });
+  });
+
+  expect(screen.getByText(statusLabel("done"))).toBeDefined();
+});
+
+it("offers to run only the selected node", () => {
+  renderParams();
+
+  expect(screen.getByRole("button", { name: "Ejecutar este nodo" })).toBeDefined();
+});
+
+it("does not offer to run a node without a selected node", () => {
+  const stores = createAppStores(flowOf([nodeOf("f", FILTER.id)]));
+  stores.engineStore.getState().dispatch({ type: "catalog.loaded", nodes: CATALOG });
+
+  renderWithStores(<Panel />, stores);
+
+  expect(screen.queryByRole("button", { name: "Ejecutar este nodo" })).toBeNull();
 });

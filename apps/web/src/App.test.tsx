@@ -1,6 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import type { NepParams } from "@nodomics/protocol";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { createAppStores } from "./app-stores.ts";
+import { CATALOG, edgeOf, FILTER, flowOf, nodeOf, SAMPLE } from "./canvas/canvas-fixtures.ts";
 import { ANA, createSeededHub, createTestHub } from "./hub/hub-pages-fixtures.tsx";
 import { renderApp } from "./testing/render-app.tsx";
 import { stubResizeObserver } from "./testing/stub-resize-observer.ts";
@@ -369,5 +372,39 @@ describe("App hub links", () => {
     await userEvent.click(link);
 
     expect(window.location.pathname).toBe("/");
+  });
+});
+
+describe("App parameters inspector", () => {
+  it("asks the engine to run only the selected node", async () => {
+    const runs: NepParams<"flow.run">[] = [];
+    const stores = createAppStores(
+      flowOf(
+        [nodeOf("s", SAMPLE.id), nodeOf("f", FILTER.id)],
+        [edgeOf("e1", ["s", "out"], ["f", "in"])],
+      ),
+    );
+    renderApp({
+      stores,
+      handlers: {
+        "nodes.list": () => ({ nodes: [...CATALOG] }),
+        "flow.run": (params) => {
+          runs.push(params);
+          return { runId: "r1" };
+        },
+      },
+    });
+    await waitForEngine();
+    act(() => {
+      stores.selectionStore.getState().select(["f"]);
+    });
+
+    await userEvent.click(
+      within(sidePanel("Parámetros")).getByRole("button", { name: "Ejecutar este nodo" }),
+    );
+
+    await waitFor(() => {
+      expect(runs.map(({ targets }) => targets)).toEqual([["f"]]);
+    });
   });
 });
