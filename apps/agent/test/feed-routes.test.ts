@@ -74,18 +74,20 @@ const request = (overrides: Partial<RouteRequest> = {}): RouteRequest => ({
   ...overrides,
 });
 
-const call = (
-  routes: readonly Route[],
-  method: "GET" | "POST",
-  path: string,
-  overrides: Partial<RouteRequest> = {},
-): Promise<RouteReply> => find(routes, method, path).handle(request(overrides));
+type CallOptions = {
+  readonly method: "GET" | "POST";
+  readonly path: string;
+  readonly overrides?: Partial<RouteRequest>;
+};
+
+const call = (routes: readonly Route[], options: CallOptions): Promise<RouteReply> =>
+  find(routes, options.method, options.path).handle(request(options.overrides));
 
 const json = (value: unknown): string => JSON.stringify(value);
 
 describe("POST /feed/profile", () => {
   const post = (routes: readonly Route[], rawBody: string) =>
-    call(routes, "POST", "/feed/profile", { rawBody });
+    call(routes, { method: "POST", path: "/feed/profile", overrides: { rawBody } });
 
   it("saves the card under the caller and replies 200 with it", async () => {
     const card = validCard();
@@ -144,7 +146,7 @@ describe("POST /feed/profile", () => {
 
 describe("GET /feed/cards/:handle", () => {
   const get = (routes: readonly Route[], handle: string) =>
-    call(routes, "GET", "/feed/cards/:handle", { params: { handle } });
+    call(routes, { method: "GET", path: "/feed/cards/:handle", overrides: { params: { handle } } });
 
   it("replies 200 with the card", async () => {
     const card: ProfileCard = validCard();
@@ -174,7 +176,7 @@ describe("GET /feed/cards/:handle", () => {
 
 describe("GET /feed/search", () => {
   const search = (routes: readonly Route[], query: Record<string, string>) =>
-    call(routes, "GET", "/feed/search", { query });
+    call(routes, { method: "GET", path: "/feed/search", overrides: { query } });
 
   it("replies 200 with the results and the default k of 20", async () => {
     const hits = [hit("ana")];
@@ -238,7 +240,7 @@ describe("GET /feed/search", () => {
 
 describe("GET /feed/matches", () => {
   const matches = (routes: readonly Route[], query: Record<string, string> = {}) =>
-    call(routes, "GET", "/feed/matches", { query });
+    call(routes, { method: "GET", path: "/feed/matches", overrides: { query } });
 
   const own = () => ({
     profileId: "user-1",
@@ -294,8 +296,12 @@ describe("GET /feed/matches", () => {
 
 describe("POST /feed/registration", () => {
   const register = (routes: readonly Route[], body: unknown) =>
-    call(routes, "POST", "/feed/registration", {
-      rawBody: typeof body === "string" ? body : json(body),
+    call(routes, {
+      method: "POST",
+      path: "/feed/registration",
+      overrides: {
+        rawBody: typeof body === "string" ? body : json(body),
+      },
     });
 
   it("extracts a card from pasted text without saving it", async () => {

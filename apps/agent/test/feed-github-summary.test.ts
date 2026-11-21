@@ -15,7 +15,7 @@ const REPOS = [
 
 function fakeFetch(routes: Record<string, () => Response | Promise<Response>>) {
   const urls: string[] = [];
-  const fetchImpl = ((input: RequestInfo | URL) => {
+  const fetchImpl = ((input: string | URL | Request) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     urls.push(url);
     const handler = routes[url];

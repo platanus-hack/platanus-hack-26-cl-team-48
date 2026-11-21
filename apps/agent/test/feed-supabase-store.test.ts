@@ -13,7 +13,7 @@ function fakeClient(replyFor: (table: string) => Reply) {
   const rpcCalls: [string, unknown][] = [];
   const builder = (call: Call): unknown => {
     const reply = replyFor(call.table);
-    const single = Array.isArray(reply.data) ? reply.data[0] : reply.data;
+    const single: unknown = Array.isArray(reply.data) ? (reply.data[0] as unknown) : reply.data;
     const proxy: unknown = new Proxy(() => undefined, {
       get: (_target, name: string) => {
         if (name === "then") {
