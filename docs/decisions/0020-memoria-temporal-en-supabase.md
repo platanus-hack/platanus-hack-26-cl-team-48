@@ -1,6 +1,6 @@
 # 0020. Memoria temporal en tablas de Supabase
 
-- **Estado:** propuesta
+- **Estado:** aceptada (decidido por el responsable de la capa de agente por delegación del líder)
 - **Fecha:** 2026-11-21
 
 ## Contexto
@@ -9,7 +9,7 @@ La memoria del agente debe responder qué se construyó, cuándo, cómo, por qui
 
 ## Decisión
 
-La memoria se guarda como tablas en Supabase (Postgres):
+La memoria se guarda como tablas en el mismo proyecto de Supabase del hub (ADR 0018). Los actores (personas) se identifican con los ids de `profiles` del hub, sin tabla de usuarios propia. Tablas:
 
 - `entities`: usuarios, agente, flujos, nodos, conversaciones, decisiones, propuestas, círculos.
 - `edges`: relaciones entre entidades con `valid_from` y `valid_to` (creó, modificó, propuso, aceptó, rechazó, derivó de, conversó sobre).
@@ -22,7 +22,7 @@ Graphiti queda como posible evolución futura.
 
 | Opción | A favor | En contra |
 |---|---|---|
-| Tablas en Supabase con pgvector (elegida) | Una sola base; RLS ya definida (ADR 0022); los embeddings compartidos con el buscador; sin servicio nuevo | Hay que escribir a mano las consultas temporales y la extracción de relaciones |
+| Tablas en Supabase con pgvector (elegida) | Una sola base; RLS ya definida (ADR 0018 y 0021); los embeddings compartidos con el buscador; sin servicio nuevo | Hay que escribir a mano las consultas temporales y la extracción de relaciones |
 | Graphiti (grafo de conocimiento temporal, Apache-2.0) | Pensado para memoria de agentes; modelo temporal ya resuelto | Solo Python (el servicio es Node/TS); exige Neo4j, FalkorDB o Neptune, sin soporte de Postgres; Anthropic no ofrece embedder, así que igual se necesita otro proveedor |
 | Sin memoria estructurada (solo historial de chat) | Nada que construir | No responde preguntas sobre el porqué de un cambio ni permite buscar componentes |
 
