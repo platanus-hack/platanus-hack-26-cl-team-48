@@ -4,7 +4,6 @@ import type { ConnectionFailure } from "./engine/engine-events.ts";
 // Every user-visible text of the interface lives here, so an i18n layer can replace it in one place.
 export const MESSAGES = {
   flowNodes: {
-    tab: "Nodos",
     open: "Abrir flujo",
     legacy: "Creados con «Convertir en nodo»",
     update: (version: string) => `Actualizar a la versión ${version}`,
@@ -113,10 +112,6 @@ export const MESSAGES = {
     },
   },
   savedFlows: {
-    title: "Mis flujos",
-    flows: "Flujos",
-    data: "Datos",
-    close: "Cerrar",
     newFlow: "Nuevo flujo",
     name: "Nombre del flujo",
     open: "Abrir",
@@ -144,7 +139,6 @@ export const MESSAGES = {
     nodes: (count: number) => `${String(count)} nodos`,
   },
   secrets: {
-    title: "Credenciales",
     name: "Nombre",
     value: "Valor",
     add: "Agregar",
@@ -191,7 +185,6 @@ export const MESSAGES = {
     importFile: "Importar archivo…",
     flowOptions: "Opciones del flujo",
     newFlow: "Nuevo flujo",
-    export: "Exportar",
     import: "Importar",
   },
   rail: {
@@ -244,7 +237,6 @@ export const MESSAGES = {
     composerPlaceholder: "Pide un cambio o una explicación…",
   },
   library: {
-    label: "Biblioteca de nodos",
     invalid: "Descartamos entradas inválidas de tu biblioteca personal.",
     unavailable:
       "Tu biblioteca personal se conservará solo en esta sesión: el almacenamiento no está disponible.",
