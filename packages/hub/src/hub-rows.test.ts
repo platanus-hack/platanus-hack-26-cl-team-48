@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FLOW_FORMAT, type Flow, type NodeManifest } from "@nodomics/protocol";
-import { toProfile, toSummaries, toVersion, toVersionSummaries } from "./hub-rows.ts";
+import { toProfile, toStoredFlow, toSummaries, toVersion, toVersionSummaries } from "./hub-rows.ts";
 
 const flow: Flow = {
   format: FLOW_FORMAT,
@@ -323,5 +323,85 @@ describe("toVersion", () => {
     const result = toVersion(row);
 
     expectInvalid(result);
+  });
+});
+
+const flowRow = {
+  id: "flujo-1",
+  owner_id: "u-ana",
+  visibility: "public",
+  document: { name: "Ventas", flow: { nodes: [] } },
+  updated_at: "2026-11-21T10:00:00Z",
+};
+
+function withoutField(row: object, field: string): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(row).filter(([key]) => key !== field));
+}
+
+describe("toStoredFlow", () => {
+  it("maps a flow row", () => {
+    const result = toStoredFlow(flowRow);
+
+    expect(result).toEqual({
+      id: "flujo-1",
+      ownerId: "u-ana",
+      visibility: "public",
+      document: { name: "Ventas", flow: { nodes: [] } },
+      updatedAt: "2026-11-21T10:00:00Z",
+    });
+  });
+
+  it("maps a private flow row", () => {
+    const result = toStoredFlow({ ...flowRow, visibility: "private" });
+
+    expect(result?.visibility).toBe("private");
+  });
+
+  it("keeps a document that is not an object without interpreting it", () => {
+    const result = toStoredFlow({ ...flowRow, document: "texto" });
+
+    expect(result?.document).toBe("texto");
+  });
+
+  it.each(["id", "owner_id", "updated_at"])("rejects a row whose %s is not a string", (field) => {
+    const row = { ...flowRow, [field]: 1 };
+
+    const result = toStoredFlow(row);
+
+    expect(result).toBeUndefined();
+  });
+
+  it.each(["id", "owner_id", "updated_at", "visibility"])("rejects a row without %s", (field) => {
+    const row = withoutField(flowRow, field);
+
+    const result = toStoredFlow(row);
+
+    expect(result).toBeUndefined();
+  });
+
+  it("rejects an unknown visibility", () => {
+    const result = toStoredFlow({ ...flowRow, visibility: "shared" });
+
+    expect(result).toBeUndefined();
+  });
+
+  it.each([null, undefined])("rejects a row whose document is %s", (document) => {
+    const result = toStoredFlow({ ...flowRow, document });
+
+    expect(result).toBeUndefined();
+  });
+
+  it("rejects a row without a document", () => {
+    const row = withoutField(flowRow, "document");
+
+    const result = toStoredFlow(row);
+
+    expect(result).toBeUndefined();
+  });
+
+  it.each([null, "flujo", 1])("rejects a row that is not an object: %s", (row) => {
+    const result = toStoredFlow(row);
+
+    expect(result).toBeUndefined();
   });
 });
