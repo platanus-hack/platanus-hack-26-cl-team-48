@@ -82,4 +82,24 @@ describe("withMemory", () => {
     expect(await mcp.listTools()).toEqual(ok([]));
     expect(mcp.droppedEpisodes()).toBe(0);
   });
+
+  it("unauthorized calls leave no episode", async () => {
+    const memory = createFakeMemory();
+    const denied = err({ code: "UNAUTHORIZED", message: "not yours" } as const);
+    const mcp = withMemory(stubMcp(denied), memory, clock);
+    expect(await mcp.call("flows.get", { flowId: "f-foreign" }, IDENTITY)).toEqual(denied);
+    const found = await memory.episodesFor("f-foreign");
+    expect(found.ok && found.value).toEqual([]);
+    expect(mcp.droppedEpisodes()).toBe(0);
+  });
+
+  it("other errors are still recorded, summarized", async () => {
+    const memory = createFakeMemory();
+    const failed = err({ code: "TOOL_FAILED", message: "boom" } as const);
+    await withMemory(stubMcp(failed), memory, clock).call("flows.get", { flowId: "f-1" }, IDENTITY);
+    const found = await memory.episodesFor("f-1");
+    expect(found.ok && found.value[0]?.payload).toMatchObject({
+      result: { ok: false, code: "TOOL_FAILED" },
+    });
+  });
 });

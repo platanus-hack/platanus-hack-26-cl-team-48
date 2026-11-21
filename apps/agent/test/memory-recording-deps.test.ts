@@ -33,7 +33,7 @@ it("recordDecision updates the graph on the shared memory using the clock", asyn
   const memory = createFakeMemory();
   const deps = buildMemoryDeps(memory, () => AT);
   await deps.recordDecision({ actorId: "user-1", proposal: PROPOSAL, acceptedIds: ["c1"] });
-  const edges = await memory.edgesAt("n.h", AT);
+  const edges = await memory.edgesAt("n.h", AT, "user-1");
   expect(edges.ok && edges.value.map((e) => e.dst)).toEqual(["2"]);
 });
 

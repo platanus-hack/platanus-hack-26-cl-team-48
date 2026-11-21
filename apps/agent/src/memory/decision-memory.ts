@@ -42,15 +42,17 @@ function decisionEpisode(record: DecisionRecord) {
 async function applyEdgeChange(
   memory: MemoryPort,
   change: ProposalChange,
-  at: string,
+  scope: { readonly at: string; readonly actorId: string },
 ): Promise<Outcome> {
-  const current = await memory.edgesAt(change.target, at);
+  const { at, actorId } = scope;
+  const current = await memory.edgesAt(change.target, at, actorId);
   if (!current.ok) return current;
   const next = changeRelation(current.value, {
     src: change.target,
     relation: VALUE_RELATION,
     newDst: asValue(change.after),
     at,
+    actorId,
   });
   return persistChange(memory, current.value, next);
 }
@@ -74,6 +76,7 @@ async function persistChange(
     dst: opened.dst,
     relation: opened.relation,
     at: opened.validFrom,
+    actorId: opened.actorId,
   });
   return result.ok ? ok(undefined) : result;
 }
@@ -85,7 +88,10 @@ export async function rememberDecision(
   const recorded = await memory.recordEpisode(decisionEpisode(record));
   if (!recorded.ok) return recorded;
   for (const change of acceptedParams(record)) {
-    const applied = await applyEdgeChange(memory, change, record.at);
+    const applied = await applyEdgeChange(memory, change, {
+      at: record.at,
+      actorId: record.actorId,
+    });
     if (!applied.ok) return applied;
   }
   return ok(undefined);

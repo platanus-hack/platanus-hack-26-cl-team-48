@@ -14,6 +14,7 @@ const done = Promise.resolve(ok(undefined));
 
 const toEdge = (edge: NewEdge, id: string): Edge => ({
   id,
+  actorId: edge.actorId,
   src: edge.src,
   dst: edge.dst,
   relation: edge.relation,
@@ -46,8 +47,14 @@ function closeEdge(ref: StoreRef, id: string, at: string): ReturnType<MemoryPort
   return done;
 }
 
-function edgesAt(ref: StoreRef, entityId: string, at: string): ReturnType<MemoryPort["edgesAt"]> {
-  const touching = ref.current.edges.filter((e) => e.src === entityId || e.dst === entityId);
+function edgesAt(
+  ref: StoreRef,
+  query: { entityId: string; at: string; actorId: string },
+): ReturnType<MemoryPort["edgesAt"]> {
+  const { entityId, at, actorId } = query;
+  const touching = ref.current.edges.filter(
+    (e) => e.actorId === actorId && (e.src === entityId || e.dst === entityId),
+  );
   return Promise.resolve(ok(edgesValidAt(touching, at)));
 }
 
@@ -64,7 +71,7 @@ export function createFakeMemory(): MemoryPort {
     },
     openEdge: (edge) => openEdge(ref, edge),
     closeEdge: (id, at) => closeEdge(ref, id, at),
-    edgesAt: (entityId, at) => edgesAt(ref, entityId, at),
+    edgesAt: (entityId, at, actorId) => edgesAt(ref, { entityId, at, actorId }),
     episodesFor: (entityId) =>
       Promise.resolve(ok(ref.current.episodes.filter((e) => e.entityIds.includes(entityId)))),
   };

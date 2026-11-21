@@ -19,6 +19,9 @@ function summarize(outcome: Outcome): Record<string, unknown> {
   return { ok: false, code: outcome.error.code, message: outcome.error.message.slice(0, 200) };
 }
 
+const isUnauthorized = (outcome: Outcome): boolean =>
+  !outcome.ok && outcome.error.code === "UNAUTHORIZED";
+
 async function recordSafely(
   memory: MemoryPort,
   call: Parameters<typeof recordMcpCall>[1],
@@ -34,6 +37,7 @@ export function withMemory(mcp: McpPort, memory: MemoryPort, clock: () => string
   const dropped = { count: 0 };
   const call = async (name: string, args: unknown, identity: UserIdentity): Promise<Outcome> => {
     const outcome = await mcp.call(name, args, identity);
+    if (isUnauthorized(outcome)) return outcome;
     const stored = await recordSafely(memory, {
       actorId: identity.userId,
       tool: name,

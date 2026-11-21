@@ -43,10 +43,16 @@ const decide = (memory: ReturnType<typeof createFakeMemory>, acceptedIds: string
 describe("rememberDecision", () => {
   it("accepted set_param opens new edge and closes old one", async () => {
     const memory = createFakeMemory();
-    await memory.openEdge({ src: "node-a.hours", dst: "4", relation: "has_value", at: T1 });
+    await memory.openEdge({
+      src: "node-a.hours",
+      dst: "4",
+      relation: "has_value",
+      at: T1,
+      actorId: "user-1",
+    });
     expect(await decide(memory, ["c1"], T2)).toEqual({ ok: true, value: undefined });
-    const before = await memory.edgesAt("node-a.hours", T1);
-    const after = await memory.edgesAt("node-a.hours", T3);
+    const before = await memory.edgesAt("node-a.hours", T1, "user-1");
+    const after = await memory.edgesAt("node-a.hours", T3, "user-1");
     expect(before.ok && before.value.map((e) => e.dst)).toEqual(["4"]);
     expect(after.ok && after.value.map((e) => e.dst)).toEqual(["2"]);
   });
@@ -54,18 +60,40 @@ describe("rememberDecision", () => {
   it("opens the first value when the param had none, ignoring non set_param changes", async () => {
     const memory = createFakeMemory();
     await decide(memory, ["c1", "c3"], T2);
-    const edges = await memory.edgesAt("node-a.hours", T3);
+    const edges = await memory.edgesAt("node-a.hours", T3, "user-1");
     expect(edges.ok && edges.value).toHaveLength(1);
-    const added = await memory.edgesAt("node-c", T3);
+    const added = await memory.edgesAt("node-c", T3, "user-1");
     expect(added.ok && added.value).toHaveLength(0);
   });
 
   it("rejected changes leave the graph untouched", async () => {
     const memory = createFakeMemory();
-    await memory.openEdge({ src: "node-a.hours", dst: "4", relation: "has_value", at: T1 });
+    await memory.openEdge({
+      src: "node-a.hours",
+      dst: "4",
+      relation: "has_value",
+      at: T1,
+      actorId: "user-1",
+    });
     await decide(memory, ["c2"], T2);
-    const kept = await memory.edgesAt("node-a.hours", T3);
+    const kept = await memory.edgesAt("node-a.hours", T3, "user-1");
     expect(kept.ok && kept.value.map((e) => [e.dst, e.validTo])).toEqual([["4", null]]);
+  });
+
+  it("a decision never closes or reads another actor's edges", async () => {
+    const memory = createFakeMemory();
+    await memory.openEdge({
+      src: "node-a.hours",
+      dst: "9",
+      relation: "has_value",
+      at: T1,
+      actorId: "user-2",
+    });
+    await decide(memory, ["c1"], T2);
+    const other = await memory.edgesAt("node-a.hours", T3, "user-2");
+    const own = await memory.edgesAt("node-a.hours", T3, "user-1");
+    expect(other.ok && other.value.map((e) => [e.dst, e.validTo])).toEqual([["9", null]]);
+    expect(own.ok && own.value.map((e) => e.dst)).toEqual(["2"]);
   });
 
   it("records one proposal_decision episode with accepted and rejected ids", async () => {
