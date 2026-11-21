@@ -1,5 +1,7 @@
 import { createIdbFlowLibrary } from "./library/idb-flow-library.ts";
 import { startFlowSaving } from "./library/flow-saving.ts";
+import { createCloudFlowLibrary } from "./library/cloud-flow-library.ts";
+import { followFlowSession } from "./library/follow-flow-session.ts";
 import "@nodomics/ui/tokens.css";
 import "@nodomics/ui/fonts.css";
 import "@nodomics/ui/components.css";
@@ -32,10 +34,11 @@ import { followStoredTheme } from "./theme/theme-sync.ts";
 
 // Composition root: the one place that reads the URL, creates the stores and picks the engines.
 const shared = decodeSharedFlow(window.location.hash);
+const hub = createAppHub(import.meta.env);
 const stores = createAppStores(
   shared?.ok === true ? shared.value : undefined,
   createStoragePersonalLibrary(() => window.localStorage),
-  createIdbFlowLibrary(() => window.indexedDB),
+  createCloudFlowLibrary({ flows: hub, local: createIdbFlowLibrary(() => window.indexedDB) }),
 );
 if (shared?.ok === false)
   stores.noticeStore.getState().show({
@@ -55,8 +58,9 @@ window.addEventListener("storage", (event) => {
 if (!isHubTab) await startEditorFlow();
 
 async function startEditorFlow() {
+  const profile = await hub.currentProfile();
   await stores.savedFlowStore.getState().initialize(shared !== undefined);
-  startFlowSaving({
+  const saving = startFlowSaving({
     stores,
     timers: {
       set: (callback, delay) => window.setTimeout(callback, delay),
@@ -67,9 +71,8 @@ async function startEditorFlow() {
     createId: () => `flow_${crypto.randomUUID()}`,
     now: Date.now,
   });
+  followFlowSession({ hub, stores, saving, initialProfileId: profile?.id });
 }
-
-const hub = createAppHub(import.meta.env);
 
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.

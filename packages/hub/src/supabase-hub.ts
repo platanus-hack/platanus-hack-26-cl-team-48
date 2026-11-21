@@ -1,8 +1,7 @@
 import { err, ok } from "@nodomics/protocol";
-import { createClient, type PostgrestError } from "@supabase/supabase-js";
+import type { PostgrestError } from "@supabase/supabase-js";
 import type {
   Hub,
-  HubError,
   HubProfile,
   HubResult,
   PublicationDetail,
@@ -14,22 +13,17 @@ import type {
 import { toProfile, toSummaries, toVersion, toVersionSummaries } from "./hub-rows.ts";
 import { parseSnapshot, type Snapshot } from "./snapshot.ts";
 import type { FlowStore } from "./flow-store.ts";
+import { createHubClient, fromPostgrest, type HubClient } from "./supabase-client.ts";
 import { createSupabaseFlowStore } from "./supabase-flow-store.ts";
 import { isNewerVersion } from "./versions.ts";
 
-/** Untyped on purpose: every row is parsed at the boundary (hub-rows.ts). */
-export const createHubClient = (url: string, publishableKey: string) =>
-  createClient(url, publishableKey);
-export type HubClient = ReturnType<typeof createHubClient>;
+export { createHubClient, type HubClient } from "./supabase-client.ts";
 
 const PUBLICATIONS_VIEW = "hub_publications";
 const SNAPSHOT_BUCKET = "snapshots";
 /** The bucket's own limit (migration 20261121120000); checked first to give a clear error. */
 const MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 60;
-// Postgres error codes the hub's rules raise (see supabase/migrations).
-const CHECK_VIOLATION = "23514";
-const INSUFFICIENT_PRIVILEGE = "42501";
 
 export type SupabaseHubOptions = {
   readonly url: string;
@@ -266,15 +260,4 @@ function summaries({ data, error }: Rows): HubResult<ReadonlyArray<PublicationSu
 function firstSummary(rows: Rows): HubResult<PublicationSummary | undefined> {
   const found = summaries(rows);
   return found.ok ? ok(found.value[0]) : found;
-}
-
-export function fromPostgrest(error: PostgrestError): HubError {
-  switch (error.code) {
-    case CHECK_VIOLATION:
-      return { kind: "stale-version", detail: error.message };
-    case INSUFFICIENT_PRIVILEGE:
-      return { kind: "signed-out", detail: error.message };
-    default:
-      return { kind: "unavailable", detail: error.message };
-  }
 }

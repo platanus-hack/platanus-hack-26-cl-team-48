@@ -9,9 +9,10 @@ const STATUS_MESSAGES: Record<SavedFlowStatus, string> = {
   saving: MESSAGES.savedFlows.saving,
   saved: MESSAGES.savedFlows.saved,
   unavailable: MESSAGES.savedFlows.unsaved,
+  "signed-out": MESSAGES.savedFlows.signedOut,
 };
 
-/** The open flow's name, renamed in place, and whether this browser has saved it. */
+/** The open flow's name, renamed in place, and whether the account has saved it. */
 export function FlowName() {
   const { savedFlowStore } = useAppStores();
   const name = useFlowState((state) => state.flow.name);

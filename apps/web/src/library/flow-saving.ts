@@ -4,7 +4,8 @@ import { createFlowSync, type Timers } from "../engine/flow-sync.ts";
 import { MESSAGES } from "../messages.ts";
 import { nodeFromFlow } from "./flow-node.ts";
 import { nextNodeVersion } from "./node-version.ts";
-import type { SavedFlow } from "./flow-library.ts";
+import type { LibraryIssue, SavedFlow } from "./flow-library.ts";
+import { isBlockedStatus, type SavedFlowStatus } from "./saved-flow-store.ts";
 
 export const AUTO_SAVE_DELAY_MS = 1000;
 type SavingDeps = {
@@ -25,6 +26,12 @@ export function startFlowSaving(deps: SavingDeps) {
   });
   return {
     flush: sync.flush,
+    saveCurrent: async () => {
+      const { state } = deps.stores.flowStore.getState();
+      if (state.flow.nodes.length === 0) return;
+      sync.schedule(state.rev, state.flow);
+      await sync.flush();
+    },
     close: () => {
       unsubscribe();
       deps.stores.savedFlowStore.setState({ flushPending: () => Promise.resolve() });
@@ -54,13 +61,18 @@ async function saveFlow(deps: SavingDeps, flow: Flow) {
   store.setState({ currentId: id });
   const previous = report(await library.readFlow(id));
   const node = savedNode({ id, flow, previous: previous?.node }, savingCatalog(deps.stores, flow));
-  const result = await library.saveFlow(
-    savedFlowRecord({ id, flow, files, node, updatedAt: deps.now() }),
-  );
+  const result = await library.saveFlow({
+    ...savedFlowRecord({ id, flow, files, node, updatedAt: deps.now() }),
+    ...(previous?.visibility === undefined ? {} : { visibility: previous.visibility }),
+  });
   report(result);
   if (store.getState().generation !== generation) return;
-  store.setState({ status: result.issue === "unavailable" ? "unavailable" : "saved" });
+  store.setState({ status: savedStatus(result.issue) });
   await store.getState().refresh();
+}
+
+function savedStatus(issue: LibraryIssue | undefined): SavedFlowStatus {
+  return issue === "unavailable" || issue === "signed-out" ? issue : "saved";
 }
 
 function savedFlowRecord({
@@ -123,6 +135,6 @@ function subscribeSaving(stores: AppStores, sync: FlowSync) {
 }
 
 function markPending(stores: AppStores, flow: Flow) {
-  if (stores.savedFlowStore.getState().status !== "unavailable")
+  if (!isBlockedStatus(stores.savedFlowStore.getState().status))
     stores.savedFlowStore.setState({ status: flow.nodes.length === 0 ? "unsaved" : "saving" });
 }

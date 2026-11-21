@@ -3,7 +3,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import type { FlowStore, StoredFlow } from "./flow-store.ts";
 import type { HubError, HubResult } from "./hub.ts";
 import { toStoredFlow } from "./hub-rows.ts";
-import { fromPostgrest, type HubClient } from "./supabase-hub.ts";
+import { fromPostgrest, type HubClient } from "./supabase-client.ts";
 
 const FLOWS_TABLE = "flows";
 // Row level security refuses an upsert over someone else's flow with this code.

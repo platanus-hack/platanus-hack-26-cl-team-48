@@ -1,3 +1,4 @@
+import type { FlowVisibility } from "@nodomics/hub";
 import type { Flow, NodeManifest } from "@nodomics/protocol";
 
 export type SavedFlow = {
@@ -6,6 +7,8 @@ export type SavedFlow = {
   readonly flow: Flow;
   readonly files: Readonly<Record<string, string>>;
   readonly updatedAt: number;
+  /** Missing means private (ADR 0023). */
+  readonly visibility?: FlowVisibility;
   readonly node?: {
     readonly version: string;
     readonly fingerprint: string;
@@ -20,7 +23,8 @@ export type StoredFile = {
   readonly bytes?: Uint8Array;
   readonly handle?: FileSystemFileHandle;
 };
-export type LibraryResult<T> = { readonly value: T; readonly issue?: "invalid" | "unavailable" };
+export type LibraryIssue = "invalid" | "unavailable" | "signed-out";
+export type LibraryResult<T> = { readonly value: T; readonly issue?: LibraryIssue };
 export type Secret = { readonly name: string; readonly value: string };
 export interface SecretStore {
   listSecretNames(): Promise<LibraryResult<ReadonlyArray<string>>>;

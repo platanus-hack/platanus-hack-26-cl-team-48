@@ -1,3 +1,4 @@
+import type { FlowVisibility } from "@nodomics/hub";
 import { FLOW_FORMAT, type Flow } from "@nodomics/protocol";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { Command } from "../flow/flow-commands.ts";
@@ -6,7 +7,10 @@ import { duplicateSavedFlow } from "./duplicate-saved-flow.ts";
 import { MESSAGES } from "../messages.ts";
 import type { FlowLibrary, LibraryResult, SavedFlow, StoredFile } from "./flow-library.ts";
 
-export type SavedFlowStatus = "unsaved" | "saving" | "saved" | "unavailable";
+export type SavedFlowStatus = "unsaved" | "saving" | "saved" | "unavailable" | "signed-out";
+/** States an edit or a new flow does not clear: saving cannot work until they change. */
+export const isBlockedStatus = (status: SavedFlowStatus) =>
+  status === "unavailable" || status === "signed-out";
 export type SavedFlowState = {
   readonly currentId: string | undefined;
   readonly status: SavedFlowStatus;
@@ -32,6 +36,7 @@ export type SavedFlowState = {
   readonly duplicate: (id: string) => Promise<void>;
   readonly rename: (id: string, name: string) => Promise<void>;
   readonly remove: (id: string) => Promise<void>;
+  readonly setVisibility: (id: string, visibility: FlowVisibility) => Promise<void>;
   readonly removeFile: (key: string) => Promise<void>;
 };
 
@@ -77,7 +82,10 @@ function initialSavedFlowState(): Omit<
 function createReport({ deps, set }: Context): SavedFlowState["report"] {
   const reported = new Set<string>();
   return (result) => {
-    if (result.issue === "unavailable") set({ status: "unavailable" });
+    if (result.issue === "unavailable" || result.issue === "signed-out")
+      set({ status: result.issue });
+    // Signed out is shown in the toolbar and in Mis flujos, not as a notice.
+    if (result.issue === "signed-out") return result.value;
     if (result.issue !== undefined && !reported.has(result.issue)) {
       reported.add(result.issue);
       deps.show({ tone: "warn", title: MESSAGES.savedFlows[result.issue] });
@@ -100,15 +108,18 @@ function savedFlowActions(context: Context) {
     duplicate: createDuplicate(context),
     rename: createRename(context),
     remove: createRemove(context),
+    setVisibility: createSetVisibility(context),
     removeFile: createRemoveFile(context),
   };
 }
 
 function createRefresh({ deps, set, get }: Context): SavedFlowState["refresh"] {
   return async () => {
-    const flows = get().report(await deps.library.listFlows());
+    const listed = await deps.library.listFlows();
+    const flows = get().report(listed);
     const storedFiles = get().report(await deps.library.listFiles());
     set({ flows, storedFiles });
+    if (listed.issue !== "signed-out" && get().status === "signed-out") set({ status: "unsaved" });
   };
 }
 
@@ -134,7 +145,7 @@ function createOpenFlow({ deps, set, get }: Context): SavedFlowState["openFlow"]
       sessionSources: matchingSessionSources(saved.files, get().sessionFiles),
     });
     deps.dispatch({ type: "flow.load", flow: saved.flow });
-    set({ isOpening: false, status: get().status === "unavailable" ? "unavailable" : "saved" });
+    set({ isOpening: false, status: isBlockedStatus(get().status) ? get().status : "saved" });
   };
 }
 
@@ -153,7 +164,7 @@ function createResetForLoad({ set, get }: Context): SavedFlowState["resetForLoad
       files: {},
       sessionSources: new Set(),
       generation: get().generation + 1,
-      status: get().status === "unavailable" ? "unavailable" : "unsaved",
+      status: isBlockedStatus(get().status) ? get().status : "unsaved",
     });
   };
 }
@@ -223,6 +234,14 @@ function createRemove({ deps, get }: Context): SavedFlowState["remove"] {
     await get().flushPending();
     get().report(await deps.library.deleteFlow(id));
     if (get().currentId === id) get().resetForLoad();
+    await get().refresh();
+  };
+}
+
+function createSetVisibility({ deps, get }: Context): SavedFlowState["setVisibility"] {
+  return async (id, visibility) => {
+    const saved = get().report(await deps.library.readFlow(id));
+    if (saved !== undefined) get().report(await deps.library.saveFlow({ ...saved, visibility }));
     await get().refresh();
   };
 }
