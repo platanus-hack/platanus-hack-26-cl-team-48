@@ -25,7 +25,9 @@ export type McpError = {
 };
 
 export type McpPort = {
-  readonly listTools: () => Promise<Result<readonly ToolDescriptor[], McpError>>;
+  readonly listTools: (
+    identity?: UserIdentity,
+  ) => Promise<Result<readonly ToolDescriptor[], McpError>>;
   readonly call: (
     name: string,
     args: unknown,

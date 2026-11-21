@@ -39,6 +39,14 @@ it("fake mcp covers every capability in spec section 4", async () => {
   ).toBe(true);
 });
 
+it("accepts an optional identity on listTools without changing result", async () => {
+  const mcp = createFakeMcp();
+  const withIdentity = await mcp.listTools(IDENTITY);
+  const withoutIdentity = await mcp.listTools();
+
+  expect(withIdentity).toEqual(withoutIdentity);
+});
+
 const errorCode = (result: Result<unknown, McpError>): string | null =>
   result.ok ? null : result.error.code;
 
