@@ -1,11 +1,11 @@
 import type { Flow } from "@nodomics/protocol";
+import { useState } from "react";
 import { ICON_SIZE, Icon, Input } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { encodeSharedFlow } from "../flow/flow-file.ts";
 import { MESSAGES } from "../messages.ts";
 import { pathOf, type Route } from "../routing/routes.ts";
 import { navigate, useRoute } from "../routing/use-route.ts";
-import { useState } from "react";
 import { AccountButton } from "./AccountButton.tsx";
 import { HubPage } from "./HubPage.tsx";
 import { ProfilePage } from "./ProfilePage.tsx";
@@ -52,7 +52,7 @@ function HubBar({
         {MESSAGES.app.title}
         <span className="web-hub-bar-section">{MESSAGES.hub.title}</span>
       </p>
-      <div className="web-hub-bar-search">
+      <search className="web-hub-bar-search">
         <Input
           type="search"
           icon="search"
@@ -61,7 +61,7 @@ function HubBar({
           value={text}
           onChange={onSearch}
         />
-      </div>
+      </search>
       <div className="web-hub-bar-end">
         <a
           className="nd-btn nd-btn-secondary"

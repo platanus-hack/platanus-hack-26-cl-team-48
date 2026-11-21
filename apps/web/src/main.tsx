@@ -74,8 +74,9 @@ const hub = createAppHub(import.meta.env);
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.
 if (isHubTab) {
-  applyTheme(preferenceStorage.read().theme);
-  followStoredTheme(window, () => readPreferences(() => window.localStorage).theme, applyTheme);
+  const readTheme = () => readPreferences(() => window.localStorage).theme;
+  applyTheme(readTheme());
+  followStoredTheme(window, readTheme, applyTheme);
 }
 
 const [defaultEngine] = ENGINES;

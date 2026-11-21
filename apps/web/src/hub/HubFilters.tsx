@@ -51,9 +51,12 @@ function RadioList<T extends string>(props: {
   readonly onChange: (value: T) => void;
 }) {
   const name = useId();
+  const legend = useId();
   return (
-    <fieldset className="web-hub-filter" role="radiogroup" aria-label={props.label}>
-      <legend className="web-overline">{props.label}</legend>
+    <fieldset className="web-hub-filter" role="radiogroup" aria-labelledby={legend}>
+      <legend id={legend} className="web-overline">
+        {props.label}
+      </legend>
       {props.options.map((option) => (
         <label key={option.value} className="web-hub-filter-option">
           <input

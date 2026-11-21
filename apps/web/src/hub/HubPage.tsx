@@ -1,10 +1,18 @@
 import type { PublicationSummary } from "@nodomics/hub";
+import { ok } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
 import { useCallback, useId, useState } from "react";
 import { MESSAGES } from "../messages.ts";
 import { useHub, useHubProfile } from "./hub-context.ts";
 import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
-import { ALL_KINDS, matching, tagsOf, toggled, withTags, type KindFilter } from "./hub-filters.ts";
+import {
+  ALL_KINDS,
+  matching,
+  offeredTags,
+  toggled,
+  withTags,
+  type KindFilter,
+} from "./hub-filters.ts";
 import { PublicationList } from "./PublicationCard.tsx";
 import { useHubQuery, type HubQuery } from "./use-hub-query.ts";
 
@@ -22,22 +30,25 @@ const INITIAL_FILTERS: HubFilterState = {
 export function HubPage({ text }: { readonly text: string }) {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const listed = useListed(filters, text);
-  const change = (patch: Partial<HubFilterState>) => {
-    setFilters({ ...filters, ...patch });
+  const change = (patch: (current: HubFilterState) => Partial<HubFilterState>) => {
+    setFilters((current) => ({ ...current, ...patch(current) }));
   };
   return (
     <div className="web-hub-browse">
       <HubFilters
         filters={filters}
-        tags={listed !== SIGNED_OUT && listed.status === "ready" ? tagsOf(listed.value) : []}
+        tags={offeredTags(
+          listed !== SIGNED_OUT && listed.status === "ready" ? listed.value : [],
+          filters.pressedTags,
+        )}
         onView={(view) => {
-          change({ view });
+          change(() => ({ view }));
         }}
         onKind={(kind) => {
-          change({ kind });
+          change(() => ({ kind }));
         }}
         onTag={(tag) => {
-          change({ pressedTags: toggled(filters.pressedTags, tag) });
+          change((current) => ({ pressedTags: toggled(current.pressedTags, tag) }));
         }}
       />
       <main className="web-hub-page">
@@ -111,9 +122,15 @@ function ForYouMockup() {
 
 /** What the chosen view lists before the tags narrow it. */
 function useListed(filters: HubFilterState, text: string): Listed {
+  const handle = useHubProfile()?.handle;
+  const isMine = filters.view === "mine";
   const searched = useSearch(text, filters.kind);
-  const mine = useMine(text, filters.kind);
-  return filters.view === "mine" ? mine : searched;
+  const mine = useOwnPublications(isMine ? handle : undefined);
+  if (!isMine) return searched;
+  if (handle === undefined) return SIGNED_OUT;
+  return mine.status === "ready"
+    ? { status: "ready", value: matching(mine.value, { text, kind: filters.kind }) }
+    : mine;
 }
 
 function useSearch(text: string, kind: KindFilter) {
@@ -125,13 +142,12 @@ function useSearch(text: string, kind: KindFilter) {
   return useHubQuery(search, SEARCH_DELAY_MS);
 }
 
-function useMine(text: string, kind: KindFilter): Listed {
+/** Asks the hub only for someone's publications: none while signed out or in another view. */
+function useOwnPublications(handle: string | undefined) {
   const hub = useHub();
-  const handle = useHubProfile()?.handle;
-  const ask = useCallback(() => hub.publicationsOf(handle ?? ""), [hub, handle]);
-  const query = useHubQuery(ask);
-  if (handle === undefined) return SIGNED_OUT;
-  return query.status === "ready"
-    ? { status: "ready", value: matching(query.value, { text, kind }) }
-    : query;
+  const ask = useCallback(
+    () => (handle === undefined ? Promise.resolve(ok([])) : hub.publicationsOf(handle)),
+    [hub, handle],
+  );
+  return useHubQuery(ask);
 }

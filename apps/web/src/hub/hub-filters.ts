@@ -13,11 +13,23 @@ export const tagsOf = (publications: Publications): string[] =>
     a.localeCompare(b),
   );
 
+/** The tags to offer: those of the listed publications, plus the pressed ones so they can be lifted. */
+export const offeredTags = (publications: Publications, pressed: ReadonlySet<string>): string[] =>
+  tagsOf(publications)
+    .concat([...pressed])
+    .filter(isFirst)
+    .sort(byText);
+
+const isFirst = (tag: string, index: number, tags: ReadonlyArray<string>) =>
+  tags.indexOf(tag) === index;
+
+const byText = (a: string, b: string) => a.localeCompare(b);
+
 /** Keeps the publications that carry every pressed tag. */
 export const withTags = (publications: Publications, pressed: ReadonlySet<string>): Publications =>
   publications.filter((publication) => [...pressed].every((tag) => publication.tags.includes(tag)));
 
-/** The search the hub does on the server, done here over the user's own publications. */
+/** The hub's search (title, description, tags, owner), done here over the user's publications. */
 export const matching = (
   publications: Publications,
   { text, kind }: { readonly text: string; readonly kind: KindFilter },
@@ -28,11 +40,21 @@ export const matching = (
   );
 
 const containsText = (publication: PublicationSummary, text: string) => {
-  const needle = text.trim().toLocaleLowerCase();
-  return [publication.title, publication.description].some((field) =>
-    field.toLocaleLowerCase().includes(needle),
-  );
+  const needle = normalize(text.trim());
+  return [
+    publication.title,
+    publication.description,
+    ...publication.tags,
+    publication.owner.handle,
+  ].some((field) => normalize(field).includes(needle));
 };
+
+// The same folding as the hub's own search, so "region" finds "región".
+const normalize = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 
 /** Pressing a tag again lifts its filter. */
 export const toggled = (pressed: ReadonlySet<string>, tag: string): ReadonlySet<string> => {
