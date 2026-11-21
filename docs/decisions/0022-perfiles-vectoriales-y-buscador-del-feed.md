@@ -74,8 +74,12 @@ Una sola escala pondría "a la mitad" a quien es experto en teoría y principian
 Se reutiliza el servicio de Gabriel (ADR 0019): ya guarda la clave de Voyage y tiene el puerto `EmbeddingsPort`. Así no hacen falta Edge Functions ni copias de las claves. Se agregan tres rutas HTTP, autenticadas con el JWT de Supabase del usuario (ADR 0021):
 
 - `POST /feed/profile`: recibe la ficha, la parsea, la guarda y la vectoriza.
-- `POST /feed/search`: búsqueda libre.
-- `GET /feed/matches`: los complementos del usuario.
+- `GET /feed/search?q=&k=`: búsqueda libre. Es `GET` porque no cambia nada y se puede repetir y cachear.
+- `GET /feed/matches?k=`: los complementos del usuario.
+- `GET /feed/cards/:handle`: la ficha de un perfil.
+- `POST /feed/registration`: el agente de registro (§6). Devuelve una ficha propuesta y no guarda nada.
+
+Las rutas y el formato de sus respuestas están en `packages/profile/src/feed-contract.ts`, que comparten la web y el servicio.
 
 Quién escribe esas rutas (Gabriel, o Cantú en un módulo `feed/` dentro de `apps/agent`) se acuerda con Gabriel.
 
