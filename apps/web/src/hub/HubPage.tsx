@@ -6,7 +6,7 @@ import { PeopleSection } from "../feed/PeopleSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
 import { PublicationList } from "./PublicationCard.tsx";
-import { useHubQuery } from "./use-hub-query.ts";
+import { useQuery } from "../async/use-query.ts";
 
 const SEARCH_DELAY_MS = 200;
 const ALL = "all";
@@ -81,5 +81,5 @@ function useSearch(text: string, kind: KindFilter) {
     () => hub.search({ text: text.trim(), ...(kind === ALL ? {} : { kind }) }),
     [hub, text, kind],
   );
-  return useHubQuery(search, SEARCH_DELAY_MS);
+  return useQuery(search, SEARCH_DELAY_MS);
 }

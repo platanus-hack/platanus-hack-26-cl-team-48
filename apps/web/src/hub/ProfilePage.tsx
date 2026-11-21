@@ -1,4 +1,4 @@
-import type { HubProfile, PublicationSummary } from "@nodomics/hub";
+import type { HubProfile } from "@nodomics/hub";
 import { ok } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
 import { useCallback } from "react";
@@ -7,12 +7,7 @@ import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
 import { Avatar } from "./Avatar.tsx";
 import { EmptyState, PublicationList } from "./PublicationCard.tsx";
-import { useHubQuery } from "./use-hub-query.ts";
-
-type ProfileWithPublications = {
-  readonly profile: HubProfile | undefined;
-  readonly publications: ReadonlyArray<PublicationSummary>;
-};
+import { useQuery } from "../async/use-query.ts";
 
 /** A person and what they published (ADR 0018, `/u/<handle>`). */
 export function ProfilePage({ handle }: { readonly handle: string }) {
@@ -73,5 +68,5 @@ function useProfile(handle: string) {
     if (!publications.ok) return publications;
     return ok({ profile: profile.value, publications: publications.value });
   }, [hub, handle]);
-  return useHubQuery<ProfileWithPublications>(ask);
+  return useQuery(ask);
 }

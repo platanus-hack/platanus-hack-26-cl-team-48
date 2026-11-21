@@ -3,7 +3,7 @@ import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
 import { useOptionalFeed } from "./feed-context.ts";
 import type { FeedService } from "./feed-service.ts";
-import { useFeedQuery } from "./use-feed-query.ts";
+import { useQuery } from "../async/use-query.ts";
 
 const SEARCH_DELAY_MS = 200;
 
@@ -18,7 +18,7 @@ export function PeopleSection({ text }: { readonly text: string }) {
 function PeopleResults({ feed, query }: { readonly feed: FeedService; readonly query: string }) {
   const heading = useId();
   const search = useCallback(() => feed.search(query), [feed, query]);
-  const people = useFeedQuery(search, SEARCH_DELAY_MS);
+  const people = useQuery(search, SEARCH_DELAY_MS);
   if (people.status !== "ready") return null;
   const profiles = people.value.filter((hit) => hit.kind === "profile");
   if (profiles.length === 0) return null;

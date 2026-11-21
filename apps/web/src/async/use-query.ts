@@ -1,17 +1,17 @@
+import type { Result } from "@nodomics/protocol";
 import { useEffect, useState } from "react";
-import type { FeedError, FeedResult } from "./feed-service.ts";
 
-export type FeedQuery<T> =
+export type Query<T, E> =
   | { readonly status: "loading" }
-  | { readonly status: "failed"; readonly error: FeedError }
+  | { readonly status: "failed"; readonly error: E }
   | { readonly status: "ready"; readonly value: T };
 
 /**
- * The answer of a Feed read, asked again whenever `ask` changes (memoize it with `useCallback`);
+ * The answer of an async read, asked again whenever `ask` changes (memoize it with `useCallback`);
  * answers that arrive after a newer question are dropped.
  */
-export function useFeedQuery<T>(ask: () => Promise<FeedResult<T>>, delay = 0): FeedQuery<T> {
-  const [query, setQuery] = useState<FeedQuery<T>>({ status: "loading" });
+export function useQuery<T, E>(ask: () => Promise<Result<T, E>>, delay = 0): Query<T, E> {
+  const [query, setQuery] = useState<Query<T, E>>({ status: "loading" });
   useEffect(() => {
     let isCurrent = true;
     const timer = setTimeout(() => {
@@ -27,5 +27,5 @@ export function useFeedQuery<T>(ask: () => Promise<FeedResult<T>>, delay = 0): F
   return query;
 }
 
-const toQuery = <T>(result: FeedResult<T>): FeedQuery<T> =>
+const toQuery = <T, E>(result: Result<T, E>): Query<T, E> =>
   result.ok ? { status: "ready", value: result.value } : { status: "failed", error: result.error };

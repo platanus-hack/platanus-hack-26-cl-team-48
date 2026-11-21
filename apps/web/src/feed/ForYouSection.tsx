@@ -7,7 +7,7 @@ import { RouteLink } from "../routing/RouteLink.tsx";
 import { useOptionalFeed } from "./feed-context.ts";
 import type { FeedError, FeedService } from "./feed-service.ts";
 import { HitSummary } from "./HitSummary.tsx";
-import { useFeedQuery } from "./use-feed-query.ts";
+import { useQuery } from "../async/use-query.ts";
 
 /** The people, nodes and flows that complement the signed-in person (ADR 0022 §3). */
 export function ForYouSection() {
@@ -28,7 +28,7 @@ function ForYouBody({ feed }: { readonly feed: FeedService }) {
 }
 
 function Matches({ feed, handle }: { readonly feed: FeedService; readonly handle: string }) {
-  const matches = useFeedQuery(feed.matches);
+  const matches = useQuery(feed.matches);
   switch (matches.status) {
     case "loading":
       return <p className="web-hub-muted">{MESSAGES.feed.loading}</p>;

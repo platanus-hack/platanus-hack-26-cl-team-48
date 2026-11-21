@@ -7,7 +7,7 @@ import { useOptionalFeed } from "./feed-context.ts";
 import type { FeedService } from "./feed-service.ts";
 import { ProfileCardEditor } from "./ProfileCardEditor.tsx";
 import { ProfileCardView } from "./ProfileCardView.tsx";
-import { useFeedQuery } from "./use-feed-query.ts";
+import { useQuery } from "../async/use-query.ts";
 
 /** The collaboration card of a person (ADR 0022 §1), editable by its owner. */
 export function ProfileCardSection({ handle }: { readonly handle: string }) {
@@ -23,7 +23,7 @@ export function ProfileCardSection({ handle }: { readonly handle: string }) {
 }
 
 function CardBody({ feed, handle }: { readonly feed: FeedService; readonly handle: string }) {
-  const loaded = useFeedQuery(useCallback(() => feed.card(handle), [feed, handle]));
+  const loaded = useQuery(useCallback(() => feed.card(handle), [feed, handle]));
   const [saved, setSaved] = useState<ProfileCard | undefined>(undefined);
   const [isEditing, setEditing] = useState(false);
   const isOwner = useHubProfile()?.handle === handle;
