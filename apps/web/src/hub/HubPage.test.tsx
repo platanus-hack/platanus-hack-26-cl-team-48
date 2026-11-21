@@ -101,6 +101,36 @@ async function chooseExplore(name: string) {
   await userEvent.click(exploreOption(name));
 }
 
+/** Ventas (comercial) by Ana as a flow and Limpiar (no tags) by Ana as a node. */
+async function createHubWithUntaggedNode(): Promise<Hub> {
+  const hub = createTestHub();
+  await publishAs(hub, ANA.handle, [
+    draftOf({ tags: ["comercial"] }),
+    draftOf({
+      slug: "limpiar",
+      kind: "node",
+      title: "Limpiar texto",
+      description: "Quita espacios y acentos",
+      tags: [],
+      manifest: CLEAN_NODE_MANIFEST,
+    }),
+  ]);
+  return hub;
+}
+
+/** Wraps the hub so that every handle asked to publicationsOf is recorded. */
+function spyingOnPublicationsOf(hub: Hub) {
+  const handles: string[] = [];
+  const spied: Hub = {
+    ...hub,
+    publicationsOf: (handle) => {
+      handles.push(handle);
+      return hub.publicationsOf(handle);
+    },
+  };
+  return { hub: spied, handles };
+}
+
 afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
@@ -429,6 +459,37 @@ describe("HubPage Mis publicaciones view", () => {
     });
   });
 
+  it("keeps only the user's publications with a tag that matches the text", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), ANA.handle), "comercial");
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Ventas por región"]);
+    });
+  });
+
+  it("matches the user's publications regardless of accents in the text", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), ANA.handle), "region");
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Ventas por región"]);
+    });
+  });
+
+  it("does not ask the hub for the user's publications while signed out", async () => {
+    const { hub, handles } = spyingOnPublicationsOf(await createSeededHub());
+    renderHubPage(hub);
+    await cardTitled("Clima diario");
+
+    await chooseExplore("Mis publicaciones");
+    await screen.findByText("Entra para ver tus publicaciones.");
+
+    expect(handles).toEqual([]);
+  });
+
   it("asks to sign in when signed out", async () => {
     renderHubPage(await createSeededHub());
 
@@ -522,6 +583,76 @@ describe("HubPage Etiquetas filter", () => {
     await waitFor(() => {
       expect(tagNames()).toEqual(["texto"]);
     });
+  });
+
+  it("keeps offering a pressed tag after the kind changes so that it can be unpressed", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+
+    await userEvent.click(kindChip("Nodos"));
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["comercial", "texto"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("lifts a pressed tag's filter when it is pressed again after the kind changes", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+    await userEvent.click(kindChip("Nodos"));
+    await waitFor(() => {
+      expect(cardTitles()).toEqual([]);
+    });
+
+    await userEvent.click(tagButton("comercial"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("keeps offering a pressed tag after the text changes", async () => {
+    const { showText } = renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+
+    showText("clima");
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["clima", "comercial", "mensual"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps offering a pressed tag after the Explorar view changes", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), "beto"));
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["clima", "comercial", "mensual"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("shows the Etiquetas group with the pressed tag when no listed publication has tags", async () => {
+    renderHubPage(await createHubWithUntaggedNode());
+    await cardTitled("Ventas por región");
+    await userEvent.click(tagButton("comercial"));
+
+    await userEvent.click(kindChip("Nodos"));
+    await waitFor(() => {
+      expect(cardTitles()).toEqual([]);
+    });
+
+    expect(tagNames()).toEqual(["comercial"]);
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
   });
 
   it("hides the Etiquetas group when no publication has tags", async () => {
