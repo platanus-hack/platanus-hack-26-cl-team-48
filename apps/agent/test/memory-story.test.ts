@@ -125,6 +125,7 @@ describe("explainWhy", () => {
       dst: "node-2",
       relation: "feeds",
       at: "2026-11-20T09:00:00Z",
+      actorId: ACTOR,
     });
     const { llm, requests } = llmReplying("Se creó [e1].");
 
@@ -152,5 +153,30 @@ describe("explainWhy", () => {
       ok: false,
       error: { code: "MEMORY_FAILED" },
     });
+  });
+
+  it("story never includes another actor's edges", async () => {
+    const memory = await memoryWith([episode("e1", "2026-11-20T10:00:00Z")]);
+    await memory.openEdge({
+      src: COMPONENT,
+      dst: "mine-dst",
+      relation: "uses",
+      at: "2026-11-20T09:00:00Z",
+      actorId: ACTOR,
+    });
+    await memory.openEdge({
+      src: COMPONENT,
+      dst: "secret-dst",
+      relation: "uses",
+      at: "2026-11-20T09:00:00Z",
+      actorId: "u2",
+    });
+    const { llm, requests } = llmReplying("Se creo [e1].");
+
+    await ask(memory, llm);
+
+    const prompt = JSON.stringify(requests[0]?.messages);
+    expect(prompt).toContain("mine-dst");
+    expect(prompt).not.toContain("secret-dst");
   });
 });

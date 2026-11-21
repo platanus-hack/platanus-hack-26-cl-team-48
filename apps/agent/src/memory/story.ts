@@ -36,7 +36,11 @@ async function loadHistory(
 ): Promise<Result<History, StoryError>> {
   const episodes = await deps.memory.episodesFor(query.componentId);
   if (!episodes.ok) return err({ code: "MEMORY_FAILED", message: episodes.error.message });
-  const edges = await deps.memory.edgesAt(query.componentId, (deps.now ?? defaultNow)());
+  const edges = await deps.memory.edgesAt(
+    query.componentId,
+    (deps.now ?? defaultNow)(),
+    query.actorId,
+  );
   if (!edges.ok) return err({ code: "MEMORY_FAILED", message: edges.error.message });
   const own = episodes.value.filter((episode) => episode.actorId === query.actorId);
   return ok({ episodes: [...own].sort(byTime), edges: edges.value });

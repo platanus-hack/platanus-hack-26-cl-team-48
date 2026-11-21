@@ -7,6 +7,7 @@ import { edgesValidAt } from "./temporal-graph.ts";
 
 const EdgeRow = Type.Object({
   id: Type.String(),
+  actor_id: Type.String(),
   src: Type.String(),
   dst: Type.String(),
   relation: Type.String(),
@@ -52,6 +53,7 @@ function parseRows<S extends TSchema>(schema: S, rows: unknown): Outcome<readonl
 
 const toEdge = (row: Static<typeof EdgeRow>): Edge => ({
   id: row.id,
+  actorId: row.actor_id,
   src: row.src,
   dst: row.dst,
   relation: row.relation,
@@ -73,27 +75,37 @@ async function write(query: PromiseLike<Reply>): Promise<Outcome<void>> {
   return error ? storeFailed(error.message) : ok(undefined);
 }
 
-async function readEdges(client: SupabaseClient, column: "src" | "dst", id: string) {
-  const { data, error } = await client.from("agent_edges").select("*").eq(column, id);
+type EdgeScope = { readonly entityId: string; readonly actorId: string };
+
+async function readEdges(client: SupabaseClient, column: "src" | "dst", scope: EdgeScope) {
+  const query = client.from("agent_edges").select("*").eq(column, scope.entityId);
+  const { data, error } = await query.eq("actor_id", scope.actorId);
   return error ? storeFailed(error.message) : parseRows(EdgeRow, data);
 }
 
 async function edgesTouching(
   client: SupabaseClient,
-  entityId: string,
+  scope: EdgeScope,
 ): Promise<Outcome<readonly Edge[]>> {
   const [asSrc, asDst] = await Promise.all([
-    readEdges(client, "src", entityId),
-    readEdges(client, "dst", entityId),
+    readEdges(client, "src", scope),
+    readEdges(client, "dst", scope),
   ]);
   if (!asSrc.ok) return asSrc;
   if (!asDst.ok) return asDst;
-  const byId = new Map([...asSrc.value, ...asDst.value].map((row) => [row.id, toEdge(row)]));
+  const own = [...asSrc.value, ...asDst.value].filter((row) => row.actor_id === scope.actorId);
+  const byId = new Map(own.map((row) => [row.id, toEdge(row)]));
   return ok([...byId.values()]);
 }
 
 async function openEdge(client: SupabaseClient, edge: Parameters<MemoryPort["openEdge"]>[0]) {
-  const row = { src: edge.src, dst: edge.dst, relation: edge.relation, valid_from: edge.at };
+  const row = {
+    src: edge.src,
+    dst: edge.dst,
+    relation: edge.relation,
+    valid_from: edge.at,
+    actor_id: edge.actorId,
+  };
   const { data, error }: Reply = await client.from("agent_edges").insert(row).select().single();
   if (error) return storeFailed(error.message);
   const parsed = parseRow(EdgeRow, data);
@@ -137,8 +149,8 @@ export function createSupabaseMemory(client: SupabaseClient): MemoryPort {
       write(client.from("agent_entities").upsert(entity, { onConflict: "actor_id,id" })),
     openEdge: (edge) => openEdge(client, edge),
     closeEdge: (id, at) => closeEdge(client, id, at),
-    edgesAt: async (entityId, at) => {
-      const touching = await edgesTouching(client, entityId);
+    edgesAt: async (entityId, at, actorId) => {
+      const touching = await edgesTouching(client, { entityId, actorId });
       return touching.ok ? ok(edgesValidAt(touching.value, at)) : touching;
     },
     episodesFor: (entityId) => episodesFor(client, entityId),
