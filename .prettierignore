@@ -5,3 +5,6 @@ packages/ui/src/tokens.css
 packages/ui/src/components.css
 *.md
 .claude/
+
+# Hackathon metadata keeps the organizers' format
+platanus-hack-project.jsonc
