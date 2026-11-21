@@ -94,26 +94,20 @@ afterEach(() => {
 });
 
 describe("HubLayer chrome", () => {
-  it("links back to the editor", async () => {
+  it("has no link back to the editor of its own", async () => {
     await renderLayer({ page: "hub" });
 
-    const link = await screen.findByRole("link", { name: "Volver al editor" });
+    await screen.findByRole("heading", { level: 1, name: "Hub" });
 
-    expect(link.getAttribute("href")).toBe("/");
+    expect(screen.queryByRole("link", { name: "Volver al editor" })).toBeNull();
   });
 
-  it("offers to sign in when signed out", async () => {
-    await renderLayer({ page: "hub" });
-
-    expect(await screen.findByRole("button", { name: "Entrar" })).toBeTruthy();
-  });
-
-  it("keeps the link back to the editor on a publication page", async () => {
+  it("has no link back to the editor on a publication page", async () => {
     await renderLayer({ page: "publication", handle: "ana", slug: "ventas" });
 
-    const link = await screen.findByRole("link", { name: "Volver al editor" });
+    await screen.findByRole("heading", { level: 1, name: "Ventas por región" });
 
-    expect(link.getAttribute("href")).toBe("/");
+    expect(screen.queryByRole("link", { name: "Volver al editor" })).toBeNull();
   });
 });
 

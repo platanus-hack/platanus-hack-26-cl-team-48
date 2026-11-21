@@ -1,6 +1,6 @@
 import type { PublicationKind } from "@nodomics/hub";
-import { Field, Input, Notice, Select } from "@nodomics/ui";
-import { useCallback, useState } from "react";
+import { Input, Notice } from "@nodomics/ui";
+import { useCallback, useId, useState } from "react";
 import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
 import { PublicationList } from "./PublicationCard.tsx";
@@ -21,26 +21,53 @@ export function HubPage() {
   const results = useSearch(text, kind);
   return (
     <main className="web-hub-page">
-      <h1>{MESSAGES.hub.title}</h1>
-      <div className="web-hub-filters">
-        <Field label={MESSAGES.hub.search}>
-          <Input type="search" icon="search" value={text} onChange={setText} />
-        </Field>
-        <Field label={MESSAGES.hub.kind}>
-          <Select
-            options={KIND_OPTIONS}
-            value={kind}
-            onChange={(value) => {
-              setKind(toKindFilter(value));
-            }}
+      <header className="web-hub-hero">
+        <h1>{MESSAGES.hub.title}</h1>
+        <p className="web-hub-lead">{MESSAGES.hub.subtitle}</p>
+        <div className="web-hub-search">
+          <Input
+            type="search"
+            icon="search"
+            label={MESSAGES.hub.search}
+            placeholder={MESSAGES.hub.search}
+            value={text}
+            onChange={setText}
           />
-        </Field>
-      </div>
+        </div>
+        <KindChips kind={kind} onChange={setKind} />
+      </header>
       {results.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
       {results.status === "ready" && (
         <PublicationList publications={results.value} empty={MESSAGES.hub.noResults} />
       )}
     </main>
+  );
+}
+
+function KindChips({
+  kind,
+  onChange,
+}: {
+  readonly kind: KindFilter;
+  readonly onChange: (kind: KindFilter) => void;
+}) {
+  const name = useId();
+  return (
+    <fieldset className="web-hub-chips" role="radiogroup" aria-label={MESSAGES.hub.kind}>
+      {KIND_OPTIONS.map((option) => (
+        <label key={option.value}>
+          <input
+            type="radio"
+            name={name}
+            checked={kind === option.value}
+            onChange={() => {
+              onChange(option.value);
+            }}
+          />
+          {option.label}
+        </label>
+      ))}
+    </fieldset>
   );
 }
 
@@ -52,6 +79,3 @@ function useSearch(text: string, kind: KindFilter) {
   );
   return useHubQuery(search, SEARCH_DELAY_MS);
 }
-
-const toKindFilter = (value: string): KindFilter =>
-  value === "flow" || value === "node" ? value : ALL;

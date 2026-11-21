@@ -4,7 +4,8 @@ import { Notice } from "@nodomics/ui";
 import { useCallback } from "react";
 import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
-import { PublicationList } from "./PublicationCard.tsx";
+import { Avatar } from "./Avatar.tsx";
+import { EmptyState, PublicationList } from "./PublicationCard.tsx";
 import { useHubQuery } from "./use-hub-query.ts";
 
 type ProfileWithPublications = {
@@ -26,18 +27,36 @@ export function ProfilePage({ handle }: { readonly handle: string }) {
   return (
     <main className="web-hub-page">
       {profile === undefined ? (
-        <p className="web-hub-empty">{MESSAGES.hub.noProfile(handle)}</p>
+        <EmptyState text={MESSAGES.hub.noProfile(handle)} />
       ) : (
         <>
-          <header className="web-hub-profile">
-            {profile.avatarUrl !== undefined && <img src={profile.avatarUrl} alt="" />}
-            <h1>{profile.displayName}</h1>
-            <span>{`@${profile.handle}`}</span>
-          </header>
+          <ProfileHeader profile={profile} count={publications.length} />
           <PublicationList publications={publications} empty={MESSAGES.hub.noPublications} />
         </>
       )}
     </main>
+  );
+}
+
+function ProfileHeader({
+  profile,
+  count,
+}: {
+  readonly profile: HubProfile;
+  readonly count: number;
+}) {
+  return (
+    <header className="web-hub-profile">
+      <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
+      <div>
+        <h1>{profile.displayName}</h1>
+        <p className="web-hub-muted">
+          <span>{`@${profile.handle}`}</span>
+          <span aria-hidden="true">·</span>
+          <span>{MESSAGES.hub.publications(count)}</span>
+        </p>
+      </div>
+    </header>
   );
 }
 

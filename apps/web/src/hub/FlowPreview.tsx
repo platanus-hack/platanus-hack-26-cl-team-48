@@ -29,7 +29,7 @@ export function FlowPreview({
     [snapshot],
   );
   return (
-    <section className="web-hub-preview" aria-label={MESSAGES.hub.preview}>
+    <section className="web-hub-preview" aria-label={MESSAGES.hub.preview} data-canvas-frame>
       <AppStoresContext value={stores}>
         <EngineConnectionContext value={connection}>
           <ReactFlowProvider>

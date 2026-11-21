@@ -6,7 +6,10 @@ import { createSeededHub, createTestHub, renderWithHub } from "./hub-pages-fixtu
 import { HubPage } from "./HubPage.tsx";
 
 const searchField = () => screen.getByLabelText("Buscar en el hub");
-const kindSelect = () => screen.getByRole("combobox", { name: "Tipo" });
+const kindChips = () => screen.getByRole("radiogroup", { name: "Tipo" });
+const kindChip = (name: string) => within(kindChips()).getByRole("radio", { name });
+const isChecked = (radio: HTMLElement) =>
+  radio instanceof HTMLInputElement ? radio.checked : radio.getAttribute("aria-checked") === "true";
 const cardTitled = async (title: string) => {
   const link = await screen.findByRole("link", { name: title });
   const card = link.closest("article");
@@ -25,16 +28,41 @@ describe("HubPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Hub" })).toBeTruthy();
   });
 
-  it("offers a search field and a kind filter that starts at Todo", async () => {
+  it("offers a search field", async () => {
     renderWithHub(<HubPage />, await createSeededHub());
 
-    expect({
-      search: searchField().tagName,
-      kinds: within(kindSelect())
-        .getAllByRole("option")
-        .map((option) => option.textContent),
-      selected: screen.getByRole<HTMLOptionElement>("option", { name: "Todo" }).selected,
-    }).toEqual({ search: "INPUT", kinds: ["Todo", "Flujos", "Nodos"], selected: true });
+    expect(searchField().tagName).toBe("INPUT");
+  });
+
+  it("offers the kinds Todo, Flujos and Nodos as chips", async () => {
+    renderWithHub(<HubPage />, await createSeededHub());
+
+    const radios = within(kindChips()).getAllByRole("radio");
+
+    expect(radios).toEqual([kindChip("Todo"), kindChip("Flujos"), kindChip("Nodos")]);
+  });
+
+  it("starts with Todo chosen", async () => {
+    renderWithHub(<HubPage />, await createSeededHub());
+
+    expect(["Todo", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it("chooses the chip the user clicks", async () => {
+    const user = userEvent.setup();
+    renderWithHub(<HubPage />, await createSeededHub());
+
+    await user.click(kindChip("Nodos"));
+
+    expect(["Todo", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
+      false,
+      false,
+      true,
+    ]);
   });
 
   it("shows one card per publication", async () => {
@@ -82,7 +110,7 @@ describe("HubPage", () => {
     renderWithHub(<HubPage />, await createSeededHub());
     await cardTitled("Clima diario");
 
-    await user.selectOptions(kindSelect(), screen.getByRole("option", { name: "Nodos" }));
+    await user.click(kindChip("Nodos"));
 
     await waitFor(() => {
       expect(screen.getAllByRole("article")).toHaveLength(1);
@@ -95,7 +123,7 @@ describe("HubPage", () => {
     renderWithHub(<HubPage />, await createSeededHub());
     await cardTitled("Clima diario");
 
-    await user.selectOptions(kindSelect(), screen.getByRole("option", { name: "Flujos" }));
+    await user.click(kindChip("Flujos"));
 
     await waitFor(() => {
       expect(screen.queryByRole("link", { name: "Limpiar texto" })).toBeNull();

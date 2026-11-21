@@ -1,14 +1,16 @@
 import type { PublicationDetail, PublishedVersion } from "@nodomics/hub";
 import { SNAPSHOT_FORMAT } from "@nodomics/hub";
 import type { Flow, NodeManifest } from "@nodomics/protocol";
-import { Badge, Button, Field, Notice, Select } from "@nodomics/ui";
+import { Button, Field, Notice, Select } from "@nodomics/ui";
 import { useCallback, useState } from "react";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
+import { Avatar } from "./Avatar.tsx";
 import { FlowPreview } from "./FlowPreview.tsx";
 import { withoutPrivateParams } from "./hub-flow.ts";
 import { manifestsToInstall } from "./hub-install.ts";
 import { useHub } from "./hub-context.ts";
+import { EmptyState } from "./PublicationCard.tsx";
 import { useHubQuery } from "./use-hub-query.ts";
 
 type PublicationPageProps = {
@@ -28,7 +30,7 @@ export function PublicationPage({ handle, slug, ...actions }: PublicationPagePro
       {detail.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
       {detail.status === "ready" &&
         (detail.value === undefined ? (
-          <p className="web-hub-empty">{MESSAGES.hub.noPublication}</p>
+          <EmptyState text={MESSAGES.hub.noPublication} />
         ) : (
           <PublicationView key={detail.value.id} detail={detail.value} {...actions} />
         ))}
@@ -42,18 +44,28 @@ function PublicationView({ detail, ...actions }: { readonly detail: PublicationD
   return (
     <>
       <PublicationHeader detail={detail} />
-      <div className="web-hub-toolbar">
-        <Field label={MESSAGES.hub.version}>
-          <Select options={versionOptions(detail)} value={selected} onChange={select} />
-        </Field>
-        {version.status === "ready" && (
-          <VersionActions kind={detail.kind} version={version.value} {...actions} />
-        )}
+      <div className="web-hub-detail">
+        <div className="web-hub-detail-main">
+          {version.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
+          {version.status === "ready" && (
+            <FlowPreview flow={version.value.flow} snapshot={snapshotOf(version.value)} />
+          )}
+        </div>
+        <aside className="web-hub-detail-side">
+          <section className="web-hub-panel" aria-label={MESSAGES.hub.use}>
+            <Field label={MESSAGES.hub.version}>
+              <Select options={versionOptions(detail)} value={selected} onChange={select} />
+            </Field>
+            {version.status === "ready" && (
+              <VersionActions kind={detail.kind} version={version.value} {...actions} />
+            )}
+            <p className="web-hub-muted">
+              {detail.kind === "node" ? MESSAGES.hub.nodeHint : MESSAGES.hub.flowHint}
+            </p>
+          </section>
+          <PublicationFacts detail={detail} selected={selected} />
+        </aside>
       </div>
-      {version.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
-      {version.status === "ready" && (
-        <FlowPreview flow={version.value.flow} snapshot={snapshotOf(version.value)} />
-      )}
     </>
   );
 }
@@ -61,21 +73,51 @@ function PublicationView({ detail, ...actions }: { readonly detail: PublicationD
 function PublicationHeader({ detail }: { readonly detail: PublicationDetail }) {
   return (
     <header className="web-hub-publication">
+      <span className="web-kind-tag" data-kind={detail.kind}>
+        {MESSAGES.hub.kindLabel[detail.kind]}
+      </span>
       <h1>{detail.title}</h1>
-      <RouteLink route={{ page: "profile", handle: detail.owner.handle }}>
-        {`@${detail.owner.handle}`}
-      </RouteLink>
-      {detail.description !== "" && <p>{detail.description}</p>}
+      {detail.description !== "" && <p className="web-hub-lead">{detail.description}</p>}
       <div className="web-hub-tags">
         {detail.tags.map((tag) => (
-          <Badge key={tag} tone="neutral">
+          <span key={tag} className="web-hub-tag">
             {tag}
-          </Badge>
+          </span>
         ))}
       </div>
     </header>
   );
 }
+
+type FactsProps = { readonly detail: PublicationDetail; readonly selected: string };
+
+function PublicationFacts({ detail, selected }: FactsProps) {
+  const createdAt = detail.versions.find(({ version }) => version === selected)?.createdAt;
+  return (
+    <dl className="web-hub-panel web-hub-facts">
+      <dt>{MESSAGES.hub.by}</dt>
+      <dd>
+        <RouteLink
+          route={{ page: "profile", handle: detail.owner.handle }}
+          className="web-hub-owner"
+        >
+          <Avatar name={detail.owner.displayName} url={detail.owner.avatarUrl} />
+          {`@${detail.owner.handle}`}
+        </RouteLink>
+      </dd>
+      {createdAt !== undefined && (
+        <>
+          <dt>{MESSAGES.hub.published}</dt>
+          <dd>{DATE_FORMAT.format(new Date(createdAt))}</dd>
+        </>
+      )}
+      <dt>{MESSAGES.hub.license}</dt>
+      <dd className="web-hub-mono">{detail.license}</dd>
+    </dl>
+  );
+}
+
+const DATE_FORMAT = new Intl.DateTimeFormat("es", { dateStyle: "medium" });
 
 type VersionActionsProps = Actions & {
   readonly kind: PublicationDetail["kind"];
@@ -92,6 +134,7 @@ function VersionActions({ kind, version, onOpenCopy, onInstall }: VersionActions
   return (
     <div className="web-hub-actions">
       <Button
+        variant={kind === "flow" ? "primary" : "secondary"}
         icon="copy"
         onClick={() => {
           onOpenCopy(withoutPrivateParams(version.flow, catalog));
