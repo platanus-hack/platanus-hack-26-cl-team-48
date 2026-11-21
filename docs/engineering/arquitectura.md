@@ -43,6 +43,7 @@ Patrones que dan forma al sistema (catálogo completo, con criterios de verifica
 | `packages/engine-mock` | Motor falso en memoria que cumple el NEP, para desarrollar y probar la interfaz | Usarse en producción |
 | `packages/nodes-core` | Nodos oficiales como datos (`node.json`, `main.py`) y sus casos de prueba | Código TypeScript ejecutable por nodo |
 | `apps/web` | Interfaz: lienzo, formularios generados por JSON Schema, vistas, estado de edición, compartir | Importar algo que no sea `protocol` o `client` |
+| `apps/agent` | Bucle del agente, servidor MCP, adaptador de sandbox, propuestas | Importar `apps/web`, paquetes de motor o ejecutores; ejecutar código fuera del sandbox |
 | `engines/python-local` | Ejecutor Python local por WebSocket (`duckdb`, `pandas`, `pyarrow`) | Lógica de grafo (en la PoC la hace el coordinador TS) |
 | `tests/conformance` | Flujos de referencia que corren contra cada motor y comparan resultados | Probar detalles internos de un motor |
 
@@ -52,6 +53,7 @@ Patrones que dan forma al sistema (catálogo completo, con criterios de verifica
 protocol, rpc  ←  client  ←  apps/web  →  ui
 protocol, rpc  ←  coordinator  ←  engine-browser  →  executor-duckdb-wasm, executor-pyodide
 protocol, rpc  ←  engine-mock
+protocol       ←  apps/agent
 protocol       ←  executor-*       (implementan la interfaz Executor definida en protocol)
 ```
 
