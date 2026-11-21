@@ -3,7 +3,7 @@ import { canvasOf, nodeOnCanvas, waitForAllNodesReady } from "../support/canvas.
 import { missingColumnFlow, sampleOnlyFlow } from "../support/demo-flows.ts";
 import { openEmptyApp, openSharedFlow } from "../support/flow-files.ts";
 import { openPreviewPanel, previewOf } from "../support/preview.ts";
-import { railButton, railOf, SIDE_SECTIONS, sidePanelOf } from "../support/side-panel.ts";
+import { railButton, railOf, SIGNED_OUT_SECTIONS, sidePanelOf } from "../support/side-panel.ts";
 
 test.describe("visible errors", () => {
   test("shows on the node the error of a parameter naming a missing column", async ({ page }) => {
@@ -25,7 +25,8 @@ test.describe("accessibility of the controls the demo uses", () => {
     await expect(toolbar.getByRole("combobox", { name: "Motor" })).toBeVisible();
     for (const name of ["Opciones del flujo", "Deshacer", "Rehacer", "Compartir", "Ejecutar"])
       await expect(toolbar.getByRole("button", { name, exact: true })).toBeVisible();
-    for (const section of SIDE_SECTIONS) await expect(railButton(page, section)).toBeVisible();
+    for (const section of SIGNED_OUT_SECTIONS)
+      await expect(railButton(page, section)).toBeVisible();
     await expect(railOf(page).getByRole("button", { name: "Tema", exact: true })).toBeVisible();
     const library = sidePanelOf(page, "Nodos");
     for (const region of ["Transformar", "Python", "Fuentes", "Vistas"])

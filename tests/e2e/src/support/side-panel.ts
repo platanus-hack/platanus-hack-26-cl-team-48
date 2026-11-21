@@ -14,6 +14,13 @@ export type SideSection = keyof typeof PANEL_OF_SECTION;
 
 export const SIDE_SECTIONS = Object.keys(PANEL_OF_SECTION) as ReadonlyArray<SideSection>;
 
+const SECTIONS_NEEDING_ACCOUNT: ReadonlyArray<SideSection> = ["Mis flujos", "Agente"];
+
+/** The sections the rail shows while signed out; the rest need an account (ADR 0023). */
+export const SIGNED_OUT_SECTIONS = SIDE_SECTIONS.filter(
+  (section) => !SECTIONS_NEEDING_ACCOUNT.includes(section),
+);
+
 export const railOf = (page: Page): Locator =>
   page.getByRole("navigation", { name: "Secciones del editor" });
 

@@ -18,18 +18,21 @@ import {
 import { dropCsvOnCanvas } from "../support/csv-drop.ts";
 import { chooseFlowOption, openEmptyApp } from "../support/flow-files.ts";
 import { showPreview } from "../support/preview.ts";
-import { showSidePanel, sidePanelOf } from "../support/side-panel.ts";
+import { railButton, showSidePanel, sidePanelOf } from "../support/side-panel.ts";
 
 const FLOW_NAME = "Ventas";
 const UNTITLED = "Flujo sin título";
 const SIGNED_OUT_STATUS = "Entra para guardar";
-const SIGNED_OUT_INVITE = "Entra para guardar tus flujos en tu cuenta.";
+const PUBLISH = "Publicar en el hub…";
 
 const flowNameOf = (page: Page): Locator =>
   toolbarOf(page).getByRole("textbox", { name: "Nombre del flujo" });
 
 const cardOf = (flows: Locator, name: string): Locator =>
   flows.getByRole("article", { name, exact: true });
+
+const shareOption = (page: Page, name: string): Locator =>
+  page.getByRole("menu", { name: "Compartir" }).getByRole("menuitem", { name, exact: true });
 
 const button = (scope: Locator, name: string): Locator =>
   scope.getByRole("button", { name, exact: true });
@@ -56,14 +59,22 @@ test.describe("saving flows in the account (ADR 0023)", () => {
     await expect(flowStatus(page, "Guardado")).toHaveCount(0);
   });
 
-  test("invites to sign in from Mis flujos while signed out", async ({ page }) => {
+  test("hides Mis flujos, Agente and publishing until signing in", async ({ page }) => {
     await openEmptyApp(page);
-    const flows = await showSidePanel(page, "Mis flujos");
+    await expect(railButton(page, "Nodos")).toBeVisible();
+    await expect(railButton(page, "Mis flujos")).toHaveCount(0);
+    await expect(railButton(page, "Agente")).toHaveCount(0);
+    await button(toolbarOf(page), "Compartir").click();
+    await expect(shareOption(page, "Copiar enlace")).toBeVisible();
+    await expect(shareOption(page, PUBLISH)).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
-    await button(flows, "Entrar").click();
+    await signInLocally(page);
 
-    await expect(flows.getByText(SIGNED_OUT_INVITE)).toBeVisible();
-    await expect(signInDialogOf(page)).toBeVisible();
+    await expect(railButton(page, "Mis flujos")).toBeVisible();
+    await expect(railButton(page, "Agente")).toBeVisible();
+    await button(toolbarOf(page), "Compartir").click();
+    await expect(shareOption(page, PUBLISH)).toBeVisible();
   });
 
   test("signs in to the local account with its handle as the email", async ({ page }) => {
@@ -181,14 +192,14 @@ test.describe("saving flows in the account (ADR 0023)", () => {
     await expect(cardOf(flows, FLOW_NAME)).toHaveCount(0);
   });
 
-  test("empties Mis flujos and asks to sign in again after signing out", async ({ page }) => {
+  test("hides Mis flujos and asks to sign in again after signing out", async ({ page }) => {
     const flows = await openSavedFlow(page);
     await expect(cardOf(flows, FLOW_NAME)).toBeVisible();
 
     await signOut(page);
 
-    await expect(cardOf(flows, FLOW_NAME)).toHaveCount(0);
-    await expect(flows.getByText(SIGNED_OUT_INVITE)).toBeVisible();
+    await expect(sidePanelOf(page, "Mis flujos")).toHaveCount(0);
+    await expect(railButton(page, "Mis flujos")).toHaveCount(0);
     await expect(flowStatus(page, SIGNED_OUT_STATUS)).toBeVisible();
   });
 
