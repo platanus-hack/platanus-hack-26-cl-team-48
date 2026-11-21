@@ -101,6 +101,9 @@ importers:
       '@nodomics/hub':
         specifier: workspace:*
         version: link:../../packages/hub
+      '@nodomics/profile':
+        specifier: workspace:*
+        version: link:../../packages/profile
       '@nodomics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
