@@ -12,6 +12,7 @@ test-results/
 .DS_Store
 .env
 .env.*
+!.env.example
 .claude/settings.local.json
 
 # Project agents are versioned (overrides a global ignore of .claude)
