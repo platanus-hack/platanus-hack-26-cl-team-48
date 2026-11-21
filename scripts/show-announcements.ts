@@ -17,27 +17,40 @@ const FOLDER = "docs/anuncios";
 const STATE_FILE = "nodomics-anuncios.json";
 const FETCH_EVERY_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
+// A fetch must never wait for a password: the hook runs on every prompt, unattended.
+const NON_INTERACTIVE = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
 
 type State = { readonly read: ReadonlyArray<string>; readonly fetchedAt: number };
 
 const isShowingAll = process.argv.includes("--todos");
-const statePath = git(["rev-parse", "--git-path", STATE_FILE]).trim();
-const state = readState(statePath);
-const fetchedAt = refreshSource(state.fetchedAt);
-const read = new Set(state.read);
-const { announcements, invalid } = readAnnouncements();
-const shown = isShowingAll
-  ? activeAnnouncements({ announcements, today: today() })
-  : pendingAnnouncements({ announcements, read, today: today() });
-const shownInvalid = isShowingAll ? invalid : invalid.filter(({ file }) => !read.has(file));
-process.stdout.write(formatAnnouncements(shown, shownInvalid) || emptyMessage());
-writeState(statePath, {
-  read: [...new Set([...read, ...[...shown, ...shownInvalid].map(({ file }) => file)])],
-  fetchedAt,
-});
+const isHook = process.argv.includes("--hook");
+
+try {
+  showAnnouncements();
+} catch (error) {
+  // In a hook a failure must not get in the way of the agent's prompt.
+  if (!isHook) throw error;
+}
+
+function showAnnouncements(): void {
+  const statePath = git(["rev-parse", "--git-path", STATE_FILE]).trim();
+  const state = readState(statePath);
+  const fetchedAt = refreshSource(state.fetchedAt);
+  const read = new Set(state.read);
+  const { announcements, invalid } = readAnnouncements();
+  const shown = isShowingAll
+    ? activeAnnouncements({ announcements, today: today() })
+    : pendingAnnouncements({ announcements, read, today: today() });
+  const shownInvalid = isShowingAll ? invalid : invalid.filter(({ file }) => !read.has(file));
+  process.stdout.write(formatAnnouncements(shown, shownInvalid) || emptyMessage());
+  writeState(statePath, {
+    read: [...new Set([...read, ...[...shown, ...shownInvalid].map(({ file }) => file)])],
+    fetchedAt,
+  });
+}
 
 function git(args: ReadonlyArray<string>, timeout?: number): string {
-  const result = spawnSync("git", args, { encoding: "utf8", timeout });
+  const result = spawnSync("git", args, { encoding: "utf8", timeout, env: NON_INTERACTIVE });
   return result.status === 0 ? result.stdout : "";
 }
 
@@ -93,11 +106,15 @@ function isState(value: unknown): value is State {
 }
 
 function writeState(path: string, next: State): void {
-  if (path !== "") writeFileSync(path, JSON.stringify(next));
+  try {
+    if (path !== "") writeFileSync(path, JSON.stringify(next));
+  } catch {
+    // A sandbox with a read-only .git (Codex) only loses the memory of what it already saw.
+  }
 }
 
 function emptyMessage(): string {
-  return process.argv.includes("--hook") ? "" : "No hay anuncios nuevos.\n";
+  return isHook ? "" : "No hay anuncios nuevos.\n";
 }
 
 function today(): string {

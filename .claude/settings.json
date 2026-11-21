@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node scripts/show-announcements.ts --hook --todos",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node scripts/show-announcements.ts --hook --todos 2>/dev/null || true",
             "timeout": 20
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node scripts/show-announcements.ts --hook",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node scripts/show-announcements.ts --hook 2>/dev/null || true",
             "timeout": 20
           }
         ]
