@@ -53,6 +53,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@nodomics/profile':
+        specifier: workspace:*
+        version: link:../../packages/profile
       '@nodomics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
