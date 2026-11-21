@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createAppStores, type AppStores } from "./app-stores.ts";
 import { CATALOG, flowOf, nodeOf, SAMPLE } from "./canvas/canvas-fixtures.ts";
+import { ANA, createTestHub } from "./hub/hub-pages-fixtures.tsx";
 import type { WorkspacePreferences } from "./layout/workspace-preferences.ts";
 import { recordDownloads } from "./testing/record-downloads.ts";
 import { renderApp } from "./testing/render-app.tsx";
@@ -35,12 +36,31 @@ async function seededStores(): Promise<AppStores> {
   return stores;
 }
 
+const PANEL_NAMES: Record<WorkspacePreferences["sideSection"], string> = {
+  nodes: "Biblioteca de nodos",
+  flows: "Mis flujos",
+  "my-nodes": "Mis nodos",
+  data: "Datos",
+  secrets: "Credenciales",
+  agent: "Agente",
+};
+
+async function signedInHub() {
+  const hub = createTestHub();
+  await hub.signIn({ kind: "email", email: ANA.handle });
+  return hub;
+}
+
+/** Signed in, because Mis flujos and Agente are only offered with an account. */
 async function renderSection(sideSection: WorkspacePreferences["sideSection"], stores?: AppStores) {
-  return renderApp({
+  const rendered = renderApp({
     stores: stores ?? (await seededStores()),
+    hub: await signedInHub(),
     preferences: { sideSection, isSidePanelOpen: true },
     handlers: { "nodes.list": () => ({ nodes: [...CATALOG] }) },
   });
+  await screen.findByRole("complementary", { name: PANEL_NAMES[sideSection] });
+  return rendered;
 }
 
 const panel = (name: string) => screen.getByRole("complementary", { name });

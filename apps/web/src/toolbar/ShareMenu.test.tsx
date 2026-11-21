@@ -167,8 +167,8 @@ describe("ShareMenu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("offers only copying the link and publishing", async () => {
-    await setup();
+  it("offers only copying the link and publishing when signed in", async () => {
+    await setup({ isSignedIn: true });
 
     const menu = await openMenu();
 
@@ -177,6 +177,40 @@ describe("ShareMenu", () => {
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
     ).toEqual(MENU_ITEMS);
+  });
+
+  it("offers only copying the link when signed out", async () => {
+    await setup();
+
+    const menu = await openMenu();
+
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Copiar enlace"]);
+  });
+
+  it("offers publishing once the user signs in", async () => {
+    const { hub } = await setup();
+    await act(async () => {
+      await hub.signIn({ kind: "email", email: ANA.handle });
+    });
+
+    const menu = await openMenu();
+
+    expect(within(menu).getByRole("menuitem", { name: "Publicar en el hub…" })).toBeTruthy();
+  });
+
+  it("stops offering publishing once the user signs out", async () => {
+    const { hub } = await setup({ isSignedIn: true });
+    await act(async () => {
+      await hub.signOut();
+    });
+
+    const menu = await openMenu();
+
+    expect(within(menu).queryByRole("menuitem", { name: "Publicar en el hub…" })).toBeNull();
   });
 
   it("closes with Escape", async () => {
@@ -225,15 +259,6 @@ describe("ShareMenu Copiar enlace", () => {
 });
 
 describe("ShareMenu Publicar en el hub…", () => {
-  it("asks to sign in before publishing when signed out", async () => {
-    await setup();
-
-    await chooseItem("Publicar en el hub…");
-
-    expect(await screen.findByRole("dialog", { name: "Entrar a Nodomics" })).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: "Publicar en el hub" })).toBeNull();
-  });
-
   it("opens the publish dialog titled after the current saved flow", async () => {
     await setup({ isSignedIn: true, savedName: "Ventas" });
 

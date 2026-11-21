@@ -36,10 +36,10 @@ async function renderWithCloudFlows() {
 const card = (name: string) => screen.getByRole("article", { name });
 
 describe("SavedFlowList signed out", () => {
-  it("invites to sign in to keep flows in the account", () => {
+  it("does not invite to sign in, since the rail hides Mis flujos without an account", () => {
     renderSignedOut();
 
-    expect(screen.getByText("Entra para guardar tus flujos en tu cuenta.")).toBeDefined();
+    expect(screen.queryByText("Entra para guardar tus flujos en tu cuenta.")).toBeNull();
   });
 
   it("does not show the empty list text", () => {
@@ -48,12 +48,10 @@ describe("SavedFlowList signed out", () => {
     expect(screen.queryByText("Todavía no hay flujos guardados.")).toBeNull();
   });
 
-  it("opens the sign-in dialog from its Entrar button", async () => {
+  it("offers no sign-in button when signed out", () => {
     renderSignedOut();
 
-    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
-
-    expect(screen.getByRole("dialog", { name: "Entrar a Nodomics" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Entrar" })).toBeNull();
   });
 
   it("offers no sign-in button when signed in", async () => {

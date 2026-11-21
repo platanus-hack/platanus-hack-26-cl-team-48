@@ -1,6 +1,6 @@
 import type { Hub } from "@nodomics/hub";
 import { err } from "@nodomics/protocol";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { AppStoresContext } from "../app-context.ts";
@@ -97,9 +97,13 @@ async function signedInAs(hub: Hub, handle: string): Promise<Hub> {
   return hub;
 }
 
+/** Mis publicaciones is offered once the signed-in profile has loaded. */
 async function chooseExplore(name: string) {
-  await userEvent.click(exploreOption(name));
+  await userEvent.click(await within(radioGroup("Explorar")).findByRole("radio", { name }));
 }
+
+const findExploreOption = (name: string) =>
+  within(radioGroup("Explorar")).findByRole("radio", { name });
 
 /** Ventas (comercial) by Ana as a flow and Limpiar (no tags) by Ana as a node. */
 async function createHubWithUntaggedNode(): Promise<Hub> {
@@ -116,19 +120,6 @@ async function createHubWithUntaggedNode(): Promise<Hub> {
     }),
   ]);
   return hub;
-}
-
-/** Wraps the hub so that every handle asked to publicationsOf is recorded. */
-function spyingOnPublicationsOf(hub: Hub) {
-  const handles: string[] = [];
-  const spied: Hub = {
-    ...hub,
-    publicationsOf: (handle) => {
-      handles.push(handle);
-      return hub.publicationsOf(handle);
-    },
-  };
-  return { hub: spied, handles };
 }
 
 afterEach(() => {
@@ -292,8 +283,9 @@ describe("HubPage", () => {
 });
 
 describe("HubPage Explorar filter", () => {
-  it("offers Para ti, Recientes and Mis publicaciones", async () => {
-    renderHubPage(await createSeededHub());
+  it("offers Para ti, Recientes and Mis publicaciones when signed in", async () => {
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
+    await findExploreOption("Mis publicaciones");
 
     const radios = within(radioGroup("Explorar")).getAllByRole("radio");
 
@@ -304,8 +296,30 @@ describe("HubPage Explorar filter", () => {
     ]);
   });
 
-  it("starts with Para ti chosen", async () => {
+  it("offers only Para ti and Recientes when signed out", async () => {
     renderHubPage(await createSeededHub());
+    await cardTitled("Clima diario");
+
+    const radios = within(radioGroup("Explorar")).getAllByRole("radio");
+
+    expect(radios).toEqual([exploreOption("Para ti"), exploreOption("Recientes")]);
+  });
+
+  it("offers Mis publicaciones once the user signs in", async () => {
+    const hub = await createSeededHub();
+    renderHubPage(hub);
+    await cardTitled("Clima diario");
+
+    await act(async () => {
+      await hub.signIn({ kind: "email", email: ANA.handle });
+    });
+
+    expect(await findExploreOption("Mis publicaciones")).toBeTruthy();
+  });
+
+  it("starts with Para ti chosen", async () => {
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
+    await findExploreOption("Mis publicaciones");
 
     expect(
       ["Para ti", "Recientes", "Mis publicaciones"].map((name) => isChecked(exploreOption(name))),
@@ -313,7 +327,8 @@ describe("HubPage Explorar filter", () => {
   });
 
   it("chooses the option the user clicks", async () => {
-    renderHubPage(await createSeededHub());
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
+    await findExploreOption("Mis publicaciones");
 
     await chooseExplore("Recientes");
 
@@ -479,32 +494,38 @@ describe("HubPage Mis publicaciones view", () => {
     });
   });
 
-  it("does not ask the hub for the user's publications while signed out", async () => {
-    const { hub, handles } = spyingOnPublicationsOf(await createSeededHub());
+  it("stops offering Mis publicaciones once the user signs out", async () => {
+    const hub = await signedInAs(await createSeededHub(), ANA.handle);
     renderHubPage(hub);
-    await cardTitled("Clima diario");
+    await findExploreOption("Mis publicaciones");
 
-    await chooseExplore("Mis publicaciones");
-    await screen.findByText("Entra para ver tus publicaciones.");
+    await act(async () => {
+      await hub.signOut();
+    });
 
-    expect(handles).toEqual([]);
+    await waitFor(() => {
+      expect(
+        within(radioGroup("Explorar")).queryByRole("radio", { name: "Mis publicaciones" }),
+      ).toBeNull();
+    });
   });
 
-  it("asks to sign in when signed out", async () => {
-    renderHubPage(await createSeededHub());
-
+  it("goes back to Para ti when the user signs out", async () => {
+    const hub = await signedInAs(await createSeededHub(), ANA.handle);
+    renderHubPage(hub);
     await chooseExplore("Mis publicaciones");
+    await cardTitled("Ventas por región");
 
-    expect(await screen.findByText("Entra para ver tus publicaciones.")).toBeTruthy();
-  });
+    await act(async () => {
+      await hub.signOut();
+    });
 
-  it("lists no publications when signed out", async () => {
-    renderHubPage(await createSeededHub());
-
-    await chooseExplore("Mis publicaciones");
-    await screen.findByText("Entra para ver tus publicaciones.");
-
-    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    await waitFor(() => {
+      expect({
+        isForYouChosen: isChecked(exploreOption("Para ti")),
+        forYouSection: screen.queryByRole("heading", { name: "Para ti" }) !== null,
+      }).toEqual({ isForYouChosen: true, forYouSection: true });
+    });
   });
 });
 

@@ -24,9 +24,11 @@ const rail = () => screen.getByRole("navigation", { name: "Secciones del editor"
 const railButton = (name: string) => within(rail()).getByRole("button", { name });
 
 const pressedSections = () =>
-  SECTIONS.filter(({ button }) => railButton(button).getAttribute("aria-pressed") === "true").map(
-    ({ button }) => button,
-  );
+  SECTIONS.filter(
+    ({ button }) =>
+      within(rail()).queryByRole("button", { name: button })?.getAttribute("aria-pressed") ===
+      "true",
+  ).map(({ button }) => button);
 
 const shownPanels = () =>
   PANEL_NAMES.filter((name) => screen.queryByRole("complementary", { name }) !== null);
@@ -54,6 +56,15 @@ async function signedInHub() {
   await hub.signIn({ kind: "email", email: ANA.handle });
   return hub;
 }
+
+/** Mis flujos and Agente need an account, so the sections that use them render signed in. */
+async function renderSignedIn(options: Parameters<typeof renderApp>[0] = {}) {
+  const rendered = renderApp({ ...options, hub: await signedInHub() });
+  await within(rail()).findByRole("button", { name: "Agente" });
+  return rendered;
+}
+
+const findSidePanel = (name: string) => screen.findByRole("complementary", { name });
 
 async function openProfileLink() {
   renderApp({ hub: await signedInHub() });
@@ -84,16 +95,16 @@ afterAll(() => {
 });
 
 describe("App activity rail", () => {
-  it("offers one toggle button per section", () => {
-    renderApp();
+  it("offers one toggle button per section", async () => {
+    await renderSignedIn();
 
     expect(SECTIONS.map(({ button }) => railButton(button).hasAttribute("aria-pressed"))).toEqual(
       SECTIONS.map(() => true),
     );
   });
 
-  it("lists the sections before the hub link and the theme control", () => {
-    renderApp();
+  it("lists the sections before the hub link and the theme control", async () => {
+    await renderSignedIn();
     const controls = [
       ...SECTIONS.map(({ button }) => railButton(button)),
       within(rail()).getByRole("link", { name: "Abrir el hub en otra pestaña" }),
@@ -156,7 +167,10 @@ describe("App side panel", () => {
   });
 
   it.each(SECTIONS)("shows the $panel panel when $button is chosen", async (section) => {
-    renderApp({ preferences: { sideSection: section.id === "nodes" ? "agent" : "nodes" } });
+    await renderSignedIn({
+      preferences: { sideSection: section.id === "nodes" ? "agent" : "nodes" },
+    });
+    await findSidePanel(section.id === "nodes" ? "Agente" : "Biblioteca de nodos");
 
     await userEvent.click(railButton(section.button));
 
@@ -166,20 +180,20 @@ describe("App side panel", () => {
     });
   });
 
-  it.each(SECTIONS)("heads the $panel panel with $heading", (section) => {
-    renderApp({ preferences: { sideSection: section.id } });
+  it.each(SECTIONS)("heads the $panel panel with $heading", async (section) => {
+    await renderSignedIn({ preferences: { sideSection: section.id } });
 
-    expect(
-      within(sidePanel(section.panel)).getByRole("heading", { level: 2, name: section.heading }),
-    ).toBeTruthy();
+    const panel = await findSidePanel(section.panel);
+
+    expect(within(panel).getByRole("heading", { level: 2, name: section.heading })).toBeTruthy();
   });
 
-  it.each(SECTIONS)("offers to hide the $panel panel", (section) => {
-    renderApp({ preferences: { sideSection: section.id } });
+  it.each(SECTIONS)("offers to hide the $panel panel", async (section) => {
+    await renderSignedIn({ preferences: { sideSection: section.id } });
 
-    expect(
-      within(sidePanel(section.panel)).getByRole("button", { name: "Ocultar panel" }),
-    ).toBeTruthy();
+    const panel = await findSidePanel(section.panel);
+
+    expect(within(panel).getByRole("button", { name: "Ocultar panel" })).toBeTruthy();
   });
 
   it("hides the panel when the active section is chosen again", async () => {
@@ -236,7 +250,7 @@ describe("App side panel", () => {
   });
 
   it("has no Mis flujos dialog", async () => {
-    renderApp();
+    await renderSignedIn();
 
     await userEvent.click(railButton("Mis flujos"));
 
@@ -286,7 +300,7 @@ describe("App side panel preferences", () => {
   });
 
   it("remembers the section chosen", async () => {
-    const { preferences } = renderApp();
+    const { preferences } = await renderSignedIn();
 
     await userEvent.click(railButton("Agente"));
 
@@ -305,7 +319,7 @@ describe("App side panel preferences", () => {
   });
 
   it("reopens on the remembered section after being hidden", async () => {
-    renderApp({ preferences: { sideSection: "flows", isSidePanelOpen: false } });
+    await renderSignedIn({ preferences: { sideSection: "flows", isSidePanelOpen: false } });
 
     await userEvent.click(railButton("Mis flujos"));
 
