@@ -374,6 +374,16 @@ body {
   padding: var(--space-3);
 }
 
+/* Read by screen readers, not shown. */
+.web-visually-hidden {
+  position: absolute;
+  width: var(--stroke-hairline);
+  height: var(--stroke-hairline);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Mockups of features still in development -------------------------------------------------- */
 
 .web-mockup-note {
@@ -416,12 +426,22 @@ body {
   border-radius: var(--radius-md);
 }
 
+.web-agent-draft {
+  align-self: flex-start;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--ai-pending-soft);
+  color: var(--ai-pending);
+  font: var(--text-label);
+}
+
 .web-agent-proposal .web-overline {
   color: var(--ai-pending);
 }
 
 .web-agent-proposal-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-1);
 }
@@ -889,6 +909,13 @@ body {
 .web-params-node-name h3 {
   margin: 0;
   font: var(--text-title-sm);
+}
+
+.web-params-node-run {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .web-params-description {

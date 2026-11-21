@@ -1,6 +1,9 @@
 import type { FlowNode } from "@nodomics/protocol";
 import { useId, useRef } from "react";
-import { ICON_SIZE, Icon } from "@nodomics/ui";
+import { Button, ICON_SIZE, Icon, StatusIndicator } from "@nodomics/ui";
+import { NODE_ACTION_MESSAGES } from "../canvas/node-action-messages.ts";
+import { useRunFlow } from "../engine/use-engine-actions.ts";
+import { toUiExecState } from "../engine/ui-types.ts";
 import {
   useCatalog,
   useDispatch,
@@ -108,6 +111,7 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
           </span>
           <h3>{node.label ?? manifest.name}</h3>
         </div>
+        <NodeRunHeader nodeId={node.id} />
         {manifest.description !== undefined && (
           <p className="web-params-description">{manifest.description}</p>
         )}
@@ -136,6 +140,25 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
         }}
       </NodeDetailTabs>
     </>
+  );
+}
+
+/** The node's last run and a way to run just it, as on its card in the canvas. */
+function NodeRunHeader({ nodeId }: { readonly nodeId: string }) {
+  const state = useEngineState((engine) => engine.nodes[nodeId]?.state);
+  const run = useRunFlow();
+  return (
+    <div className="web-params-node-run">
+      <StatusIndicator state={toUiExecState(state)} />
+      <Button
+        size="sm"
+        icon="play"
+        disabled={run === undefined}
+        onClick={() => void run?.([nodeId])}
+      >
+        {NODE_ACTION_MESSAGES.run}
+      </Button>
+    </div>
   );
 }
 

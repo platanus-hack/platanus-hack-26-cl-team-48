@@ -31,7 +31,8 @@ export function createStorageWorkspacePreferences(
     },
   };
 }
-function readPreferences(getStorage: () => PreferenceStorage): WorkspacePreferences {
+/** What is stored now, which another tab may have changed since this one loaded it. */
+export function readPreferences(getStorage: () => PreferenceStorage): WorkspacePreferences {
   try {
     return parsePreferences(JSON.parse(getStorage().getItem(WORKSPACE_PREFERENCES_KEY) ?? "null"));
   } catch {
