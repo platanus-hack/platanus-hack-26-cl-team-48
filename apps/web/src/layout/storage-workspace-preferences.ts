@@ -7,7 +7,9 @@ import {
 } from "./size-range.ts";
 import {
   DEFAULT_WORKSPACE_PREFERENCES,
+  SIDE_SECTIONS,
   type PreviewLocation,
+  type SideSection,
   type WorkspacePreferences,
   type WorkspacePreferenceStorage,
 } from "./workspace-preferences.ts";
@@ -38,7 +40,9 @@ function readPreferences(getStorage: () => PreferenceStorage): WorkspacePreferen
 }
 function parsePreferences(value: unknown): WorkspacePreferences {
   if (!isRecord(value)) return DEFAULT_WORKSPACE_PREFERENCES;
-  const { theme, isLibraryOpen, isParamsOpen } = value;
+  const { theme, isParamsOpen } = value;
+  const isSidePanelOpen = value["isSidePanelOpen"] ?? value["isLibraryOpen"];
+  const sideSection = parseSideSection(value["sideSection"]);
   const preview = parsePreviewSize(value["preview"]);
   const previewLocation = parsePreviewLocation(value["previewLocation"]);
   const paramsWidth = parseSize(
@@ -53,7 +57,7 @@ function parsePreferences(value: unknown): WorkspacePreferences {
   );
   if (
     (theme !== "light" && theme !== "dark" && theme !== "system") ||
-    typeof isLibraryOpen !== "boolean" ||
+    typeof isSidePanelOpen !== "boolean" ||
     typeof isParamsOpen !== "boolean" ||
     preview === undefined ||
     previewLocation === undefined ||
@@ -63,13 +67,21 @@ function parsePreferences(value: unknown): WorkspacePreferences {
     return DEFAULT_WORKSPACE_PREFERENCES;
   return {
     theme,
-    isLibraryOpen,
+    isSidePanelOpen,
+    sideSection,
     isParamsOpen,
     previewLocation,
     preview,
     paramsWidth,
     codeEditorRows,
   };
+}
+
+/** Preferences saved before the rail existed, or with an unknown section, show the nodes. */
+function parseSideSection(value: unknown): SideSection {
+  return (
+    SIDE_SECTIONS.find((section) => section === value) ?? DEFAULT_WORKSPACE_PREFERENCES.sideSection
+  );
 }
 
 function parsePreviewSize(value: unknown): PreviewSize | undefined {
