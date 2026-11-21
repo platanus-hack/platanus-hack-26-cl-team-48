@@ -211,4 +211,41 @@ describe("POST /agent/requests", () => {
 
     expect(reply.status).toBe(200);
   });
+
+  it("post request returns proposal with domain cards", async () => {
+    const addNodeTurn: LlmTurn = {
+      kind: "tool_calls",
+      calls: [
+        {
+          id: "c2",
+          name: "flows.add_node",
+          args: { draftId: "draft-1", type: "data.source", nodeId: "src" },
+        },
+      ],
+    };
+    const { deps } = depsWith([
+      createDraft(),
+      addNodeTurn,
+      finish("Listo, propuesta creada"),
+      finish(JSON.stringify({ "add_node:src": "Fuente de datos de cosecha" })),
+    ]);
+    const { createFakeProposalStore } = await import("../src/proposals/fake-proposal-store.ts");
+    const proposals = createFakeProposalStore();
+
+    const reply = await post(
+      { ...deps, proposals },
+      authed({ goal: "agrega nodo fuente", flowId: "flow-1" }),
+    );
+
+    expect(reply.status).toBe(200);
+    const body = reply.body as Record<string, unknown>;
+    expect(body["draftId"]).toBe("draft-1");
+    expect(typeof body["proposalId"]).toBe("string");
+    expect(Array.isArray(body["cards"])).toBe(true);
+    expect((body["cards"] as unknown[]).length).toBeGreaterThan(0);
+    expect(body["summary"]).toBe("Listo, propuesta creada");
+
+    const saved = await proposals.get(String(body["proposalId"]), USER.userId);
+    expect(saved.ok).toBe(true);
+  });
 });
