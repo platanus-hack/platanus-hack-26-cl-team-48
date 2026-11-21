@@ -41,6 +41,29 @@ Si tu cambio rompe un invariante, está mal aunque funcione.
 6. **Autorrevisar** con la checklist de la sección 7.
 7. **Reportar con honestidad** usando la plantilla de `workflow.md`: qué hiciste, la salida en rojo y luego en verde de los tests, lo que no hiciste y por qué, y las dudas abiertas. Nunca digas "funciona" sin haberlo ejecutado.
 
+### 2.1 Git continuo: sincronizar, detectar choques, commit y push (obligatorio)
+
+Varias personas y agentes trabajan en paralelo. El estado local debe estar **siempre** sincronizado con el remoto, y cada cambio debe quedar en el remoto lo antes posible. Esto se hace **de forma automática, sin pedir permiso cada vez**.
+
+1. **Nunca trabajes en `main`.** Cada tarea vive en su propia rama `<agente>/<paquete>-<tema>` (`estandares.md` §9). Si estás en `main`, crea la rama antes del primer cambio.
+2. **Sincroniza al empezar y antes de cada commit:** `git fetch --all --prune` y luego `git rebase origin/main` (o `git pull --rebase` si la rama ya existe en el remoto).
+3. **ANTES de cada commit, busca choques en las demás ramas.** Compara los archivos que tú tocas con los que toca cada rama remota:
+
+   ```bash
+   git fetch --all --prune
+   mine=$( { git diff --name-only origin/main...HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u)
+   for b in $(git for-each-ref --format="%(refname:short)" refs/remotes/origin | grep -v -e "^origin$" -e "^origin/HEAD$" -e "^origin/main$" -e "^origin/$(git branch --show-current)$"); do
+     shared=$(comm -12 <(echo "$mine") <(git diff --name-only origin/main..."$b" | sort -u))
+     [ -n "$shared" ] && { echo "== $b — $(git log -1 --format="%an, %ar" "$b")"; git log --format="   %s" origin/main.."$b" | head -5; echo "$shared" | sed "s/^/   ! /"; }
+   done
+   ```
+
+   Si hay coincidencias, **detente e informa** antes de seguir: **quién** (autor y rama), **qué** está haciendo (sus últimos commits) y **qué archivos** chocan. No edites esos archivos ni resuelvas el choque por tu cuenta; pregunta cómo coordinar. Revisa también ramas que tocan el mismo concepto aunque no el mismo archivo (mismo paquete, mismo tipo del protocolo).
+4. **Commit seguido.** Haz commit con cada paso pequeño y coherente (el test en rojo, el código que lo pone en verde, el refactor), siguiendo Conventional Commits. No acumules trabajo sin commitear.
+5. **Push inmediato después de cada commit:** `git push -u origin HEAD`. Nunca `push --force` sobre ramas ajenas ni sobre `main`; en tu propia rama, tras un rebase, solo `git push --force-with-lease`.
+6. **Si un rebase o un push choca**, no lo resuelvas a ciegas sobre código de otra persona: detente, informa quién y qué choca, y pregunta.
+7. **Nunca commitees** secretos (`.env`, credenciales), archivos generados ni datos de usuarios.
+
 ## 3. Principios de diseño
 
 - **SLAP (un solo nivel de abstracción por función).** Una función o lee como una lista de pasos con nombre, o hace un detalle concreto; nunca mezcla ambas cosas. Si mezcla niveles, extrae funciones con nombre.
@@ -96,4 +119,5 @@ Cada agente trabaja **solo en el paquete asignado**. Si necesitas un cambio en o
 - [ ] No rompí ningún invariante de la sección 1 ni toqué paquetes ajenos.
 - [ ] No hay `any`, `as` innecesarios, `!` de no-nulo, ni `console.log` olvidados.
 - [ ] Los commits siguen Conventional Commits y no mencionan a Claude ni a ningún asistente de IA.
+- [ ] Revisé choques con las demás ramas antes de cada commit, y todo está commiteado y pusheado a mi rama (§2.1).
 - [ ] El reporte dice la verdad: qué se hizo, qué no, qué quedó en duda.
