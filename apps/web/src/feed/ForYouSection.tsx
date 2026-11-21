@@ -2,6 +2,7 @@ import type { FeedHit } from "@nodomics/profile";
 import { Notice } from "@nodomics/ui";
 import { useId } from "react";
 import { useHubProfile } from "../hub/hub-context.ts";
+import { useSessionVersion } from "../hub/use-session-version.ts";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
 import { useOptionalFeed } from "./feed-context.ts";
@@ -23,8 +24,9 @@ export function ForYouSection() {
 
 function ForYouBody({ feed }: { readonly feed: FeedService }) {
   const profile = useHubProfile();
+  const session = useSessionVersion();
   if (profile === undefined) return <p className="web-hub-muted">{MESSAGES.feed.forYouSignIn}</p>;
-  return <Matches feed={feed} handle={profile.handle} />;
+  return <Matches key={session} feed={feed} handle={profile.handle} />;
 }
 
 function Matches({ feed, handle }: { readonly feed: FeedService; readonly handle: string }) {
