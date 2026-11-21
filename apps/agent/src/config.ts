@@ -16,19 +16,21 @@ export type AgentConfig = {
   readonly supabaseAnonKey: string;
   readonly mcpUrl: string;
   readonly port: number;
+  readonly devIdentity: boolean;
 };
 
 export type ConfigError = { readonly issues: readonly ConfigIssue[] };
 
 const DEFAULT_PORT = 8787;
 const MAX_PORT = 65535;
+const FAKE_MCP = "fake";
 
 export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
   const anthropic = readRequired(env, "ANTHROPIC_API_KEY");
   const voyage = readRequired(env, "VOYAGE_API_KEY");
   const supabase = readHttpsUrl(env, "SUPABASE_URL");
   const anonKey = readRequired(env, "SUPABASE_ANON_KEY");
-  const mcp = readHttpsUrl(env, "MCP_URL");
+  const mcp = readMcpUrl(env);
   const port = readPort(env["PORT"]);
 
   if (anthropic.ok && voyage.ok && supabase.ok && anonKey.ok && mcp.ok && port.ok) {
@@ -39,6 +41,7 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
       supabaseAnonKey: anonKey.value,
       mcpUrl: mcp.value,
       port: port.value,
+      devIdentity: env["AGENT_DEV_IDENTITY"] === "1",
     });
   }
   return err({ issues: collectIssues([anthropic, voyage, supabase, anonKey, mcp, port]) });
@@ -61,6 +64,10 @@ function readHttpsUrl(env: Env, variable: UrlVariable): Result<string, ConfigIss
     return err({ variable, kind: "invalid" });
   }
   return field;
+}
+
+function readMcpUrl(env: Env): Result<string, ConfigIssue> {
+  return env["MCP_URL"] === FAKE_MCP ? ok(FAKE_MCP) : readHttpsUrl(env, "MCP_URL");
 }
 
 function readPort(value: string | undefined): Result<number, ConfigIssue> {

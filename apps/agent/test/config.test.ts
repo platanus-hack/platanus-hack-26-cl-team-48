@@ -60,6 +60,7 @@ it("loads all required values and defaults to port 8787", () => {
       supabaseAnonKey: VALID_ENV.SUPABASE_ANON_KEY,
       mcpUrl: VALID_ENV.MCP_URL,
       port: 8787,
+      devIdentity: false,
     },
   });
 });
@@ -80,3 +81,29 @@ it.each(["65536", "0", "-1", "12.5", "1e2", "fixture-port", ""])(
     });
   },
 );
+
+it("accepts the fake MCP mode", () => {
+  expect(loadConfig({ ...VALID_ENV, MCP_URL: "fake" })).toMatchObject({
+    ok: true,
+    value: { mcpUrl: "fake" },
+  });
+});
+
+it.each(["FAKE", "fake://x", "http://fake"])("rejects MCP_URL %j", (MCP_URL) => {
+  expect(loadConfig({ ...VALID_ENV, MCP_URL })).toEqual({
+    ok: false,
+    error: { issues: [{ variable: "MCP_URL", kind: "invalid" }] },
+  });
+});
+
+it.each([
+  ["1", true],
+  ["0", false],
+  ["true", false],
+  [undefined, false],
+])("reads AGENT_DEV_IDENTITY %j as %j", (AGENT_DEV_IDENTITY, devIdentity) => {
+  expect(loadConfig({ ...VALID_ENV, AGENT_DEV_IDENTITY })).toMatchObject({
+    ok: true,
+    value: { devIdentity },
+  });
+});
