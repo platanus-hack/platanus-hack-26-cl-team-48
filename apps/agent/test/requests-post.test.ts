@@ -65,7 +65,11 @@ async function post(deps: RequestDeps, init: { body: string; authorization?: str
   await completed;
   const raw = Buffer.concat(chunks).toString();
   const [headers = "", text = ""] = raw.split("\r\n\r\n");
-  return { status: Number(/^HTTP\/1\.1 (\d+)/.exec(headers)?.[1]), headers, body: JSON.parse(text) as unknown } satisfies Reply;
+  return {
+    status: Number(/^HTTP\/1\.1 (\d+)/.exec(headers)?.[1]),
+    headers,
+    body: JSON.parse(text) as unknown,
+  } satisfies Reply;
 }
 
 const authed = (body: unknown) => ({
@@ -104,7 +108,8 @@ describe("POST /agent/requests", () => {
 
     await post(deps, authed({ goal: "cambia el filtro", flowId: "flow-9" }));
 
-    expect(requests[0]?.messages[0]).toMatchObject({ text: expect.stringContaining("flow-9") });
+    const first = requests[0]?.messages[0];
+    expect(first?.role === "user" && first.text).toContain("flow-9");
   });
 
   it.each([
@@ -134,7 +139,10 @@ describe("POST /agent/requests", () => {
     const { deps, requests } = depsWith([finish("x")]);
 
     const missing = await post(deps, { body: JSON.stringify({ goal: "hola" }) });
-    const invalid = await post(deps, { body: JSON.stringify({ goal: "hola" }), authorization: "Bearer other" });
+    const invalid = await post(deps, {
+      body: JSON.stringify({ goal: "hola" }),
+      authorization: "Bearer other",
+    });
 
     expect([missing.status, invalid.status]).toEqual([401, 401]);
     expect(missing.body).toEqual({ error: "unauthorized" });
@@ -160,7 +168,10 @@ describe("POST /agent/requests", () => {
       complete: () => Promise.resolve(err({ code: "NETWORK", message: "secret-host:443 refused" })),
     };
 
-    const reply = await post({ identity: rejectingIdentity, llm, mcp: createFakeMcp() }, authed({ goal: "hola" }));
+    const reply = await post(
+      { identity: rejectingIdentity, llm, mcp: createFakeMcp() },
+      authed({ goal: "hola" }),
+    );
 
     expect(reply.status).toBe(502);
     expect(JSON.stringify(reply.body)).not.toContain("secret-host");
@@ -168,7 +179,10 @@ describe("POST /agent/requests", () => {
 
   it("an unavailable mcp is 502 without leaking details", async () => {
     const failure: McpError = { code: "UNAVAILABLE", message: "10.0.0.5 unreachable" };
-    const mcp: McpPort = { listTools: () => Promise.resolve(err(failure)), call: () => Promise.resolve(err(failure)) };
+    const mcp: McpPort = {
+      listTools: () => Promise.resolve(err(failure)),
+      call: () => Promise.resolve(err(failure)),
+    };
     const { deps } = depsWith([], mcp);
 
     const reply = await post(deps, authed({ goal: "hola" }));
@@ -190,7 +204,10 @@ describe("POST /agent/requests", () => {
   it("the dev identity needs no bearer", async () => {
     const { deps } = depsWith([finish("ok")]);
 
-    const reply = await post({ ...deps, identity: createDevIdentity() }, { body: JSON.stringify({ goal: "hola" }) });
+    const reply = await post(
+      { ...deps, identity: createDevIdentity() },
+      { body: JSON.stringify({ goal: "hola" }) },
+    );
 
     expect(reply.status).toBe(200);
   });

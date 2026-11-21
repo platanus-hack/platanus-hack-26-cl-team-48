@@ -21,7 +21,9 @@ describe("buildRequestDeps", () => {
 
   it("requires a bearer unless the dev identity is on", async () => {
     const strict = await buildRequestDeps(CONFIG).identity.resolve(undefined);
-    const dev = await buildRequestDeps({ ...CONFIG, devIdentity: true }).identity.resolve(undefined);
+    const dev = await buildRequestDeps({ ...CONFIG, devIdentity: true }).identity.resolve(
+      undefined,
+    );
 
     expect(strict).toMatchObject({ ok: false, error: { code: "UNAUTHORIZED" } });
     expect(dev).toMatchObject({ ok: true });

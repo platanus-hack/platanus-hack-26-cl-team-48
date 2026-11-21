@@ -13,7 +13,10 @@ async function request(method: string, path: string): Promise<string> {
     },
   });
   const completed = once(socket, "finish");
-  createServer({ handleRequest: () => Promise.reject(new Error("unused")) }).emit("connection", socket);
+  createServer({ handleRequest: () => Promise.reject(new Error("unused")) }).emit(
+    "connection",
+    socket,
+  );
   socket.push(`${method} ${path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n`);
   await completed;
   return Buffer.concat(chunks).toString();

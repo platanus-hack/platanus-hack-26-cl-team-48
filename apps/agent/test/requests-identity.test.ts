@@ -13,10 +13,20 @@ type Seen = { url: string; headers: Headers };
 function fetchReplying(response: Response | Error) {
   const seen: Seen[] = [];
   const fetchImpl: typeof fetch = (input, init) => {
-    seen.push({ url: String(input), headers: new Headers(init?.headers) });
+    seen.push({
+      url: typeof input === "string" ? input : "unexpected",
+      headers: new Headers(init?.headers),
+    });
     return response instanceof Error ? Promise.reject(response) : Promise.resolve(response);
   };
-  return { seen, identity: createSupabaseIdentity({ supabaseUrl: SUPABASE_URL, anonKey: ANON_KEY, fetch: fetchImpl }) };
+  return {
+    seen,
+    identity: createSupabaseIdentity({
+      supabaseUrl: SUPABASE_URL,
+      anonKey: ANON_KEY,
+      fetch: fetchImpl,
+    }),
+  };
 }
 
 describe("supabase identity", () => {
