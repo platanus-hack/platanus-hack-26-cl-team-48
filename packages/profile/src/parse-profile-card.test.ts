@@ -150,6 +150,37 @@ describe("parseProfileCard schema version and shape", () => {
   });
 });
 
+describe("parseProfileCard hostile input", () => {
+  it("returns an error at /schemaVersion when schemaVersion is a throwing getter", () => {
+    const hostile = {
+      get schemaVersion(): number {
+        throw new Error("boom");
+      },
+    };
+
+    const result = parseProfileCard(hostile);
+
+    expect(result.ok).toBe(false);
+    expect(issuePaths(hostile)).toContain("/schemaVersion");
+  });
+
+  it("returns an error at /schemaVersion when a proxy get trap throws", () => {
+    const hostile = new Proxy(
+      {},
+      {
+        get(): never {
+          throw new Error("boom");
+        },
+      },
+    );
+
+    const result = parseProfileCard(hostile);
+
+    expect(result.ok).toBe(false);
+    expect(issuePaths(hostile)).toContain("/schemaVersion");
+  });
+});
+
 describe("parseProfileCard closed schema", () => {
   it("rejects an unknown top-level property", () => {
     const card = validCard({ cv: "full resume text" });
