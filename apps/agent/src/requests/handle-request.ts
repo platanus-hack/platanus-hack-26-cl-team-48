@@ -23,9 +23,12 @@ export type RequestDeps = {
   readonly llm: LlmPort;
   readonly mcp: McpPort;
   readonly proposals?: ProposalStorePort;
+  readonly proposalsForUser?: (identity: UserIdentity) => ProposalStorePort | null;
   readonly limits?: LoopLimits;
   readonly memoryForUser?: (identity: UserIdentity) => MemoryPort | null;
   readonly search?: { readonly embeddings: EmbeddingsPort; readonly index: SearchIndexPort };
+  readonly searchForUser?: (identity: UserIdentity) => SearchIndexPort | null;
+  readonly documentEmbeddings?: EmbeddingsPort;
 };
 
 export type RequestInput = {
@@ -81,7 +84,8 @@ async function buildProposalData(
   identity: UserIdentity,
   input: { readonly draftId: string; readonly flowId?: string | undefined },
 ): Promise<ProposalPayload | null> {
-  if (!deps.proposals) return null;
+  const store = deps.proposalsForUser?.(identity) ?? deps.proposals;
+  if (!store) return null;
   const outcome = await buildProposal({
     mcp: deps.mcp,
     llm: deps.llm,
@@ -91,7 +95,7 @@ async function buildProposalData(
   });
   if (!outcome.ok || !outcome.value) return null;
   const { proposal, cards } = outcome.value;
-  await deps.proposals.save({ proposal, cards, ownerId: identity.userId });
+  await store.save({ proposal, cards, ownerId: identity.userId });
   return { proposalId: proposal.id, cards };
 }
 

@@ -102,4 +102,13 @@ describe("createAnthropicLlm", () => {
 
     expect(!result.ok && result.error.code).toBe("MALFORMED_RESPONSE");
   });
+
+  it("omits the tools property when request tools is empty", async () => {
+    const { client, seen } = fakeClient(() => ({ content: [{ type: "text", text: "done" }] }));
+    const llm = createAnthropicLlm({ apiKey: "k", client });
+
+    await llm.complete({ system: "s", messages: [{ role: "user", text: "hi" }], tools: [] });
+
+    expect(seen[0]?.tools).toBeUndefined();
+  });
 });

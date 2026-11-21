@@ -10,6 +10,15 @@ export type RateLimiter = {
 
 const DEFAULT_PER_MINUTE = 6;
 const WINDOW_MS = 60_000;
+const MAX_TRACKED_USERS = 100;
+
+function pruneExpired(timestamps: Map<string, readonly number[]>, cutoff: number): void {
+  for (const [user, history] of timestamps.entries()) {
+    if (history.every((time) => time <= cutoff)) {
+      timestamps.delete(user);
+    }
+  }
+}
 
 export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
   const perMinute = options.perMinute ?? DEFAULT_PER_MINUTE;
@@ -19,6 +28,7 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
   const check = (userId: string): boolean => {
     const now = clock();
     const cutoff = now - WINDOW_MS;
+    if (timestamps.size > MAX_TRACKED_USERS) pruneExpired(timestamps, cutoff);
     const history = (timestamps.get(userId) ?? []).filter((time) => time > cutoff);
     if (history.length >= perMinute) return false;
     timestamps.set(userId, [...history, now]);

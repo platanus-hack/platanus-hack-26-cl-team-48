@@ -61,6 +61,29 @@ describe("supabase identity", () => {
     expect(seen[0]?.headers.get("apikey")).toBe(ANON_KEY);
   });
 
+  it("normalizes trailing slash in supabase url", async () => {
+    const seen: Seen[] = [];
+    const identity = createSupabaseIdentity({
+      supabaseUrl: `${SUPABASE_URL}///`,
+      anonKey: ANON_KEY,
+      fetch: (input, init) => {
+        seen.push({
+          url: typeof input === "string" ? input : "unexpected",
+          headers: new Headers(init?.headers),
+        });
+        return Promise.resolve(Response.json({ id: "user-1" }));
+      },
+    });
+
+    const result = await identity.resolve("good-jwt");
+
+    expect(result).toEqual({
+      ok: true,
+      value: { userId: "user-1", accessToken: "good-jwt" },
+    });
+    expect(seen[0]?.url).toBe(`${SUPABASE_URL}/auth/v1/user`);
+  });
+
   it("a malformed user payload is unauthorized", async () => {
     const { identity } = fetchReplying(Response.json({ nope: true }));
 

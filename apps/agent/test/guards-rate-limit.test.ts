@@ -25,4 +25,20 @@ describe("rate-limit guard", () => {
     expect(limiter.check("user-1")).toBe(false);
     expect(limiter.check("user-2")).toBe(true);
   });
+
+  it("prunes expired user records when capacity threshold is reached", () => {
+    let now = 1_000_000;
+    const limiter = createRateLimiter({ perMinute: 6, clock: () => now });
+
+    // Fill up 105 users
+    for (let i = 0; i < 105; i++) {
+      expect(limiter.check(`user-${String(i)}`)).toBe(true);
+    }
+
+    // Advance beyond window
+    now += 61_000;
+
+    // A new user check triggers pruning
+    expect(limiter.check("new-user")).toBe(true);
+  });
 });

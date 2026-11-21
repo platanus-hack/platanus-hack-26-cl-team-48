@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { expect, it } from "vitest";
 import type { ComponentCard } from "../src/contracts/component-card.ts";
-import { createSupabaseSearchIndex } from "../src/memory/supabase-search.ts";
+import {
+  createSupabaseSearchIndex,
+  createUserScopedSearchIndex,
+} from "../src/memory/supabase-search.ts";
 
 const CARD: ComponentCard = {
   id: "fruit",
@@ -63,5 +66,38 @@ it("maps a Supabase error to a Result", async () => {
   expect(result).toEqual({
     ok: false,
     error: { code: "INDEX_ERROR", message: "Component search failed." },
+  });
+});
+
+it("createUserScopedSearchIndex requires a non-empty access token", () => {
+  const result = createUserScopedSearchIndex({
+    supabaseUrl: "https://example.supabase.co",
+    anonKey: "anon",
+    accessToken: "",
+  });
+
+  expect(result.ok).toBe(false);
+});
+
+it("createUserScopedSearchIndex forwards bearer token to client", () => {
+  let capturedOptions: unknown = null;
+  const fakeFactory = (_url: string, _key: string, options: unknown): SupabaseClient => {
+    capturedOptions = options;
+    return {} as SupabaseClient;
+  };
+
+  const result = createUserScopedSearchIndex(
+    {
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon",
+      accessToken: "token-456",
+    },
+    fakeFactory,
+  );
+
+  expect(result.ok).toBe(true);
+  expect(capturedOptions).toEqual({
+    global: { headers: { Authorization: "Bearer token-456" } },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 });

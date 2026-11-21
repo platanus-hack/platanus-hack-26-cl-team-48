@@ -3,7 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DomainCard } from "../src/contracts/domain-card.ts";
 import type { Proposal } from "../src/contracts/proposal.ts";
 import { createFakeProposalStore } from "../src/proposals/fake-proposal-store.ts";
-import { createSupabaseProposalStore } from "../src/proposals/supabase-proposal-store.ts";
+import {
+  createSupabaseProposalStore,
+  createUserScopedProposalStore,
+} from "../src/proposals/supabase-proposal-store.ts";
 import type { StoredProposal } from "../src/proposals/proposal-store-port.ts";
 
 const SAMPLE_PROPOSAL: Proposal = {
@@ -157,5 +160,37 @@ describe("SupabaseProposalStore", () => {
     expect(getRes.ok).toBe(true);
     if (!getRes.ok) return;
     expect(getRes.value.proposal.id).toBe("prop-1");
+  });
+
+  it("createUserScopedProposalStore requires a non-empty access token", () => {
+    const res = createUserScopedProposalStore({
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon",
+      accessToken: "",
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("createUserScopedProposalStore forwards the bearer authorization header", () => {
+    let capturedOptions: unknown = null;
+    const fakeFactory = (_url: string, _key: string, options: unknown): SupabaseClient => {
+      capturedOptions = options;
+      return {} as SupabaseClient;
+    };
+
+    const res = createUserScopedProposalStore(
+      {
+        supabaseUrl: "https://example.supabase.co",
+        anonKey: "anon",
+        accessToken: "user-token-123",
+      },
+      fakeFactory,
+    );
+
+    expect(res.ok).toBe(true);
+    expect(capturedOptions).toEqual({
+      global: { headers: { Authorization: "Bearer user-token-123" } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
   });
 });

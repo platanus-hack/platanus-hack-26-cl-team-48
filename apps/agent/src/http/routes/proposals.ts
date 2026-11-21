@@ -13,7 +13,7 @@ export type DecisionNotification = {
 };
 
 export type ProposalRouteDeps = {
-  readonly store: ProposalStorePort;
+  readonly store: ProposalStorePort | ((identity: UserIdentity) => ProposalStorePort);
   readonly mcp: McpPort;
   readonly recordDecision?: (
     decision: DecisionNotification,
@@ -25,6 +25,11 @@ export type ProposalRouteDeps = {
     identity: UserIdentity,
   ) => Promise<unknown>;
 };
+
+const resolveStore = (
+  store: ProposalStorePort | ((identity: UserIdentity) => ProposalStorePort),
+  identity: UserIdentity,
+): ProposalStorePort => (typeof store === "function" ? store(identity) : store);
 
 const DecisionBody = Type.Object({
   acceptedIds: Type.Array(Type.String()),
@@ -59,7 +64,8 @@ function decisionError(error: DecisionError): RouteReply {
 }
 
 async function getProposal(deps: ProposalRouteDeps, request: RouteRequest): Promise<RouteReply> {
-  const result = await deps.store.get(request.params["id"] ?? "", request.identity.userId);
+  const store = resolveStore(deps.store, request.identity);
+  const result = await store.get(request.params["id"] ?? "", request.identity.userId);
   if (result.ok) return reply(200, { proposal: result.value.proposal, cards: result.value.cards });
   return reply(result.error.code === "NOT_FOUND" ? 404 : 500, {
     error: result.error.code.toLowerCase(),
@@ -85,8 +91,10 @@ async function recordIfPresent(deps: ProposalRouteDeps, context: DecisionContext
 async function postDecision(deps: ProposalRouteDeps, request: RouteRequest): Promise<RouteReply> {
   const body = readDecisionBody(request.rawBody);
   if (!body) return reply(400, { error: "invalid_body" });
+  const store = resolveStore(deps.store, request.identity);
   const result = await decideProposal({
     ...deps,
+    store,
     identity: request.identity,
     proposalId: request.params["id"] ?? "",
     acceptedIds: body.acceptedIds,

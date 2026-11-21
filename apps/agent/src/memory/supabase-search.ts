@@ -1,11 +1,40 @@
 import { err, ok, parse, type Result } from "@nodomics/protocol";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ComponentCard } from "../contracts/component-card.ts";
 import type { SearchError, SearchIndexPort } from "./search.ts";
+
+export type UserScopedSearchConfig = {
+  readonly supabaseUrl: string;
+  readonly anonKey: string;
+  readonly accessToken: string;
+};
+
+type ClientFactory = (
+  url: string,
+  key: string,
+  options: {
+    readonly global: { readonly headers: Readonly<Record<string, string>> };
+    readonly auth: { readonly persistSession: false; readonly autoRefreshToken: false };
+  },
+) => SupabaseClient;
 
 type Reply = { readonly data: unknown; readonly error: unknown };
 const failure = (message: string): Result<never, SearchError> =>
   err({ code: "INDEX_ERROR", message });
+
+export function createUserScopedSearchIndex(
+  config: UserScopedSearchConfig,
+  factory: ClientFactory = createClient,
+): Result<SearchIndexPort, SearchError> {
+  if (config.accessToken === "") {
+    return failure("A user access token is required for component indexing");
+  }
+  const client = factory(config.supabaseUrl, config.anonKey, {
+    global: { headers: { Authorization: `Bearer ${config.accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return ok(createSupabaseSearchIndex(client));
+}
 
 export function createSupabaseSearchIndex(client: SupabaseClient): SearchIndexPort {
   return {

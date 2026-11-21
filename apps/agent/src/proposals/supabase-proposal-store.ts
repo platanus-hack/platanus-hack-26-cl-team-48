@@ -1,10 +1,42 @@
 import { err, ok, type Result } from "@nodomics/protocol";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   ProposalStoreError,
   ProposalStorePort,
   StoredProposal,
 } from "./proposal-store-port.ts";
+
+export type UserScopedProposalConfig = {
+  readonly supabaseUrl: string;
+  readonly anonKey: string;
+  readonly accessToken: string;
+};
+
+type ClientFactory = (
+  url: string,
+  key: string,
+  options: {
+    readonly global: { readonly headers: Readonly<Record<string, string>> };
+    readonly auth: { readonly persistSession: false; readonly autoRefreshToken: false };
+  },
+) => SupabaseClient;
+
+export function createUserScopedProposalStore(
+  config: UserScopedProposalConfig,
+  factory: ClientFactory = createClient,
+): Result<ProposalStorePort, ProposalStoreError> {
+  if (config.accessToken === "") {
+    return err({
+      code: "STORE_FAILED",
+      message: "A user access token is required for the proposal store",
+    });
+  }
+  const client = factory(config.supabaseUrl, config.anonKey, {
+    global: { headers: { Authorization: `Bearer ${config.accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return ok(createSupabaseProposalStore(client));
+}
 
 type ProposalRow = {
   readonly id: string;

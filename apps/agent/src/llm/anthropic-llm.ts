@@ -46,16 +46,17 @@ function fromSdk(sdk: Anthropic): AnthropicClient {
 }
 
 function toParams(model: string, request: LlmRequest): CreateParams {
+  const tools = request.tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    input_schema: { ...tool.inputSchema, type: "object" as const },
+  }));
   return {
     model,
     max_tokens: MAX_OUTPUT_TOKENS,
     system: request.system,
     messages: request.messages.map(toMessageParam),
-    tools: request.tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: { ...tool.inputSchema, type: "object" },
-    })),
+    ...(tools.length > 0 ? { tools } : {}),
   };
 }
 

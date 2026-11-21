@@ -16,12 +16,18 @@ import { createSupabaseMemory, createUserScopedMemory } from "../memory/supabase
 import type { EmbeddingsPort } from "../memory/embeddings.ts";
 import { createVoyageEmbeddings } from "../memory/embeddings.ts";
 import { createFakeSearchIndex, type SearchIndexPort } from "../memory/search.ts";
-import { createSupabaseSearchIndex } from "../memory/supabase-search.ts";
+import {
+  createSupabaseSearchIndex,
+  createUserScopedSearchIndex,
+} from "../memory/supabase-search.ts";
 import { indexComponent } from "../memory/indexer.ts";
 import type { FlowLike } from "../memory/component-card.ts";
 import type { Proposal } from "../contracts/proposal.ts";
 import { createFakeProposalStore } from "../proposals/fake-proposal-store.ts";
-import { createSupabaseProposalStore } from "../proposals/supabase-proposal-store.ts";
+import {
+  createSupabaseProposalStore,
+  createUserScopedProposalStore,
+} from "../proposals/supabase-proposal-store.ts";
 import type { ProposalStorePort } from "../proposals/proposal-store-port.ts";
 import { createFakeMcp } from "../mcp/fake-mcp.ts";
 import { createMcpClient } from "../mcp/mcp-client.ts";
@@ -50,13 +56,16 @@ const selectProposalStore = (config: AgentConfig): ProposalStorePort =>
       )
     : createFakeProposalStore();
 
-const selectEmbeddings = (voyageApiKey: string): EmbeddingsPort =>
+const selectEmbeddings = (
+  voyageApiKey: string,
+  inputType: "document" | "query" = "document",
+): EmbeddingsPort =>
   voyageApiKey === "fake"
     ? { embed: (texts) => Promise.resolve(ok(texts.map(() => [1, 0, 0]))) }
-    : createVoyageEmbeddings({ apiKey: voyageApiKey, fetch });
+    : createVoyageEmbeddings({ apiKey: voyageApiKey, inputType, fetch });
 
 const selectSearch = (config: AgentConfig) => ({
-  embeddings: selectEmbeddings(config.voyageApiKey),
+  embeddings: selectEmbeddings(config.voyageApiKey, "query"),
   index:
     config.memory === "supabase"
       ? createSupabaseSearchIndex(
@@ -64,6 +73,34 @@ const selectSearch = (config: AgentConfig) => ({
         )
       : createFakeSearchIndex(),
 });
+
+const selectProposalsForUser = (
+  config: AgentConfig,
+): ((identity: UserIdentity) => ProposalStorePort | null) | undefined => {
+  if (config.memory !== "supabase") return undefined;
+  return (identity) => {
+    const outcome = createUserScopedProposalStore({
+      supabaseUrl: config.supabaseUrl,
+      anonKey: config.supabaseAnonKey,
+      accessToken: identity.accessToken,
+    });
+    return outcome.ok ? outcome.value : null;
+  };
+};
+
+const selectSearchForUser = (
+  config: AgentConfig,
+): ((identity: UserIdentity) => SearchIndexPort | null) | undefined => {
+  if (config.memory !== "supabase") return undefined;
+  return (identity) => {
+    const outcome = createUserScopedSearchIndex({
+      supabaseUrl: config.supabaseUrl,
+      anonKey: config.supabaseAnonKey,
+      accessToken: identity.accessToken,
+    });
+    return outcome.ok ? outcome.value : null;
+  };
+};
 
 const selectMemoryForUser = (
   config: AgentConfig,
@@ -81,13 +118,18 @@ const selectMemoryForUser = (
 
 export function buildRequestDeps(config: AgentConfig): RequestDeps {
   const memoryForUser = selectMemoryForUser(config);
+  const proposalsForUser = selectProposalsForUser(config);
+  const searchForUser = selectSearchForUser(config);
   return {
     identity: selectIdentity(config),
     llm: createAnthropicLlm({ apiKey: config.anthropicApiKey }),
     mcp: selectMcp(config.mcpUrl),
     proposals: selectProposalStore(config),
     search: selectSearch(config),
+    documentEmbeddings: selectEmbeddings(config.voyageApiKey, "document"),
     ...(memoryForUser ? { memoryForUser } : {}),
+    ...(proposalsForUser ? { proposalsForUser } : {}),
+    ...(searchForUser ? { searchForUser } : {}),
   };
 }
 
@@ -110,22 +152,31 @@ async function maybeIndexFlow(
   identity: UserIdentity,
 ): Promise<void> {
   if (!deps.search) return;
+  const index = deps.searchForUser?.(identity) ?? deps.search.index;
+  const embeddings = deps.documentEmbeddings ?? deps.search.embeddings;
   const read = await deps.mcp.call("flows.get", { flowId: proposal.flowId }, identity);
   if (read.ok && typeof read.value === "object" && read.value !== null) {
     const flow = read.value as FlowLike;
-    await indexComponent(deps.search, {
-      flow,
-      manifests: {},
-      history: [],
-      context: DEFAULT_CONTEXT,
-    });
+    await indexComponent(
+      { embeddings, index },
+      {
+        flow,
+        manifests: {},
+        history: [],
+        context: DEFAULT_CONTEXT,
+      },
+    );
   }
 }
 
 function resolveProposalRoutes(deps: RequestDeps, memory: MemoryPort): readonly Route[] {
-  if (!deps.proposals) return [];
+  if (!deps.proposals && !deps.proposalsForUser) return [];
+  const store = deps.proposalsForUser
+    ? (identity: UserIdentity) =>
+        deps.proposalsForUser?.(identity) ?? deps.proposals ?? createFakeProposalStore()
+    : (deps.proposals ?? createFakeProposalStore());
   return createProposalRoutes({
-    store: deps.proposals,
+    store,
     mcp: deps.mcp,
     recordDecision: (decision, identity) =>
       buildMemoryDeps(resolveMemory(deps, memory, identity)).recordDecision(decision),

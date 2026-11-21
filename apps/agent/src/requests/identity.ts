@@ -34,7 +34,8 @@ async function fetchUser(
   options: SupabaseIdentityOptions,
   bearer: string,
 ): Promise<Result<UserIdentity, AuthError>> {
-  const response = await options.fetch(`${options.supabaseUrl}/auth/v1/user`, {
+  const baseUrl = options.supabaseUrl.replace(/\/+$/, "");
+  const response = await options.fetch(`${baseUrl}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${bearer}`, apikey: options.anonKey },
   });
   if (HTTP_UNAUTHORIZED.includes(response.status)) return fail("UNAUTHORIZED", "Invalid token");

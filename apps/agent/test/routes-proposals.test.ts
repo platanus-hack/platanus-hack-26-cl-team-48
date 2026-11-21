@@ -207,4 +207,22 @@ describe("proposal routes", () => {
     expect(reply.status).toBe(200);
     expect(acceptedCalls).toHaveLength(1);
   });
+
+  it("resolves store dynamically when store is a factory function", async () => {
+    let capturedIdentity: unknown = null;
+    const store = memoryStore();
+    const routes = createProposalRoutes({
+      store: (identity) => {
+        capturedIdentity = identity;
+        return store;
+      },
+      mcp: recordingMcp().mcp,
+    });
+    const get = route(routes, "GET");
+
+    const reply = await get.handle(request());
+
+    expect(reply.status).toBe(200);
+    expect(capturedIdentity).toEqual(IDENTITY);
+  });
 });

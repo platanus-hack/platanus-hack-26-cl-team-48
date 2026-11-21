@@ -5,6 +5,7 @@ import { ok } from "@nodomics/protocol";
 import type { LlmPort, LlmTurn } from "../src/llm/llm-port.ts";
 import { createFakeMcp } from "../src/mcp/fake-mcp.ts";
 import { createFakeMemory } from "../src/memory/fake-memory.ts";
+import { createFakeProposalStore } from "../src/proposals/fake-proposal-store.ts";
 import { createDevIdentity } from "../src/requests/identity.ts";
 import { assembleServer, buildRequestDeps, buildServer } from "../src/requests/wiring.ts";
 
@@ -131,6 +132,41 @@ describe("wired proposals and scoped memory", () => {
 
     await new Promise((resolve) => server.close(resolve));
     expect(seenTokens).toContain("token-user-abc");
+  });
+
+  it("supabase proposals are created per request with user token", async () => {
+    const seenTokens: string[] = [];
+    const deps = {
+      ...buildRequestDeps({
+        ...CONFIG,
+        memory: "supabase",
+      }),
+      identity: {
+        resolve: (bearer: string | undefined) =>
+          Promise.resolve(ok({ userId: "u1", accessToken: bearer ?? "" })),
+      },
+      llm: scriptedAgentAndStoryLlm(),
+      proposalsForUser: (identity: { accessToken: string }) => {
+        seenTokens.push(identity.accessToken);
+        return createFakeProposalStore();
+      },
+    };
+
+    const server = assembleServer(deps, createFakeMemory());
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    await fetch(`http://127.0.0.1:${String(port)}/agent/requests`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer token-prop-xyz",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ goal: "hola" }),
+    });
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(seenTokens).toContain("token-prop-xyz");
   });
 });
 
