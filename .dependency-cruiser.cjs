@@ -8,7 +8,10 @@ module.exports = {
       name: "web-only-uses-protocol-client-ui",
       severity: "error",
       from: { path: "^apps/web/", pathNot: "^apps/web/src/engine-registry\\.ts$" },
-      to: { path: internal, pathNot: ["^apps/web/", pkg("protocol"), pkg("client"), pkg("ui")] },
+      to: {
+        path: internal,
+        pathNot: ["^apps/web/", pkg("protocol"), pkg("client"), pkg("ui"), pkg("hub")],
+      },
     },
     {
       name: "engine-registry-only-references-engine-workers",
@@ -77,6 +80,13 @@ module.exports = {
           pkg("protocol"),
         ],
       },
+    },
+    {
+      name: "hub-uses-only-protocol",
+      comment: "ADR 0018: the hub stores and finds flows; it never talks to an engine.",
+      severity: "error",
+      from: { path: pkg("hub") },
+      to: { path: internal, pathNot: [pkg("hub"), pkg("protocol")] },
     },
     {
       name: "nothing-imports-apps",

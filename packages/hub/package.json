@@ -1,0 +1,17 @@
+{
+  "name": "@nodomics/hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@nodomics/protocol": "workspace:*",
+    "@sinclair/typebox": "0.34.52",
+    "@supabase/supabase-js": "2.119.2"
+  }
+}
