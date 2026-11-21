@@ -1,7 +1,9 @@
 import { err, ok } from "@nodomics/protocol";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Result } from "@nodomics/protocol";
+import type { ProfileCard } from "@nodomics/profile";
 import { FeedContext } from "../feed/feed-context.ts";
 import { ANA_CARD, MINIMAL_CARD, createFakeFeed } from "../feed/feed-fixtures.ts";
 import type { FeedService } from "../feed/feed-service.ts";
@@ -170,4 +172,59 @@ describe("ProfilePage registration", () => {
       ).toBeTruthy();
     },
   );
+});
+
+type FeedResult = Result<ProfileCard, { readonly code: "UNAVAILABLE" }>;
+
+function deferred() {
+  let resolve: (value: FeedResult) => void = () => undefined;
+  const promise = new Promise<FeedResult>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+const isDisabled = (form: HTMLElement, name: string) =>
+  within(form).getByRole<HTMLButtonElement>("button", { name }).disabled;
+
+describe("ProfilePage editor save and generate exclusion", () => {
+  it("disables Guardar while a card is being generated and re-enables it after", async () => {
+    const pending = deferred();
+    const { user, form } = await openEditor({ extractProfile: () => pending.promise });
+    await user.type(within(form).getByLabelText("O pega tu CV"), "mi cv");
+
+    await user.click(within(form).getByRole("button", { name: "Generar ficha" }));
+    const during = isDisabled(form, "Guardar");
+    await act(async () => {
+      pending.resolve(ok(ANA_CARD));
+      await pending.promise;
+    });
+
+    await waitFor(() => {
+      expect({ during, after: isDisabled(form, "Guardar") }).toEqual({
+        during: true,
+        after: false,
+      });
+    });
+  });
+
+  it("disables Generar ficha while the profile is being saved and re-enables it after", async () => {
+    const pending = deferred();
+    const { user, form } = await openEditor({ saveProfile: () => pending.promise });
+    await user.type(within(form).getByLabelText("O pega tu CV"), "mi cv");
+
+    await user.click(within(form).getByRole("button", { name: "Guardar" }));
+    const during = isDisabled(form, "Generar ficha");
+    await act(async () => {
+      pending.resolve({ ok: false, error: { code: "UNAVAILABLE" } });
+      await pending.promise;
+    });
+
+    await waitFor(() => {
+      expect({ during, after: isDisabled(form, "Generar ficha") }).toEqual({
+        during: true,
+        after: false,
+      });
+    });
+  });
 });

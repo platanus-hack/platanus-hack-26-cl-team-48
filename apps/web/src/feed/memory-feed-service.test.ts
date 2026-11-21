@@ -109,3 +109,63 @@ describe("createMemoryFeedService extractProfile", () => {
     expect(result).toEqual({ ok: false, error: { code: "UNAVAILABLE" } });
   });
 });
+
+describe("createMemoryFeedService with a current handle", () => {
+  const sessionSeed = (handle: string | undefined) => ({
+    cards: { beto: BETO_CARD },
+    currentHandle: () => Promise.resolve(handle),
+  });
+
+  it("stores a saved card under the current handle", async () => {
+    const service = createMemoryFeedService(sessionSeed("ana"));
+
+    const saved = await service.saveProfile(MINIMAL_CARD);
+    const stored = await service.card("ana");
+
+    expect({ saved, stored }).toEqual({
+      saved: { ok: true, value: MINIMAL_CARD },
+      stored: { ok: true, value: MINIMAL_CARD },
+    });
+  });
+
+  it("returns the other profiles from matches after saving", async () => {
+    const service = createMemoryFeedService(sessionSeed("ana"));
+    await service.saveProfile(MINIMAL_CARD);
+
+    const result = await service.matches();
+
+    expect(result.ok && result.value.map((hit) => [hit.kind, hit.id])).toEqual([
+      ["profile", "beto"],
+    ]);
+  });
+
+  it("returns UNAUTHENTICATED from saveProfile when nobody is signed in", async () => {
+    const service = createMemoryFeedService(sessionSeed(undefined));
+
+    const result = await service.saveProfile(MINIMAL_CARD);
+
+    expect(result).toEqual({ ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  it("returns UNAUTHENTICATED from matches when nobody is signed in", async () => {
+    const service = createMemoryFeedService(sessionSeed(undefined));
+
+    const result = await service.matches();
+
+    expect(result).toEqual({ ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  it("asks the current handle on each call", async () => {
+    let handle: string | undefined = undefined;
+    const service = createMemoryFeedService({
+      cards: {},
+      currentHandle: () => Promise.resolve(handle),
+    });
+
+    const before = await service.saveProfile(MINIMAL_CARD);
+    handle = "carla";
+    const after = await service.saveProfile(MINIMAL_CARD);
+
+    expect({ before: before.ok, after: after.ok }).toEqual({ before: false, after: true });
+  });
+});
