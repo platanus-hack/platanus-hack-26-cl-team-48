@@ -1,6 +1,10 @@
 import { once } from "node:events";
 import { Duplex } from "node:stream";
+import { ok } from "@nodomics/protocol";
 import { expect, it } from "vitest";
+import { createRateLimiter, REQUESTS_PER_MINUTE } from "../src/http/guards/rate-limit.ts";
+import { createFakeMcp } from "../src/mcp/fake-mcp.ts";
+import { createHandleRequest } from "../src/requests/handle-request.ts";
 import { createServer } from "../src/server.ts";
 
 async function request(
@@ -61,18 +65,24 @@ it("a different HTTP method cannot use the health route", async () => {
   expect(await request("POST", "/health")).toMatch(/^HTTP\/1\.1 404 /);
 });
 
+const GOAL_BODY = JSON.stringify({ goal: "hola" });
+
 it("seventh request in a minute is 429", async () => {
-  const server = createServer({
-    handleRequest: () => Promise.resolve({ status: 200, body: { ok: true } }),
+  const handleRequest = createHandleRequest({
+    identity: { resolve: () => Promise.resolve(ok({ userId: "u1", accessToken: "jwt" })) },
+    llm: { complete: () => Promise.resolve(ok({ kind: "text" as const, text: "listo" })) },
+    mcp: createFakeMcp(),
+    rateLimiter: createRateLimiter({ perMinute: REQUESTS_PER_MINUTE }),
   });
+  const server = createServer({ handleRequest });
   const headers = { Authorization: "Bearer user-token-123" };
 
   for (let i = 0; i < 6; i++) {
-    const res = await request("POST", "/agent/requests", { server, headers, body: "{}" });
+    const res = await request("POST", "/agent/requests", { server, headers, body: GOAL_BODY });
     expect(res).toMatch(/^HTTP\/1\.1 200 /);
   }
 
-  const seventh = await request("POST", "/agent/requests", { server, headers, body: "{}" });
+  const seventh = await request("POST", "/agent/requests", { server, headers, body: GOAL_BODY });
   expect(seventh).toMatch(/^HTTP\/1\.1 429 /);
 });
 

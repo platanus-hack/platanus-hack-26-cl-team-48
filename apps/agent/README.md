@@ -15,6 +15,27 @@ Configuración requerida para inicializar el servicio:
 | `SUPABASE_ANON_KEY` | Llave anónima de Supabase |
 | `MCP_URL` | URL HTTPS del servidor MCP del motor (o `fake` en desarrollo) |
 
+### Producción
+
+El servicio detecta producción cuando `RENDER=true` (Render lo define solo) o `NODE_ENV=production`. En producción rechaza arrancar con piezas falsas:
+
+| Variable | Valor en producción |
+|---|---|
+| `AGENT_MEMORY` | `supabase`. Es obligatoria: sin definir o con `fake` el servicio no arranca |
+| `MCP_URL` | URL HTTPS real; `fake` se rechaza |
+| `AGENT_DEV_IDENTITY` | No debe ser `1`: se rechaza siempre en producción, incluso en modo demo |
+| `AGENT_ALLOWED_ORIGINS` | Orígenes permitidos por CORS, separados por comas |
+
+Los errores de configuración nombran la variable, nunca su valor.
+
+### Modo demo
+
+`AGENT_ALLOW_FAKES=1` (exactamente `1`) permite en producción `MCP_URL=fake` y la memoria falsa (`AGENT_MEMORY=fake` o sin definir). Es un modo explícito para demostraciones: los datos no se persisten. No habilita la identidad de desarrollo.
+
+### Límites de uso
+
+Los pedidos se limitan por usuario autenticado, no por el encabezado: 6 por minuto en `/agent/requests` y 60 por minuto en las demás rutas. Un token inválido responde 401 y no consume cupo. Los registros de acceso incluyen solo método, ruta (sin query) y estado.
+
 ## Ejecución en local
 
 Requiere Node.js 24 o superior y pnpm.

@@ -5,7 +5,6 @@ import {
   type ServerResponse,
 } from "node:http";
 import { createCorsGuard, type CorsGuard } from "./http/guards/cors.ts";
-import { createRateLimiter, type RateLimiter } from "./http/guards/rate-limit.ts";
 import { createStructuredLogger, type StructuredLogger } from "./http/guards/logger.ts";
 import { MAX_BODY_BYTES, UPLOAD_MAX_BODY_BYTES } from "./http/guards/body-limit.ts";
 import type { Router } from "./http/router.ts";
@@ -15,14 +14,12 @@ export type ServerDeps = {
   readonly handleRequest: (input: RequestInput) => Promise<HttpReply>;
   readonly router?: Router;
   readonly cors?: CorsGuard;
-  readonly rateLimiter?: RateLimiter;
   readonly logger?: StructuredLogger;
 };
 
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
-const HTTP_RATE_LIMITED = 429;
 const HTTP_INTERNAL_ERROR = 500;
 const REQUESTS_PATH = "/agent/requests";
 
@@ -110,22 +107,9 @@ function handleCors(cors: CorsGuard, request: IncomingMessage, response: ServerR
   return false;
 }
 
-function checkRateLimit(
-  rateLimiter: RateLimiter,
-  request: IncomingMessage,
-  response: ServerResponse,
-): boolean {
-  const userKey = request.headers.authorization ?? request.socket.remoteAddress ?? "anonymous";
-  if (!rateLimiter.check(userKey)) {
-    sendJson(response, HTTP_RATE_LIMITED, { error: "rate_limit_exceeded" });
-    return false;
-  }
-  return true;
-}
-
 type RouteContext = {
   readonly deps: ServerDeps;
-  readonly guards: { readonly cors: CorsGuard; readonly rateLimiter: RateLimiter };
+  readonly guards: { readonly cors: CorsGuard };
 };
 
 async function route(
@@ -138,7 +122,6 @@ async function route(
   if (isRoute(request, "GET", "/health")) {
     sendJson(response, HTTP_OK, { status: "ok" });
   } else if (isRoute(request, "POST", REQUESTS_PATH)) {
-    if (!checkRateLimit(context.guards.rateLimiter, request, response)) return;
     await serveRequests(context.deps, request, response);
   } else if (context.deps.router) {
     await serveRouter(context.deps.router, request, response);
@@ -150,7 +133,6 @@ async function route(
 export function createServer(deps: ServerDeps): Server {
   const guards = {
     cors: deps.cors ?? createCorsGuard(),
-    rateLimiter: deps.rateLimiter ?? createRateLimiter(),
     logger: deps.logger ?? createStructuredLogger(),
   };
 
@@ -158,7 +140,7 @@ export function createServer(deps: ServerDeps): Server {
     response.on("finish", () => {
       guards.logger.info("request completed", {
         method: request.method,
-        url: request.url,
+        path: pathOf(request),
         status: response.statusCode,
       });
     });

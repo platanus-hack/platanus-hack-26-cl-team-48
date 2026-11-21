@@ -50,3 +50,9 @@ services:
         sync: false
       - key: MCP_URL
         sync: false
+      - key: AGENT_MEMORY
+        sync: false
+      - key: AGENT_ALLOWED_ORIGINS
+        sync: false
+      - key: AGENT_ALLOW_FAKES
+        sync: false

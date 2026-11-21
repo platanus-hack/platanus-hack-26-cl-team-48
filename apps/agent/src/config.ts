@@ -5,7 +5,7 @@ type RequiredVariable =
   "ANTHROPIC_API_KEY" | "VOYAGE_API_KEY" | "SUPABASE_URL" | "SUPABASE_ANON_KEY" | "MCP_URL";
 type UrlVariable = Extract<RequiredVariable, `${string}_URL`>;
 type ConfigIssue = {
-  readonly variable: RequiredVariable | "PORT" | "AGENT_MEMORY";
+  readonly variable: RequiredVariable | "PORT" | "AGENT_MEMORY" | "AGENT_DEV_IDENTITY";
   readonly kind: "missing" | "invalid";
 };
 
@@ -33,11 +33,22 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
   const voyage = readRequired(env, "VOYAGE_API_KEY");
   const supabase = readHttpsUrl(env, "SUPABASE_URL");
   const anonKey = readRequired(env, "SUPABASE_ANON_KEY");
-  const mcp = readMcpUrl(env);
+  const strict = isStrict(env);
+  const mcp = readMcpUrl(env, strict);
   const port = readPort(env["PORT"]);
-  const memory = readMemoryMode(env["AGENT_MEMORY"]);
+  const memory = readMemoryMode(env["AGENT_MEMORY"], strict);
+  const devIdentity = readDevIdentity(env);
 
-  if (anthropic.ok && voyage.ok && supabase.ok && anonKey.ok && mcp.ok && port.ok && memory.ok) {
+  if (
+    anthropic.ok &&
+    voyage.ok &&
+    supabase.ok &&
+    anonKey.ok &&
+    mcp.ok &&
+    port.ok &&
+    memory.ok &&
+    devIdentity.ok
+  ) {
     return ok({
       anthropicApiKey: anthropic.value,
       voyageApiKey: voyage.value,
@@ -45,11 +56,13 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
       supabaseAnonKey: anonKey.value,
       mcpUrl: mcp.value,
       port: port.value,
-      devIdentity: env["AGENT_DEV_IDENTITY"] === "1",
+      devIdentity: devIdentity.value,
       memory: memory.value,
     });
   }
-  return err({ issues: collectIssues([anthropic, voyage, supabase, anonKey, mcp, port, memory]) });
+  return err({
+    issues: collectIssues([anthropic, voyage, supabase, anonKey, mcp, port, memory, devIdentity]),
+  });
 }
 
 function collectIssues(fields: readonly Result<unknown, ConfigIssue>[]): ConfigIssue[] {
@@ -71,12 +84,32 @@ function readHttpsUrl(env: Env, variable: UrlVariable): Result<string, ConfigIss
   return field;
 }
 
-function readMcpUrl(env: Env): Result<string, ConfigIssue> {
-  return env["MCP_URL"] === FAKE_MCP ? ok(FAKE_MCP) : readHttpsUrl(env, "MCP_URL");
+const isProduction = (env: Env): boolean =>
+  env["RENDER"] === "true" || env["NODE_ENV"] === "production";
+
+// Fakes in production are only allowed in the explicit demo mode.
+const isStrict = (env: Env): boolean => isProduction(env) && env["AGENT_ALLOW_FAKES"] !== "1";
+
+function readDevIdentity(env: Env): Result<boolean, ConfigIssue> {
+  const enabled = env["AGENT_DEV_IDENTITY"] === "1";
+  return enabled && isProduction(env)
+    ? err({ variable: "AGENT_DEV_IDENTITY", kind: "invalid" })
+    : ok(enabled);
 }
 
-function readMemoryMode(value: string | undefined): Result<MemoryMode, ConfigIssue> {
-  if (value === undefined) return ok("fake");
+function readMcpUrl(env: Env, strict: boolean): Result<string, ConfigIssue> {
+  if (env["MCP_URL"] !== FAKE_MCP) return readHttpsUrl(env, "MCP_URL");
+  return strict ? err({ variable: "MCP_URL", kind: "invalid" }) : ok(FAKE_MCP);
+}
+
+function readMemoryMode(
+  value: string | undefined,
+  strict: boolean,
+): Result<MemoryMode, ConfigIssue> {
+  if (value === undefined) {
+    return strict ? err({ variable: "AGENT_MEMORY", kind: "missing" }) : ok("fake");
+  }
+  if (strict && value === "fake") return err({ variable: "AGENT_MEMORY", kind: "invalid" });
   return value === "fake" || value === "supabase"
     ? ok(value)
     : err({ variable: "AGENT_MEMORY", kind: "invalid" });

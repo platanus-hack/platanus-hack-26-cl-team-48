@@ -8,6 +8,11 @@ import { createRouter } from "../http/router.ts";
 import { createWhyRoute } from "../http/routes/why.ts";
 import { createSearchRoute } from "../http/routes/search.ts";
 import { createProposalRoutes } from "../http/routes/proposals.ts";
+import {
+  createRateLimiter,
+  REQUESTS_PER_MINUTE,
+  ROUTES_PER_MINUTE,
+} from "../http/guards/rate-limit.ts";
 import { createServer } from "../server.ts";
 import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
 import type { MemoryPort } from "../memory/memory-port.ts";
@@ -210,8 +215,13 @@ export function assembleServer(deps: RequestDeps, memory: MemoryPort): Server {
   const recorded = deps.memoryForUser
     ? deps
     : { ...deps, mcp: buildMemoryDeps(memory).wrapMcp(deps.mcp) };
-  const router = createRouter({ identity: deps.identity, routes: buildRoutes(deps, memory) });
-  return createServer({ handleRequest: createHandleRequest(recorded), router });
+  const router = createRouter({
+    identity: deps.identity,
+    routes: buildRoutes(deps, memory),
+    rateLimiter: createRateLimiter({ perMinute: ROUTES_PER_MINUTE }),
+  });
+  const rateLimiter = createRateLimiter({ perMinute: REQUESTS_PER_MINUTE });
+  return createServer({ handleRequest: createHandleRequest({ ...recorded, rateLimiter }), router });
 }
 
 /** The LLM, identity and memory are created once and shared by /agent/requests and the router. */
