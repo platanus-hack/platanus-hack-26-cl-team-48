@@ -1,9 +1,11 @@
+import type { FlowStore } from "@nodomics/hub";
 import { expect, it, vi } from "vitest";
 import { FLOW_FORMAT, type Flow } from "@nodomics/protocol";
 import { createAppStores } from "../app-stores.ts";
 import { createMemoryPersonalLibrary } from "./memory-personal-library.ts";
 import { createMemoryFlowLibrary } from "./memory-flow-library.ts";
 import { startFlowSaving, AUTO_SAVE_DELAY_MS } from "./flow-saving.ts";
+import { cloudStores, createFlowsHub, signedInHub } from "./cloud-flow-fixtures.ts";
 
 const flow: Flow = {
   format: FLOW_FORMAT,
@@ -166,5 +168,101 @@ it("never reuses session sources for an imported flow without file associations"
   stores.savedFlowStore.getState().trackSource("source_1", "file-a");
   stores.flowStore.getState().dispatch({ type: "flow.load", flow });
   expect(stores.savedFlowStore.getState().sessionSources.has("source_1")).toBe(false);
+  saving.close();
+});
+
+function cloudSetup(hub: FlowStore) {
+  const { stores, library } = cloudStores(hub);
+  const show = vi.fn();
+  stores.noticeStore.setState({ show });
+  const saving = startFlowSaving({
+    stores,
+    timers: { set: () => 0, clear: () => undefined },
+    createId: () => "flow_test",
+    now: () => 42,
+  });
+  return { stores, library, saving, show };
+}
+
+it("saves the current flow right away as a new saved flow", async () => {
+  const { stores, library, saving } = cloudSetup(await signedInHub());
+  stores.flowStore.getState().dispatch({ type: "flow.load", flow });
+
+  await saving.saveCurrent();
+
+  expect({
+    saved: (await library.readFlow("flow_test")).value?.name,
+    currentId: stores.savedFlowStore.getState().currentId,
+    status: stores.savedFlowStore.getState().status,
+  }).toEqual({ saved: "Ventas", currentId: "flow_test", status: "saved" });
+  saving.close();
+});
+
+it("does not save an empty current flow", async () => {
+  const { library, saving } = cloudSetup(await signedInHub());
+
+  await saving.saveCurrent();
+
+  expect((await library.listFlows()).value).toEqual([]);
+  saving.close();
+});
+
+it("saves the current flow into its existing saved flow", async () => {
+  const { stores, library, saving } = cloudSetup(await signedInHub());
+  await library.saveFlow({ id: "old", name: "Ventas", flow, files: {}, updatedAt: 1 });
+  await stores.savedFlowStore.getState().openFlow("old");
+  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Renombrado" });
+
+  await saving.saveCurrent();
+
+  expect((await library.listFlows()).value.map(({ id, name }) => ({ id, name }))).toEqual([
+    { id: "old", name: "Renombrado" },
+  ]);
+  saving.close();
+});
+
+it("leaves the signed-out status when a save comes back signed out", async () => {
+  const { stores, saving, show } = cloudSetup(createFlowsHub());
+  stores.flowStore.getState().dispatch({ type: "flow.load", flow });
+
+  await saving.flush();
+
+  expect({
+    status: stores.savedFlowStore.getState().status,
+    notices: show.mock.calls.length,
+  }).toEqual({ status: "signed-out", notices: 0 });
+  saving.close();
+});
+
+it("does not show saving while signed out and editing", async () => {
+  const { stores, saving } = cloudSetup(createFlowsHub());
+  await stores.savedFlowStore.getState().refresh();
+  stores.flowStore.getState().dispatch({ type: "flow.load", flow });
+
+  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
+
+  expect(stores.savedFlowStore.getState().status).toBe("signed-out");
+  saving.close();
+});
+
+it("keeps a public flow public when an edit is autosaved", async () => {
+  const { stores, library, saving } = cloudSetup(await signedInHub());
+  await library.saveFlow({
+    id: "old",
+    name: "Ventas",
+    flow,
+    files: {},
+    updatedAt: 1,
+    visibility: "public",
+  });
+  await stores.savedFlowStore.getState().openFlow("old");
+  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
+
+  await saving.flush();
+
+  expect((await library.readFlow("old")).value).toMatchObject({
+    name: "Editado",
+    visibility: "public",
+  });
   saving.close();
 });
