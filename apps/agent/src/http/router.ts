@@ -1,4 +1,5 @@
 import { parseBearer, type IdentityPort } from "../requests/identity.ts";
+import type { RateLimiter } from "./guards/rate-limit.ts";
 import { MAX_BODY_BYTES, UPLOAD_MAX_BODY_BYTES } from "./guards/body-limit.ts";
 import type { Route, RouteReply, RouteRequest } from "./route.ts";
 
@@ -17,6 +18,7 @@ export type Router = {
 export type RouterDeps = {
   readonly identity: IdentityPort;
   readonly routes: readonly Route[];
+  readonly rateLimiter?: RateLimiter;
 };
 
 type Match = {
@@ -27,6 +29,7 @@ type Match = {
 
 const BASE_URL = "http://localhost";
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_RATE_LIMITED = 429;
 const HTTP_INTERNAL_ERROR = 500;
 const HTTP_BAD_GATEWAY = 502;
 
@@ -77,6 +80,9 @@ async function run(deps: RouterDeps, match: Match, input: RouterInput): Promise<
     return identity.error.code === "UNAUTHORIZED"
       ? errorReply(HTTP_UNAUTHORIZED, "unauthorized")
       : errorReply(HTTP_BAD_GATEWAY, "upstream_unavailable");
+  }
+  if (deps.rateLimiter && !deps.rateLimiter.check(identity.value.userId)) {
+    return errorReply(HTTP_RATE_LIMITED, "rate_limit_exceeded");
   }
   const request: RouteRequest = {
     params: match.params,

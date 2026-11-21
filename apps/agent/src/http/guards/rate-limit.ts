@@ -8,7 +8,8 @@ export type RateLimiter = {
   readonly isAllowed: (userId: string) => boolean;
 };
 
-const DEFAULT_PER_MINUTE = 6;
+export const REQUESTS_PER_MINUTE = 6;
+export const ROUTES_PER_MINUTE = 60;
 const WINDOW_MS = 60_000;
 const MAX_TRACKED_USERS = 100;
 
@@ -21,7 +22,7 @@ function pruneExpired(timestamps: Map<string, readonly number[]>, cutoff: number
 }
 
 export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
-  const perMinute = options.perMinute ?? DEFAULT_PER_MINUTE;
+  const perMinute = options.perMinute ?? REQUESTS_PER_MINUTE;
   const clock = options.clock ?? Date.now;
   const timestamps = new Map<string, readonly number[]>();
 

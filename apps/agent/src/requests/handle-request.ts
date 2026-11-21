@@ -12,6 +12,7 @@ import type { MemoryPort } from "../memory/memory-port.ts";
 import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
 import type { EmbeddingsPort } from "../memory/embeddings.ts";
 import type { SearchIndexPort } from "../memory/search.ts";
+import type { RateLimiter } from "../http/guards/rate-limit.ts";
 import { SYSTEM_PROMPT } from "../prompts/system.ts";
 import { REQUEST_ALLOWLIST } from "./allowlists.ts";
 import { recordDrafts } from "./draft-recorder.ts";
@@ -29,6 +30,7 @@ export type RequestDeps = {
   readonly search?: { readonly embeddings: EmbeddingsPort; readonly index: SearchIndexPort };
   readonly searchForUser?: (identity: UserIdentity) => SearchIndexPort | null;
   readonly documentEmbeddings?: EmbeddingsPort;
+  readonly rateLimiter?: RateLimiter;
 };
 
 export type RequestInput = {
@@ -41,6 +43,7 @@ export type HttpReply = { readonly status: number; readonly body: unknown };
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_RATE_LIMITED = 429;
 const HTTP_BAD_GATEWAY = 502;
 const HTTP_GATEWAY_TIMEOUT = 504;
 
@@ -127,6 +130,9 @@ export function createHandleRequest(deps: RequestDeps) {
   return async (input: RequestInput): Promise<HttpReply> => {
     const identity = await deps.identity.resolve(parseBearer(input.authorization));
     if (!identity.ok) return authFailure(identity.error);
+    if (deps.rateLimiter && !deps.rateLimiter.check(identity.value.userId)) {
+      return reply(HTTP_RATE_LIMITED, "rate_limit_exceeded");
+    }
     const body = parseRequestBody(input.rawBody);
     if (!body.ok) return reply(HTTP_BAD_REQUEST, body.error);
     return runRequest(deps, identity.value, {
