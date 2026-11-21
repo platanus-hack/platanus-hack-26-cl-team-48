@@ -19,6 +19,7 @@ export type Entity = {
 
 export type Edge = {
   readonly id: string;
+  readonly actorId: string;
   readonly src: string;
   readonly dst: string;
   readonly relation: string;
@@ -27,6 +28,7 @@ export type Edge = {
 };
 
 export type NewEdge = {
+  readonly actorId: string;
   readonly src: string;
   readonly dst: string;
   readonly relation: string;
@@ -44,7 +46,15 @@ export type MemoryPort = {
   readonly recordEpisode: (episode: Episode) => Promise<Result<void, MemoryError>>;
   readonly upsertEntity: (entity: Entity) => Promise<Result<void, MemoryError>>;
   readonly openEdge: (edge: NewEdge) => Promise<Result<Edge, MemoryError>>;
-  readonly closeEdge: (id: string, at: string) => Promise<Result<void, MemoryError>>;
-  readonly edgesAt: (entityId: string, at: string) => Promise<Result<readonly Edge[], MemoryError>>;
+  readonly closeEdge: (
+    id: string,
+    at: string,
+    actorId: string,
+  ) => Promise<Result<void, MemoryError>>;
+  readonly edgesAt: (
+    entityId: string,
+    at: string,
+    actorId: string,
+  ) => Promise<Result<readonly Edge[], MemoryError>>;
   readonly episodesFor: (entityId: string) => Promise<Result<readonly Episode[], MemoryError>>;
 };

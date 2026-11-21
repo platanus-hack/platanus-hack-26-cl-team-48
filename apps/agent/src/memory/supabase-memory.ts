@@ -1,12 +1,13 @@
 import { err, ok, type Result } from "@nodomics/protocol";
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Edge, Episode, MemoryError, MemoryPort } from "./memory-port.ts";
 import { edgesValidAt } from "./temporal-graph.ts";
 
 const EdgeRow = Type.Object({
   id: Type.String(),
+  actor_id: Type.String(),
   src: Type.String(),
   dst: Type.String(),
   relation: Type.String(),
@@ -52,6 +53,7 @@ function parseRows<S extends TSchema>(schema: S, rows: unknown): Outcome<readonl
 
 const toEdge = (row: Static<typeof EdgeRow>): Edge => ({
   id: row.id,
+  actorId: row.actor_id,
   src: row.src,
   dst: row.dst,
   relation: row.relation,
@@ -73,35 +75,49 @@ async function write(query: PromiseLike<Reply>): Promise<Outcome<void>> {
   return error ? storeFailed(error.message) : ok(undefined);
 }
 
-async function readEdges(client: SupabaseClient, column: "src" | "dst", id: string) {
-  const { data, error } = await client.from("agent_edges").select("*").eq(column, id);
+type EdgeScope = { readonly entityId: string; readonly actorId: string };
+
+async function readEdges(client: SupabaseClient, column: "src" | "dst", scope: EdgeScope) {
+  const query = client.from("agent_edges").select("*").eq(column, scope.entityId);
+  const { data, error } = await query.eq("actor_id", scope.actorId);
   return error ? storeFailed(error.message) : parseRows(EdgeRow, data);
 }
 
 async function edgesTouching(
   client: SupabaseClient,
-  entityId: string,
+  scope: EdgeScope,
 ): Promise<Outcome<readonly Edge[]>> {
   const [asSrc, asDst] = await Promise.all([
-    readEdges(client, "src", entityId),
-    readEdges(client, "dst", entityId),
+    readEdges(client, "src", scope),
+    readEdges(client, "dst", scope),
   ]);
   if (!asSrc.ok) return asSrc;
   if (!asDst.ok) return asDst;
-  const byId = new Map([...asSrc.value, ...asDst.value].map((row) => [row.id, toEdge(row)]));
+  const own = [...asSrc.value, ...asDst.value].filter((row) => row.actor_id === scope.actorId);
+  const byId = new Map(own.map((row) => [row.id, toEdge(row)]));
   return ok([...byId.values()]);
 }
 
 async function openEdge(client: SupabaseClient, edge: Parameters<MemoryPort["openEdge"]>[0]) {
-  const row = { src: edge.src, dst: edge.dst, relation: edge.relation, valid_from: edge.at };
+  const row = {
+    src: edge.src,
+    dst: edge.dst,
+    relation: edge.relation,
+    valid_from: edge.at,
+    actor_id: edge.actorId,
+  };
   const { data, error }: Reply = await client.from("agent_edges").insert(row).select().single();
   if (error) return storeFailed(error.message);
   const parsed = parseRow(EdgeRow, data);
   return parsed.ok ? ok(toEdge(parsed.value)) : parsed;
 }
 
-async function closeEdge(client: SupabaseClient, id: string, at: string): Promise<Outcome<void>> {
-  const query = client.from("agent_edges").update({ valid_to: at }).eq("id", id).select("id");
+type EdgeClose = { readonly id: string; readonly at: string; readonly actorId: string };
+
+async function closeEdge(client: SupabaseClient, target: EdgeClose): Promise<Outcome<void>> {
+  const { id, at, actorId } = target;
+  const update = client.from("agent_edges").update({ valid_to: at });
+  const query = update.eq("id", id).eq("actor_id", actorId).select("id");
   const { data, error }: Reply = await query;
   if (error) return storeFailed(error.message);
   return Array.isArray(data) && data.length > 0
@@ -136,11 +152,56 @@ export function createSupabaseMemory(client: SupabaseClient): MemoryPort {
     upsertEntity: (entity) =>
       write(client.from("agent_entities").upsert(entity, { onConflict: "actor_id,id" })),
     openEdge: (edge) => openEdge(client, edge),
-    closeEdge: (id, at) => closeEdge(client, id, at),
-    edgesAt: async (entityId, at) => {
-      const touching = await edgesTouching(client, entityId);
+    closeEdge: (id, at, actorId) => closeEdge(client, { id, at, actorId }),
+    edgesAt: async (entityId, at, actorId) => {
+      const touching = await edgesTouching(client, { entityId, actorId });
       return touching.ok ? ok(edgesValidAt(touching.value, at)) : touching;
     },
     episodesFor: (entityId) => episodesFor(client, entityId),
   };
+}
+
+export type UserScopedConfig = {
+  readonly supabaseUrl: string;
+  readonly anonKey: string;
+  readonly accessToken: string;
+};
+
+type ClientFactory = (
+  url: string,
+  key: string,
+  options: {
+    readonly global: { readonly headers: Readonly<Record<string, string>> };
+    readonly auth: { readonly persistSession: false; readonly autoRefreshToken: false };
+  },
+) => SupabaseClient;
+
+const SERVICE_ROLE = "service_role";
+
+function jwtRole(key: string): unknown {
+  try {
+    const payload: unknown = JSON.parse(atob(key.split(".")[1] ?? ""));
+    return typeof payload === "object" && payload !== null && "role" in payload
+      ? payload.role
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function createUserScopedMemory(
+  config: UserScopedConfig,
+  factory: ClientFactory = createClient,
+): Outcome<MemoryPort> {
+  if (config.accessToken === "") {
+    return storeFailed("A user access token is required for the agent memory");
+  }
+  if (jwtRole(config.anonKey) === SERVICE_ROLE) {
+    return storeFailed("The agent memory must not use a service role key");
+  }
+  const client = factory(config.supabaseUrl, config.anonKey, {
+    global: { headers: { Authorization: `Bearer ${config.accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return ok(createSupabaseMemory(client));
 }

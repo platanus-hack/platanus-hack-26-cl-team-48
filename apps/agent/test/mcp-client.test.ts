@@ -154,6 +154,22 @@ it("lists tools as descriptors and rejects a tool without inputSchema", async ()
   expect(bad.ok ? null : bad.error.code).toBe("MALFORMED_RESPONSE");
 });
 
+it("forwards user identity on listTools when provided", async () => {
+  const seen: (UserIdentity | null)[] = [];
+  const client = createMcpClient({
+    url: URL_UNDER_TEST,
+    transport: (_url, identity) => {
+      seen.push(identity);
+      return fakeTransport(() => ({ tools: [] }));
+    },
+  });
+
+  await client.listTools(ALICE);
+  await client.listTools();
+
+  expect(seen).toEqual([ALICE, null]);
+});
+
 it("rejects non-object args before reaching the network", async () => {
   const client = createMcpClient({
     url: URL_UNDER_TEST,

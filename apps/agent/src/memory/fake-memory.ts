@@ -14,6 +14,7 @@ const done = Promise.resolve(ok(undefined));
 
 const toEdge = (edge: NewEdge, id: string): Edge => ({
   id,
+  actorId: edge.actorId,
   src: edge.src,
   dst: edge.dst,
   relation: edge.relation,
@@ -37,8 +38,12 @@ function openEdge(ref: StoreRef, edge: NewEdge): ReturnType<MemoryPort["openEdge
   return Promise.resolve(ok(opened));
 }
 
-function closeEdge(ref: StoreRef, id: string, at: string): ReturnType<MemoryPort["closeEdge"]> {
-  if (!ref.current.edges.some((edge) => edge.id === id)) {
+function closeEdge(
+  ref: StoreRef,
+  target: { id: string; at: string; actorId: string },
+): ReturnType<MemoryPort["closeEdge"]> {
+  const { id, at, actorId } = target;
+  if (!ref.current.edges.some((edge) => edge.id === id && edge.actorId === actorId)) {
     return Promise.resolve(err({ code: "NOT_FOUND", message: `Unknown edge ${id}` }));
   }
   const edges = ref.current.edges.map((e) => (e.id === id ? { ...e, validTo: at } : e));
@@ -46,8 +51,14 @@ function closeEdge(ref: StoreRef, id: string, at: string): ReturnType<MemoryPort
   return done;
 }
 
-function edgesAt(ref: StoreRef, entityId: string, at: string): ReturnType<MemoryPort["edgesAt"]> {
-  const touching = ref.current.edges.filter((e) => e.src === entityId || e.dst === entityId);
+function edgesAt(
+  ref: StoreRef,
+  query: { entityId: string; at: string; actorId: string },
+): ReturnType<MemoryPort["edgesAt"]> {
+  const { entityId, at, actorId } = query;
+  const touching = ref.current.edges.filter(
+    (e) => e.actorId === actorId && (e.src === entityId || e.dst === entityId),
+  );
   return Promise.resolve(ok(edgesValidAt(touching, at)));
 }
 
@@ -63,8 +74,8 @@ export function createFakeMemory(): MemoryPort {
       return done;
     },
     openEdge: (edge) => openEdge(ref, edge),
-    closeEdge: (id, at) => closeEdge(ref, id, at),
-    edgesAt: (entityId, at) => edgesAt(ref, entityId, at),
+    closeEdge: (id, at, actorId) => closeEdge(ref, { id, at, actorId }),
+    edgesAt: (entityId, at, actorId) => edgesAt(ref, { entityId, at, actorId }),
     episodesFor: (entityId) =>
       Promise.resolve(ok(ref.current.episodes.filter((e) => e.entityIds.includes(entityId)))),
   };

@@ -5,7 +5,7 @@ type RequiredVariable =
   "ANTHROPIC_API_KEY" | "VOYAGE_API_KEY" | "SUPABASE_URL" | "SUPABASE_ANON_KEY" | "MCP_URL";
 type UrlVariable = Extract<RequiredVariable, `${string}_URL`>;
 type ConfigIssue = {
-  readonly variable: RequiredVariable | "PORT";
+  readonly variable: RequiredVariable | "PORT" | "AGENT_MEMORY";
   readonly kind: "missing" | "invalid";
 };
 
@@ -17,7 +17,10 @@ export type AgentConfig = {
   readonly mcpUrl: string;
   readonly port: number;
   readonly devIdentity: boolean;
+  readonly memory: MemoryMode;
 };
+
+export type MemoryMode = "fake" | "supabase";
 
 export type ConfigError = { readonly issues: readonly ConfigIssue[] };
 
@@ -32,8 +35,9 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
   const anonKey = readRequired(env, "SUPABASE_ANON_KEY");
   const mcp = readMcpUrl(env);
   const port = readPort(env["PORT"]);
+  const memory = readMemoryMode(env["AGENT_MEMORY"]);
 
-  if (anthropic.ok && voyage.ok && supabase.ok && anonKey.ok && mcp.ok && port.ok) {
+  if (anthropic.ok && voyage.ok && supabase.ok && anonKey.ok && mcp.ok && port.ok && memory.ok) {
     return ok({
       anthropicApiKey: anthropic.value,
       voyageApiKey: voyage.value,
@@ -42,9 +46,10 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
       mcpUrl: mcp.value,
       port: port.value,
       devIdentity: env["AGENT_DEV_IDENTITY"] === "1",
+      memory: memory.value,
     });
   }
-  return err({ issues: collectIssues([anthropic, voyage, supabase, anonKey, mcp, port]) });
+  return err({ issues: collectIssues([anthropic, voyage, supabase, anonKey, mcp, port, memory]) });
 }
 
 function collectIssues(fields: readonly Result<unknown, ConfigIssue>[]): ConfigIssue[] {
@@ -68,6 +73,13 @@ function readHttpsUrl(env: Env, variable: UrlVariable): Result<string, ConfigIss
 
 function readMcpUrl(env: Env): Result<string, ConfigIssue> {
   return env["MCP_URL"] === FAKE_MCP ? ok(FAKE_MCP) : readHttpsUrl(env, "MCP_URL");
+}
+
+function readMemoryMode(value: string | undefined): Result<MemoryMode, ConfigIssue> {
+  if (value === undefined) return ok("fake");
+  return value === "fake" || value === "supabase"
+    ? ok(value)
+    : err({ variable: "AGENT_MEMORY", kind: "invalid" });
 }
 
 function readPort(value: string | undefined): Result<number, ConfigIssue> {

@@ -113,8 +113,8 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 export function createMcpClient(options: McpClientOptions): McpPort {
   const open = options.transport ?? httpTransport(options.fetch);
   return {
-    listTools: () =>
-      withClient(open(options.url, null), async (client) => {
+    listTools: (identity) =>
+      withClient(open(options.url, identity ?? null), async (client) => {
         const { tools } = await client.listTools();
         return ok(
           tools.map((tool): ToolDescriptor => ({

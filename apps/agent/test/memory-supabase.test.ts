@@ -47,6 +47,7 @@ function fakeClient(respond: (call: Call) => Reply): { client: SupabaseClient; c
 
 const EDGE_ROW = {
   id: "11111111-1111-1111-1111-111111111111",
+  actor_id: "user-1",
   src: "a",
   dst: "b",
   relation: "uses",
@@ -98,16 +99,24 @@ describe("supabase memory", () => {
       dst: "b",
       relation: "uses",
       at: EDGE_ROW.valid_from,
+      actorId: "user-1",
     });
     expect(calls[0]).toMatchObject({
       table: "agent_edges",
       op: "insert",
-      payload: { src: "a", dst: "b", relation: "uses", valid_from: EDGE_ROW.valid_from },
+      payload: {
+        src: "a",
+        dst: "b",
+        relation: "uses",
+        valid_from: EDGE_ROW.valid_from,
+        actor_id: "user-1",
+      },
     });
     expect(result).toEqual({
       ok: true,
       value: {
         id: EDGE_ROW.id,
+        actorId: "user-1",
         src: "a",
         dst: "b",
         relation: "uses",
@@ -124,6 +133,7 @@ describe("supabase memory", () => {
       dst: "b",
       relation: "r",
       at: "t",
+      actorId: "user-1",
     });
     expect(result).toMatchObject({ ok: false, error: { code: "MALFORMED_ROW" } });
   });
@@ -134,10 +144,12 @@ describe("supabase memory", () => {
     const closed = await createSupabaseMemory(hit.client).closeEdge(
       "x",
       "2026-11-21T11:00:00.000Z",
+      "user-1",
     );
     const missing = await createSupabaseMemory(miss.client).closeEdge(
       "x",
       "2026-11-21T11:00:00.000Z",
+      "user-1",
     );
     expect(closed).toEqual({ ok: true, value: undefined });
     expect(hit.calls[0]).toMatchObject({
@@ -145,6 +157,7 @@ describe("supabase memory", () => {
       payload: { valid_to: "2026-11-21T11:00:00.000Z" },
     });
     expect(hit.calls[0]?.filters).toContainEqual(["eq", ["id", "x"]]);
+    expect(hit.calls[0]?.filters).toContainEqual(["eq", ["actor_id", "user-1"]]);
     expect(missing).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
   });
 
@@ -158,8 +171,25 @@ describe("supabase memory", () => {
       data: call.filters.some(([, args]) => args[0] === "src") ? [EDGE_ROW, closed] : [],
       error: null,
     }));
-    const result = await createSupabaseMemory(client).edgesAt("a", "2026-11-21T11:00:00.000Z");
+    const result = await createSupabaseMemory(client).edgesAt(
+      "a",
+      "2026-11-21T11:00:00.000Z",
+      "user-1",
+    );
     expect(calls).toHaveLength(2);
+    expect(result.ok && result.value.map((e) => e.id)).toEqual([EDGE_ROW.id]);
+  });
+
+  it("edgesAt never returns another actor's edges", async () => {
+    const foreign = { ...EDGE_ROW, id: "33333333-3333-3333-3333-333333333333", actor_id: "user-2" };
+    const { client, calls } = fakeClient(() => ({ data: [EDGE_ROW, foreign], error: null }));
+    const result = await createSupabaseMemory(client).edgesAt(
+      "a",
+      "2026-11-21T11:00:00.000Z",
+      "user-1",
+    );
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expect(call.filters).toContainEqual(["eq", ["actor_id", "user-1"]]);
     expect(result.ok && result.value.map((e) => e.id)).toEqual([EDGE_ROW.id]);
   });
 
