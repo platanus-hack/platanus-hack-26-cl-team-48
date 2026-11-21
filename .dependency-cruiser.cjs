@@ -5,6 +5,18 @@ const internal = "^(packages|apps)/";
 module.exports = {
   forbidden: [
     {
+      name: "agent-uses-only-protocol",
+      severity: "error",
+      from: { path: "^apps/agent/" },
+      to: { path: internal, pathNot: ["^apps/agent/", pkg("protocol")] },
+    },
+    {
+      name: "nothing-imports-agent",
+      severity: "error",
+      from: { pathNot: "^apps/agent/" },
+      to: { path: "^apps/agent/" },
+    },
+    {
       name: "web-only-uses-protocol-client-ui",
       severity: "error",
       from: { path: "^apps/web/", pathNot: "^apps/web/src/engine-registry\\.ts$" },
