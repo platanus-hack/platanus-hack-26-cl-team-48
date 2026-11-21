@@ -11,6 +11,7 @@ export function AgentPanel() {
   return (
     <div className="web-agent">
       <p className="web-mockup-note">{text.mockup}</p>
+      <span className="web-agent-draft">{text.draft}</span>
       <p className="web-agent-message" data-from="user">
         {text.request}
       </p>
@@ -27,9 +28,18 @@ export function AgentPanel() {
             <Button size="sm" disabled>
               {text.reject}
             </Button>
+            <Button size="sm" variant="ghost" disabled>
+              {text.viewOnCanvas}
+            </Button>
           </div>
         </section>
       ))}
+      <div className="web-agent-proposal-actions">
+        <Button variant="primary" disabled>
+          {text.acceptAll}
+        </Button>
+        <Button disabled>{text.discard}</Button>
+      </div>
       <div className="web-agent-composer">
         <Input label={text.composer} placeholder={text.composerPlaceholder} value="" disabled />
       </div>
