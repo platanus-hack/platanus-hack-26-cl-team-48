@@ -1,118 +1,89 @@
-# Capa de agente: diseño v0.1
+# Capa de agente: diseño v0.2
 
-**Responsable:** Gabriel (área Agente). **Coordina con:** Sebastián (motor de nodos y MCP) y Cantú (Feed).
-**Estado:** borrador para discutir. Las decisiones difíciles de revertir (servicio nuevo, sandbox, persistencia de la memoria) se proponen como ADR antes de implementarlas (`CLAUDE.md` §5).
+**Responsable:** Gabriel (área Agente). Toma las decisiones de arquitectura de esta capa por delegación del líder.
+**Coordina con:** Sebastián (MCP, escritura y ejecución de flujos, Hub) y Cantú (Feed).
+**ADRs:** 0019 (servicio de agente), 0020 (memoria temporal) y 0021 (autorización). Se apoya en el ADR 0018 (Hub).
 
 ## 1. Principio
 
 > **El agente puede pensar en cualquier lenguaje, pero solo entrega nodos y flujos.**
 
-Cuando un usuario le pide al agente una herramienta, una función o un proyecto, el agente **lo construye con el motor de nodos**, usando las herramientas MCP. Si necesita lógica que no existe, escribe código (Python o SQL), lo prueba en el sandbox y lo **empaqueta como nodo** con su manifiesto. El usuario nunca recibe un script suelto: recibe nodos y flujos que se pueden ver, ejecutar, compartir y remixar.
+Cuando un usuario le pide al agente una herramienta, una función o un proyecto, el agente **lo construye con el motor de nodos** a través del MCP de Sebastián. Si necesita lógica que no existe, crea un nodo de código (Python o SQL) con su manifiesto. El usuario nunca recibe un script suelto: recibe nodos y flujos que se pueden ver, ejecutar, compartir y remixar.
 
-## 2. Dónde vive cada cosa (propuesta)
+## 2. Reparto de responsabilidades
 
-| Pieza | Dónde | Por qué |
+| Pieza | Dueño | Dónde |
 |---|---|---|
-| Sitio web | Render, sitio estático (ya existe) | Sin cambios |
-| **Servicio del agente** (bucle del agente, cliente MCP, claves de Anthropic y Render) | **Render, servicio web Node/TS** | Los bucles del agente duran minutos. Las Edge Functions de Supabase tienen límites de tiempo cortos. Las claves quedan solo en el servidor |
-| **Sandbox** (fork del flujo, ejecución de flujos y de código generado) | **Render Sandboxes**, creadas por el servicio del agente | Aísla lo que hace el agente. Corre en la nube si el usuario no puede o no quiere correr en su equipo |
-| **Servidor MCP del motor** | **En el servicio del agente**. Cada sesión queda atada a un usuario y un fork, y la ejecución se manda al sandbox con `exec` de un runner de comando | Render Sandboxes no expone puertos ni red privada (beta), así que el MCP no puede vivir dentro del sandbox |
-| Usuarios, perfiles, flujos guardados, propuestas | Supabase (Postgres) | Lo define el equipo del motor |
-| Tiempo real de la sala y `@agente` | Supabase Realtime | El agente se une a la sala como un participante más |
-| Índice para el buscador (embeddings de las fichas de componente) | Supabase, pgvector | Lo comparten el buscador del Feed y la memoria del agente |
-| Memoria temporal en grafo | Por decidir (ver §5) | |
+| **Servidor MCP** | Sebastián | Lo define él |
+| **Herramienta de escritura** (crear, modificar y publicar flujos) | Sebastián | MCP |
+| **Herramienta de ejecución** (solo lectura, corre en un sandbox) | Sebastián | MCP + sandbox |
+| Publicaciones, versiones y perfiles | Sebastián (Hub, ADR 0018) | Supabase |
+| **Servicio del agente**: bucle con Claude, cliente MCP, claves | **Gabriel** | Render, servicio web (`apps/agent`, ADR 0019) |
+| **Propuestas y Diff de Dominio** | **Gabriel** | `apps/agent` |
+| **Memoria temporal, fichas de componente y story coding** | **Gabriel** | `apps/agent` + Supabase (ADR 0020) |
+| Autorización del agente | **Gabriel** (ADR 0021) | `apps/agent` |
+| `@agente` en la sala y mediador | Gabriel | **Después**, cuando exista la sala |
+| Feed, buscador y agente de registro | Cantú | — |
 
 ```
-Navegador ──@agente──▶ Supabase Realtime ──▶ Servicio del agente (Render)
-                                               │  Claude (Anthropic)
-                                               │  crea / usa
-                                               ▼
-                                         Render Sandbox
-                                         ├─ fork del flujo del usuario
-                                         ├─ motor sin interfaz + servidor MCP
-                                         └─ ejecución de código de prueba
-                                               │
-                                     propuesta + Diff de Dominio
-                                               ▼
-                               Usuario acepta ──▶ el flujo original cambia
+Usuario ──pedido──▶ Servicio del agente (Render, apps/agent)
+                      │  Claude (Anthropic) · memoria · propuestas
+                      │  cliente MCP, con la identidad del usuario
+                      ▼
+              MCP de Sebastián
+              ├─ escritura: borrador del flujo, cambios, publicar
+              └─ ejecución (solo lectura) ──▶ sandbox
+                      │
+              propuesta + Diff de Dominio ──▶ el usuario acepta ──▶ se aplica / publica
 ```
 
-## 3. Ciclo del sandbox
+## 3. Ciclo de trabajo del agente
 
-1. **Fork.** El agente copia el flujo del usuario a un sandbox nuevo. El original no se toca.
-2. **Construir.** El agente usa las herramientas MCP sobre el fork: agrega nodos, conecta, cambia parámetros y crea nodos de código.
-3. **Probar.** Ejecuta el fork en el sandbox y lee resultados, esquemas y errores. Si algo falla, corrige y vuelve a probar.
-4. **Proponer.** Calcula el diff estructural entre el fork y el original, y lo traduce a un **Diff de Dominio** (tarjetas en lenguaje del oficio).
-5. **Decidir.** El usuario acepta o rechaza cambio por cambio. Lo aceptado se aplica al original. El sandbox se destruye.
+1. **Borrador.** El agente pide a la herramienta de escritura un **borrador** del flujo (una copia de trabajo que nadie más ve). El original no se toca.
+2. **Construir.** Agrega nodos, conecta, cambia parámetros y crea nodos de código sobre el borrador.
+3. **Probar.** Ejecuta el borrador con la herramienta de ejecución (solo lectura) y lee estados, esquemas, muestras y errores. Si algo falla, corrige y vuelve a probar.
+4. **Proponer.** Pide el diff entre el borrador y el original, y lo traduce a un **Diff de Dominio** (tarjetas en lenguaje del oficio, con la razón de cada cambio).
+5. **Decidir.** El usuario acepta o rechaza cambio por cambio. Lo aceptado se aplica al original o se publica, siempre con la identidad del usuario.
 
-Mientras el agente trabaja en el fork, los demás siguen usando el flujo original sin ver nada a medio hacer.
+## 4. Lo que el agente necesita del MCP de Sebastián
 
-## 4. Herramientas MCP que necesita el agente (lista para Sebastián)
+**Requisitos generales**
+- **R1. Identidad del usuario.** El agente llama al MCP en nombre de un usuario (su JWT de Supabase). Cada herramienta respeta los permisos de ese usuario, y ningún argumento puede cambiar de quién es la llamada.
+- **R2. Borradores aislados.** Los cambios del agente ocurren sobre un borrador que nadie más ve, hasta que el usuario acepta.
+- **R3. Errores como datos.** Si algo es inválido (nodo inexistente, puerto incompatible, parámetro fuera de rango, ciclo), la herramienta responde con un error legible y no cambia nada. Los cambios en lote son atómicos.
+- **R4. Revisión del flujo.** Cada flujo y cada borrador tiene una revisión estable (por ejemplo, un hash). Aplicar un borrador falla si el original cambió mientras tanto.
+- **R5. Ejecución acotada y sin escritura.** La herramienta de ejecución no puede modificar flujos ni publicar. Devuelve resultados con límites (por ejemplo, 20 filas y 64 KB por muestra) y permite pedir más páginas.
+- **R6. Sin secretos en el sandbox.** El código generado por el agente corre en el sandbox sin acceso a las claves del servicio. Recomendación: Render Sandboxes (ya tenemos la clave con alcance solo para Sandboxes) o la opción que prefiera Sebastián.
 
-Todas operan **sobre un sandbox** (`sandboxId`), validan sus entradas contra el protocolo y devuelven los errores esperados como valores (`Result`), no como excepciones. Donde existe, se apoyan en un método del protocolo NEP.
+**Herramientas que necesito** (los nombres son orientativos; Sebastián define los finales)
 
-### 4.1 Descubrir (solo lectura)
-| Herramienta | Qué hace | Base en NEP |
+| Necesito… | Para qué | Escritura o ejecución |
 |---|---|---|
-| `nodes.list` | Catálogo de nodos disponibles: id, nombre, categoría, puertos y resumen | catálogo de `nodes-core` |
-| `nodes.get_manifest` | Manifiesto completo de un nodo: puertos, parámetros (JSON Schema) e implementación | manifiesto |
-| `flows.list` / `flows.get` | Flujos guardados del usuario o de la comunidad | Supabase |
-| `components.search` | Búsqueda semántica de nodos y flujos por descripción | pgvector |
+| Listar los nodos disponibles y leer el manifiesto de uno (puertos, parámetros con JSON Schema y unidades) | Saber con qué piezas construir | Lectura |
+| Leer un flujo y buscar flujos o nodos (propios, del Hub) | Partir de algo existente | Lectura |
+| Crear un borrador desde un flujo, o uno vacío | R2 | Escritura |
+| Agregar y quitar nodos, conectar y desconectar puertos, cambiar parámetros, aplicar varios cambios en lote | Construir | Escritura |
+| Crear o actualizar un nodo de código (Python o SQL) con su manifiesto, que viaje dentro del flujo (`customNodes`) | Lógica nueva, siempre como nodo | Escritura |
+| Declarar un flujo como nodo (entradas, parámetros expuestos; ADR 0016) | Entregar herramientas reutilizables | Escritura |
+| Validar un flujo sin ejecutarlo | Corregir antes de probar | Lectura |
+| **Diff entre el borrador y el original**: nodos, conexiones y parámetros (antes y después), y nodos de código | Diff de Dominio | Lectura |
+| Aplicar un borrador (todo o solo algunos cambios) o publicarlo, con la identidad del usuario | Cuando el usuario acepta | Escritura |
+| Descartar un borrador | Limpieza | Escritura |
+| Ejecutar un flujo o borrador (todo o hasta ciertos nodos) y leer estados y errores por nodo | Probar | **Ejecución** |
+| Leer una muestra paginada, el esquema de un puerto y los logs de nodos Python | Inspeccionar | **Ejecución** |
 
-### 4.2 Sandbox
-| Herramienta | Qué hace |
-|---|---|
-| `sandbox.fork` | Crea un sandbox con una copia del flujo y devuelve `sandboxId` |
-| `sandbox.diff` | Diff estructural fork ↔ original: nodos agregados, quitados o cambiados, conexiones y parámetros (valor anterior y nuevo) |
-| `sandbox.propose` | Convierte el diff en una propuesta pendiente para el usuario |
-| `sandbox.discard` | Destruye el sandbox |
-
-### 4.3 Construir y editar el flujo
-| Herramienta | Qué hace | Base en NEP |
-|---|---|---|
-| `flow.get` | Flujo actual del fork en JSON | — |
-| `flow.add_node` | Agrega un nodo por tipo, con parámetros iniciales | `flow.set` |
-| `flow.remove_node` | Quita un nodo y sus conexiones | `flow.set` |
-| `flow.connect` / `flow.disconnect` | Conecta o desconecta puertos, validando sus tipos | `flow.set` |
-| `flow.set_param` | Cambia un parámetro, validado contra su JSON Schema | `flow.set` |
-| `flow.apply_patch` | Aplica varios cambios de forma atómica: o entran todos o ninguno | `flow.set` |
-| `flow.validate` | Valida el flujo completo sin ejecutarlo: tipos, parámetros, nodos mal configurados | `flow.set` |
-| `flow.define_as_node` | Declara el flujo como nodo: nombre, entradas y parámetros expuestos (ADR 0016) | `flow.node` |
-
-### 4.4 Crear nodos nuevos
-| Herramienta | Qué hace |
-|---|---|
-| `node.create_code` | Crea un nodo de código (Python o SQL) con manifiesto: puertos, parámetros y código, según el contrato del ADR 0014 |
-| `node.test` | Ejecuta el nodo con casos de prueba y devuelve resultados o errores |
-| `node.publish` | Guarda el nodo en la librería del usuario (ADR 0009) |
-
-### 4.5 Ejecutar e inspeccionar
-| Herramienta | Qué hace | Base en NEP |
-|---|---|---|
-| `run.flow` | Ejecuta todo el fork o hasta ciertos nodos | `flow.run` |
-| `run.status` | Estado de cada nodo y errores | `node.status`, `run.finished` |
-| `data.sample` | Primeras filas de un resultado | `data.page` |
-| `data.schema` | Columnas y tipos de un puerto sin ejecutar todo | `schema.infer` |
-| `run.logs` | Salida y errores de los nodos Python | `run.log` |
-
-### 4.6 Describir (para la memoria y el buscador)
-| Herramienta | Qué hace |
-|---|---|
-| `component.describe` | Devuelve la **ficha de componente** (§5.1) de un nodo o flujo |
-
-**Pregunta para Sebastián:** ¿qué motor corre sin interfaz dentro del sandbox? ¿El coordinador en Node con el ejecutor Python local, o algo más?
+**El agente se adapta al contrato que defina Sebastián.** Mientras no exista, `apps/agent` trabaja contra un **MCP falso** que imita esta lista.
 
 ## 5. Memoria: story coding en grafo temporal
 
 La memoria registra **qué se construyó, cuándo, cómo, por quién y por qué**: la construcción, las conversaciones con los agentes, entre usuarios y con la comunidad, y las características de cada componente.
 
-**Grafo temporal**
-- **Entidades:** usuario, agente, flujo, nodo, puerto, conversación, decisión, propuesta, círculo.
-- **Relaciones con tiempo** (válida desde y hasta): *creó*, *modificó*, *conectó*, *propuso*, *aceptó*, *rechazó*, *derivó de*, *conversó sobre*.
-- **Episodios:** cada llamada a una herramienta MCP, cada mensaje de la sala y cada propuesta aceptada o rechazada se registra como un episodio con su marca de tiempo.
-- Permite responder preguntas como: *¿por qué este nodo usa 2 h y no 4 h?* → *porque Valeria lo corrigió el sábado a las 11:40, después de hablar con Diego en la sala.*
+- **Entidades:** usuario, agente, flujo, nodo, puerto, conversación, decisión, propuesta.
+- **Relaciones con tiempo** (`valid_from`, `valid_to`): *creó*, *modificó*, *conectó*, *propuso*, *aceptó*, *rechazó*, *derivó de*, *conversó sobre*.
+- **Episodios:** cada llamada del agente al MCP, cada mensaje y cada propuesta aceptada o rechazada, con su marca de tiempo.
+- Permite responder: *¿por qué este nodo usa 2 h y no 4 h?* → *porque Valeria lo corrigió el sábado a las 11:40, después de hablar con Diego.*
 
-**Opción a evaluar:** Graphiti (grafo de conocimiento temporal de código abierto, pensado para memoria de agentes). Necesita su propia base de grafos, aparte de Postgres. Si no cabe en el tiempo, la alternativa es guardar entidades, relaciones y episodios como tablas en Supabase. Esto requiere un ADR.
+Graphiti (grafo temporal de código abierto) queda como evolución futura: es solo Python y exige Neo4j o FalkorDB (ADR 0020).
 
 ### 5.1 Ficha de componente (JSON detallado)
 
@@ -136,41 +107,10 @@ Cada nodo y flujo tiene una ficha que se genera desde su manifiesto y su histori
 }
 ```
 
-El formato final de la ficha se acuerda con Cantú, porque alimenta el buscador del Feed.
+El formato final se acuerda con Cantú, porque alimenta el buscador del Feed.
 
-## 6. `@agente` en la sala de trabajo
+## 6. Después (cuando exista la sala)
 
-- En la sala en tiempo real, cualquiera escribe `@agente` seguido de su pedido.
-- El agente recibe el contexto de la sala: participantes, flujo abierto y últimos mensajes.
-- Responde en el chat de la sala y, si hay que cambiar el flujo, trabaja en un sandbox y deja una **propuesta** visible para todos.
-- La misma vía sirve para el **mediador**: cuando se rompe un límite crítico en la mesa, el agente interviene solo.
-
-## 7. Importar desde GitHub
-
-Convierte un proyecto libre de GitHub en nodos reutilizables:
-1. Clona el repo **dentro del sandbox**, nunca en el servidor del agente.
-2. Analiza el código y detecta funciones con entradas y salidas claras.
-3. Envuelve cada función como nodo de código, con su manifiesto (`node.create_code`).
-4. Compone un flujo de ejemplo, lo prueba (`run.flow`) y genera las fichas.
-5. Lo propone al usuario.
-
-**Alcance:** es una extensión que usa las mismas herramientas. Entra en la demo solo si lo esencial ya funciona.
-
-## 8. Orden de trabajo del área Agente
-
-| Paso | Qué | Depende de |
-|---|---|---|
-| 1 | Servicio del agente en Render, con Claude y validación de salidas | — |
-| 2 | Cliente MCP con un **MCP falso** que imita las herramientas de §4 | Contrato §4 acordado con Sebastián |
-| 3 | Ciclo del sandbox: fork → construir → probar → proponer | MCP real de Sebastián, Render Sandboxes |
-| 4 | Diff de Dominio a partir de `sandbox.diff` | Paso 3 |
-| 5 | `@agente` en la sala y mediador | Sala de Sebastián |
-| 6 | Fichas de componente y embeddings | Formato acordado con Cantú |
-| 7 | Memoria temporal en grafo | ADR |
-| 8 | Importar desde GitHub | Pasos 3 y 6 |
-
-## 9. Preguntas abiertas
-
-- **Sebastián:** ¿el contrato de §4 te sirve? ¿Qué motor corre sin interfaz en el sandbox? ¿Hace falta cambiar el protocolo (ADR) para `flow.apply_patch` o `sandbox.diff`?
-- **Cantú:** ¿qué campos de la ficha (§5.1) necesita el buscador? ¿El agente de registro escribe el perfil en Supabase con algún formato que el agente deba leer?
-- **Equipo:** ¿Graphiti o tablas en Supabase para la memoria? ¿Quién crea el proyecto de Supabase y comparte las claves?
+- **`@agente` en la sala:** el agente responde en el chat y deja propuestas visibles para todos.
+- **Mediador:** cuando se rompe un límite crítico en la mesa, el agente explica el conflicto a cada uno en su jerga y propone un acuerdo.
+- **Importar desde GitHub:** convierte funciones de un repo en nodos de código, usando las mismas herramientas.
