@@ -1,8 +1,7 @@
 import { useReactFlow, useStore, type Viewport } from "@xyflow/react";
 import { useCallback } from "react";
-import { initialViewport, visibleArea, type CanvasInsets } from "./initial-viewport.ts";
-
-const SIDES = ["top", "right", "bottom", "left"] as const;
+import { canvasInsets } from "./canvas-insets.ts";
+import { initialViewport, visibleArea } from "./initial-viewport.ts";
 
 /**
  * Fits the whole flow in the part of the canvas that the floating panels leave visible, and
@@ -17,19 +16,9 @@ export function useFitFlow() {
     const viewport = initialViewport(
       getNodesBounds(getNodes()),
       bounds,
-      visibleArea(bounds, readInsets(canvas.ownerDocument)),
+      visibleArea(bounds, canvasInsets(canvas)),
     );
     void setViewport(viewport);
     return viewport;
   }, [canvas, getNodes, getNodesBounds, setViewport]);
-}
-
-/** Panels mark the side they cover with `data-canvas-inset`; hidden panels cover nothing. */
-function readInsets(document: Document): CanvasInsets {
-  return Object.fromEntries(
-    SIDES.flatMap((side) => {
-      const rect = document.querySelector(`[data-canvas-inset="${side}"]`)?.getBoundingClientRect();
-      return rect === undefined || rect.width === 0 ? [] : [[side, rect]];
-    }),
-  );
 }
