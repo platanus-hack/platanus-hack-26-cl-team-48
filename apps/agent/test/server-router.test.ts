@@ -17,13 +17,18 @@ const echoRoute: Route = {
   path: "/echo",
   handle: (request) => Promise.resolve({ status: 200, body: { length: request.rawBody.length } }),
 };
+const registerRoute: Route = {
+  method: "POST",
+  path: "/agent/register",
+  handle: (request) => Promise.resolve({ status: 200, body: { length: request.rawBody.length } }),
+};
 
 const servers: ReturnType<typeof createServer>[] = [];
 
 async function start(): Promise<string> {
   const router = createRouter({
     identity: { resolve: () => Promise.resolve(ok(USER)) },
-    routes: [whyRoute, echoRoute],
+    routes: [whyRoute, echoRoute, registerRoute],
   });
   const server = createServer({ handleRequest: () => Promise.reject(new Error("unused")), router });
   servers.push(server);
@@ -76,4 +81,17 @@ it("small bodies reach router routes", async () => {
   const response = await fetch(`${base}/echo`, { method: "POST", headers: AUTH, body: "hello" });
 
   expect(await response.json()).toEqual({ length: 5 });
+});
+
+it("registration route allows bodies exceeding standard 16 KB limit", async () => {
+  const base = await start();
+
+  const response = await fetch(`${base}/agent/register`, {
+    method: "POST",
+    headers: AUTH,
+    body: "x".repeat(32_000),
+  });
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ length: 32_000 });
 });

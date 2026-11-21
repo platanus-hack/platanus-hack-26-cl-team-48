@@ -1,4 +1,5 @@
 import { parseBearer, type IdentityPort } from "../requests/identity.ts";
+import { MAX_BODY_BYTES, UPLOAD_MAX_BODY_BYTES } from "./guards/body-limit.ts";
 import type { Route, RouteReply, RouteRequest } from "./route.ts";
 
 export type RouterInput = {
@@ -10,6 +11,7 @@ export type RouterInput = {
 
 export type Router = {
   readonly dispatch: (input: RouterInput) => Promise<RouteReply | undefined>;
+  readonly maxBodyBytes?: (method: string, url: string) => number;
 };
 
 export type RouterDeps = {
@@ -85,6 +87,15 @@ async function run(deps: RouterDeps, match: Match, input: RouterInput): Promise<
   return match.route.handle(request);
 }
 
+function resolveMaxBody(routes: readonly Route[], method: string, url: string): number {
+  const match = findMatch(routes, { method, url, authorization: undefined, rawBody: "" });
+  if (match?.route.maxBodyBytes !== undefined) return match.route.maxBodyBytes;
+  const path = URL.parse(url, BASE_URL)?.pathname ?? "";
+  return path.includes("register") || path.includes("upload")
+    ? UPLOAD_MAX_BODY_BYTES
+    : MAX_BODY_BYTES;
+}
+
 export function createRouter(deps: RouterDeps): Router {
   return {
     dispatch: async (input) => {
@@ -96,5 +107,6 @@ export function createRouter(deps: RouterDeps): Router {
         return errorReply(HTTP_INTERNAL_ERROR, "internal_error");
       }
     },
+    maxBodyBytes: (method, url) => resolveMaxBody(deps.routes, method, url),
   };
 }

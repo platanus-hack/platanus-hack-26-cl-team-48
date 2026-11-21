@@ -1,6 +1,7 @@
 import { err, ok, type Result } from "@nodomics/protocol";
 
 export const MAX_BODY_BYTES = 16 * 1024;
+export const UPLOAD_MAX_BODY_BYTES = 25 * 1024 * 1024;
 
 export type BodyLimitError = {
   readonly status: 413;

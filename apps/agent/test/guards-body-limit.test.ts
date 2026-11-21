@@ -3,6 +3,7 @@ import {
   checkBodyLimit,
   isBodyWithinLimit,
   MAX_BODY_BYTES,
+  UPLOAD_MAX_BODY_BYTES,
 } from "../src/http/guards/body-limit.ts";
 
 describe("body-limit guard", () => {
@@ -35,5 +36,12 @@ describe("body-limit guard", () => {
     if (!result.ok) {
       expect(result.error.status).toBe(413);
     }
+  });
+
+  it("allows bodies up to 25 MB when upload limit is specified", () => {
+    const oneMb = "a".repeat(1024 * 1024);
+    expect(isBodyWithinLimit(oneMb, UPLOAD_MAX_BODY_BYTES)).toBe(true);
+    const result = checkBodyLimit(oneMb, UPLOAD_MAX_BODY_BYTES);
+    expect(result.ok).toBe(true);
   });
 });

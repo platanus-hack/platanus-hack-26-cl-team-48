@@ -2,7 +2,7 @@ import { err, ok, type Result } from "@nodomics/protocol";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
-export const DEFAULT_EMBEDDING_MODEL = "voyage-3.5";
+export const DEFAULT_EMBEDDING_MODEL = "voyage-4";
 const EMBEDDINGS_URL = "https://api.voyageai.com/v1/embeddings";
 const ResponseSchema = Type.Object({
   data: Type.Array(Type.Object({ embedding: Type.Array(Type.Number()) })),

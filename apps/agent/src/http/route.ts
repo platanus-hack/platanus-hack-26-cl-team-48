@@ -13,4 +13,5 @@ export type Route = {
   readonly method: "GET" | "POST";
   readonly path: string;
   readonly handle: (request: RouteRequest) => Promise<RouteReply>;
+  readonly maxBodyBytes?: number;
 };

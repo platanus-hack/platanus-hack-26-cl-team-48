@@ -49,6 +49,77 @@ describe("buildServer", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid_query" });
   });
+
+  it("start wires the search route", async () => {
+    const server = buildServer({ ...CONFIG, devIdentity: true, voyageApiKey: "fake" });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    const response = await fetch(`http://127.0.0.1:${String(port)}/agent/search?q=crop`);
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ cards: [] });
+  });
+});
+
+describe("wired proposals and scoped memory", () => {
+  it("wired request returns a proposal with cards", async () => {
+    const deps = {
+      ...buildRequestDeps({ ...CONFIG, devIdentity: true }),
+      llm: scriptedAgentAndStoryLlm(),
+    };
+    const server = assembleServer(deps, createFakeMemory());
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    const response = await fetch(`http://127.0.0.1:${String(port)}/agent/requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal: "crea un filtro" }),
+    });
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body["proposalId"]).toBeDefined();
+    expect(Array.isArray(body["cards"])).toBe(true);
+  });
+
+  it("supabase memory is created per request with the user token", async () => {
+    const seenTokens: string[] = [];
+    const deps = {
+      ...buildRequestDeps({
+        ...CONFIG,
+        memory: "supabase",
+      }),
+      identity: {
+        resolve: (bearer: string | undefined) =>
+          Promise.resolve(ok({ userId: "u1", accessToken: bearer ?? "" })),
+      },
+      llm: scriptedAgentAndStoryLlm(),
+      memoryForUser: (identity: { accessToken: string }) => {
+        seenTokens.push(identity.accessToken);
+        return createFakeMemory();
+      },
+    };
+
+    const server = assembleServer(deps, createFakeMemory());
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    await fetch(`http://127.0.0.1:${String(port)}/agent/requests`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer token-user-abc",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ goal: "hola" }),
+    });
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(seenTokens).toContain("token-user-abc");
+  });
 });
 
 const toolCall = (id: string, name: string, args: unknown): LlmTurn => ({

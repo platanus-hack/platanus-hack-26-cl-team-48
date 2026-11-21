@@ -8,6 +8,10 @@ import {
 import type { McpPort, UserIdentity } from "../mcp/mcp-port.ts";
 import { buildProposal } from "../proposals/build-proposal.ts";
 import type { ProposalStorePort } from "../proposals/proposal-store-port.ts";
+import type { MemoryPort } from "../memory/memory-port.ts";
+import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
+import type { EmbeddingsPort } from "../memory/embeddings.ts";
+import type { SearchIndexPort } from "../memory/search.ts";
 import { SYSTEM_PROMPT } from "../prompts/system.ts";
 import { REQUEST_ALLOWLIST } from "./allowlists.ts";
 import { recordDrafts } from "./draft-recorder.ts";
@@ -20,6 +24,8 @@ export type RequestDeps = {
   readonly mcp: McpPort;
   readonly proposals?: ProposalStorePort;
   readonly limits?: LoopLimits;
+  readonly memoryForUser?: (identity: UserIdentity) => MemoryPort | null;
+  readonly search?: { readonly embeddings: EmbeddingsPort; readonly index: SearchIndexPort };
 };
 
 export type RequestInput = {
@@ -94,7 +100,9 @@ async function runRequest(
   identity: UserIdentity,
   request: { readonly goal: string; readonly flowId?: string | undefined },
 ): Promise<HttpReply> {
-  const recorder = recordDrafts(deps.mcp);
+  const userMemory = deps.memoryForUser ? deps.memoryForUser(identity) : null;
+  const mcp = userMemory ? buildMemoryDeps(userMemory).wrapMcp(deps.mcp) : deps.mcp;
+  const recorder = recordDrafts(mcp);
   const outcome = await runAgentLoop({
     llm: withSystemPrompt(deps.llm),
     mcp: recorder.mcp,
