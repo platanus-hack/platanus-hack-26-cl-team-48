@@ -6,45 +6,31 @@ import { downloadFlow } from "../flow/download-flow.ts";
 import { MESSAGES } from "../messages.ts";
 import type { FlowLibrary, SavedFlow } from "./flow-library.ts";
 
-export function SavedFlowList({ onClose }: { readonly onClose: () => void }) {
+export function SavedFlowList() {
   const { savedFlowStore } = useAppStores();
-  const openNew = async () => {
-    await savedFlowStore.getState().newFlow();
-    onClose();
-  };
   const flows = useStore(savedFlowStore, (state) => state.flows);
   return (
     <div className="web-saved-list">
       <Button
         icon="plus"
         onClick={() => {
-          void openNew();
+          void savedFlowStore.getState().newFlow();
         }}
       >
         {MESSAGES.savedFlows.newFlow}
       </Button>
       {flows.length === 0 && <p>{MESSAGES.savedFlows.empty}</p>}
       {flows.map((flow) => (
-        <SavedFlowCard key={flow.id} flow={flow} onClose={onClose} />
+        <SavedFlowCard key={flow.id} flow={flow} />
       ))}
     </div>
   );
 }
-function SavedFlowCard({
-  flow,
-  onClose,
-}: {
-  readonly flow: SavedFlow;
-  readonly onClose: () => void;
-}) {
+function SavedFlowCard({ flow }: { readonly flow: SavedFlow }) {
   const { savedFlowStore } = useAppStores();
   const [isRenaming, setRenaming] = useState(false);
   const [name, setName] = useState(flow.name);
   const state = savedFlowStore.getState();
-  const openSaved = async () => {
-    await state.openFlow(flow.id);
-    onClose();
-  };
   return (
     <article className="web-saved-card" aria-label={flow.name}>
       <h3>{flow.name}</h3>
@@ -71,7 +57,7 @@ function SavedFlowCard({
         <Button
           size="sm"
           onClick={() => {
-            void openSaved();
+            void state.openFlow(flow.id);
           }}
         >
           {MESSAGES.savedFlows.open}

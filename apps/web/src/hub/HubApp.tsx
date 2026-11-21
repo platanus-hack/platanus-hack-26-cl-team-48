@@ -1,9 +1,9 @@
-import type { Flow, NodeManifest } from "@nodomics/protocol";
+import type { Flow } from "@nodomics/protocol";
 import { ICON_SIZE, Icon } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { encodeSharedFlow } from "../flow/flow-file.ts";
 import { MESSAGES } from "../messages.ts";
-import type { Route } from "../routing/routes.ts";
+import { pathOf, type Route } from "../routing/routes.ts";
 import { useRoute } from "../routing/use-route.ts";
 import { AccountButton } from "./AccountButton.tsx";
 import { HubPage } from "./HubPage.tsx";
@@ -35,7 +35,12 @@ function HubBar() {
         <span className="web-hub-bar-section">{MESSAGES.hub.title}</span>
       </p>
       <div className="web-hub-bar-end">
-        <a className="nd-btn nd-btn-secondary" href="/" target="_blank" rel="noopener noreferrer">
+        <a
+          className="nd-btn nd-btn-secondary"
+          href={pathOf({ page: "workspace" })}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <Icon name="workflow" size={ICON_SIZE.md} />
           {MESSAGES.hub.openEditor}
         </a>
@@ -59,7 +64,7 @@ function HubRoutePage({ route }: { readonly route: HubRoute }) {
           handle={route.handle}
           slug={route.slug}
           onOpenCopy={openCopyInEditorTab}
-          onInstall={(manifests: ReadonlyArray<NodeManifest>) => {
+          onInstall={(manifests) => {
             personalLibraryStore.getState().install(manifests);
           }}
         />

@@ -1,6 +1,6 @@
 import { useSourceReconnection } from "./engine/use-source-reconnection.ts";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Canvas } from "./canvas/Canvas.tsx";
 import { useAddNode } from "./canvas/use-add-node.ts";
 import { EngineConnectionContext } from "./engine/engine-connection.ts";
@@ -26,7 +26,8 @@ import type {
   WorkspacePreferenceStorage,
 } from "./layout/workspace-preferences.ts";
 import type { CSSProperties } from "react";
-import { ActivityRail } from "./workspace/ActivityRail.tsx";
+import { ActivityRail, focusRailSection } from "./workspace/ActivityRail.tsx";
+import { RouteLinkTargetContext } from "./routing/route-link-target.ts";
 import { SidePanel } from "./workspace/SidePanel.tsx";
 import { PreviewLocationControl } from "./toolbar/PreviewLocationControl.tsx";
 
@@ -43,16 +44,18 @@ export function App({ engines, defaultEngine, shouldRunOnConnect, preferenceStor
   const connection = useEngineLifecycle(engine);
   return (
     <EngineConnectionContext value={connection}>
-      <ReactFlowProvider>
-        <Workspace
-          preferenceStorage={preferenceStorage}
-          engines={engines}
-          engine={engine}
-          onEngineChange={setEngine}
-        />
-        <AutoRun isEnabled={shouldRunOnConnect} />
-        <NoticeArea />
-      </ReactFlowProvider>
+      <RouteLinkTargetContext value="new-tab">
+        <ReactFlowProvider>
+          <Workspace
+            preferenceStorage={preferenceStorage}
+            engines={engines}
+            engine={engine}
+            onEngineChange={setEngine}
+          />
+          <AutoRun isEnabled={shouldRunOnConnect} />
+          <NoticeArea />
+        </ReactFlowProvider>
+      </RouteLinkTargetContext>
     </EngineConnectionContext>
   );
 }
@@ -67,6 +70,7 @@ function Workspace(props: {
   const addNode = useAddNode();
   const { preferences, setPreferences } = useWorkspacePreferences(preferenceStorage);
   const viewport = useViewportSize();
+  const rail = useRef<HTMLElement>(null);
   const change = (patch: Partial<WorkspacePreferences>) => {
     setPreferences({ ...preferences, ...patch });
   };
@@ -87,6 +91,7 @@ function Workspace(props: {
       >
         <Toolbar {...engine} />
         <ActivityRail
+          ref={rail}
           shown={preferences.isSidePanelOpen ? preferences.sideSection : undefined}
           onSelect={(section) => {
             change(sectionToggle(preferences, section));
@@ -101,6 +106,7 @@ function Workspace(props: {
             section={preferences.sideSection}
             onHide={() => {
               change({ isSidePanelOpen: false });
+              focusRailSection(rail.current, preferences.sideSection);
             }}
             onAdd={(manifest) => {
               addNode(manifest);

@@ -99,10 +99,6 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
   const flow = useFlowState((state) => state.flow);
   if (manifest === undefined)
     return <p className="web-panel-hint">{MESSAGES.params.unknownNode}</p>;
-  const nodeIssues = [
-    ...issues.filter((issue) => issue.nodeId === node.id),
-    ...(runError?.param === undefined ? [] : [{ ...runError, nodeId: node.id }]),
-  ];
   return (
     <>
       <div className="web-params-node">
@@ -127,7 +123,10 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
               <ParamsForm
                 node={node}
                 manifest={manifest}
-                issues={nodeIssues}
+                issues={[
+                  ...issues.filter((issue) => issue.nodeId === node.id),
+                  ...(runError?.param === undefined ? [] : [{ ...runError, nodeId: node.id }]),
+                ]}
                 onChange={(param, value) => {
                   dispatch(nodeParamEdit({ flow, node, manifest, param, value }));
                 }}

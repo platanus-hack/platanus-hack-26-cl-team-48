@@ -46,6 +46,7 @@ export function NodeDetailTabs({ children }: NodeDetailTabsProps) {
         role="tabpanel"
         aria-labelledby={`${id}-${selected}`}
         className="web-params-tab-panel"
+        tabIndex={0}
       >
         {children(selected)}
       </div>

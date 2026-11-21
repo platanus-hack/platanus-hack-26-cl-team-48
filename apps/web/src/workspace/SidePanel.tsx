@@ -19,12 +19,11 @@ type SidePanelProps = {
 };
 
 // The lists were made for a dialog that closed after opening a flow; the panel stays open.
-const KEEP_OPEN = () => undefined;
 
 const CONTENTS: Record<SideSection, (onAdd: SidePanelProps["onAdd"]) => ReactNode> = {
   nodes: (onAdd) => <LibraryPanel onAdd={onAdd} />,
-  flows: () => <SavedFlowList onClose={KEEP_OPEN} />,
-  "my-nodes": () => <SavedNodeList onClose={KEEP_OPEN} />,
+  flows: () => <SavedFlowList />,
+  "my-nodes": () => <SavedNodeList />,
   data: () => <StoredFileList />,
   secrets: () => <Credentials />,
   agent: () => <AgentPanel />,
