@@ -8,6 +8,7 @@ import type { McpError, McpPort } from "../src/mcp/mcp-port.ts";
 import { createHandleRequest, type RequestDeps } from "../src/requests/handle-request.ts";
 import { createDevIdentity } from "../src/requests/identity.ts";
 import type { IdentityPort } from "../src/requests/identity.ts";
+import { SYSTEM_PROMPT } from "../src/prompts/system.ts";
 import { createServer } from "../src/server.ts";
 
 const USER = { userId: "u1", accessToken: "jwt-u1" };
@@ -86,6 +87,7 @@ describe("POST /agent/requests", () => {
     expect(reply.status).toBe(200);
     expect(reply.body).toEqual({ draftId: "draft-1", summary: "Listo, borrador creado", steps: 2 });
     expect(requests[0]?.messages[0]).toMatchObject({ text: "hazme una calculadora de cosecha" });
+    expect(requests[0]?.system).toBe(SYSTEM_PROMPT);
     expect(requests[0]?.tools.map((tool) => tool.name)).not.toContain("flows.apply");
   });
 
