@@ -53,6 +53,34 @@ describe("PersonalLibrary", () => {
     });
   });
 
+  it("keeps the nodes another tab added before this one adds its own", () => {
+    const storage = createStorage();
+    const first = createStoragePersonalLibrary(() => storage);
+    const second = createStoragePersonalLibrary(() => storage);
+    second.read();
+    const nodeA = manifestOf("personal.a");
+    const nodeB = manifestOf("personal.b");
+    first.add(nodeA);
+
+    second.add(nodeB);
+
+    expect({
+      stored: storage.getItem(PERSONAL_NODES_KEY),
+      read: createStoragePersonalLibrary(() => storage).read().nodes,
+    }).toEqual({ stored: JSON.stringify([nodeA, nodeB]), read: [nodeA, nodeB] });
+  });
+
+  it("stops reporting invalid storage once another tab rewrites it with valid data", () => {
+    const storage = createStorage();
+    storage.setItem(PERSONAL_NODES_KEY, "{");
+    const library = createStoragePersonalLibrary(() => storage);
+    library.read();
+
+    storage.setItem(PERSONAL_NODES_KEY, JSON.stringify([NODE]));
+
+    expect(library.read()).toEqual({ nodes: [NODE] });
+  });
+
   it("falls back to memory when accessing storage throws", () => {
     const library = createStoragePersonalLibrary(() => {
       throw new Error("blocked");

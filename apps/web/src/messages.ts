@@ -4,7 +4,6 @@ import type { ConnectionFailure } from "./engine/engine-events.ts";
 // Every user-visible text of the interface lives here, so an i18n layer can replace it in one place.
 export const MESSAGES = {
   flowNodes: {
-    tab: "Nodos",
     open: "Abrir flujo",
     legacy: "Creados con «Convertir en nodo»",
     update: (version: string) => `Actualizar a la versión ${version}`,
@@ -63,6 +62,22 @@ export const MESSAGES = {
     published: "Publicada",
     use: "Usar",
     flowHint: "Se abre como un flujo nuevo en tu editor; el original no cambia.",
+    openEditor: "Abrir el editor",
+    forYou: "Para ti",
+    forYouMockup: "Maqueta: recomendaciones según los flujos en los que trabajas.",
+    forYouExamples: [
+      {
+        kind: "Flujo",
+        title: "Cosecha por ventana",
+        reason: "Usa los mismos nodos que tus flujos de ventas",
+      },
+      { kind: "Nodo", title: "Marcar atípicos", reason: "Lo usan quienes agrupan ventas por mes" },
+      {
+        kind: "Nodo",
+        title: "Calendario de feriados",
+        reason: "Tus flujos tienen columnas de fecha",
+      },
+    ],
     nodeHint:
       "Se agrega a «Mis nodos» y lo usas como cualquier otro nodo, también como copia editable.",
   },
@@ -97,10 +112,6 @@ export const MESSAGES = {
     },
   },
   savedFlows: {
-    title: "Mis flujos",
-    flows: "Flujos",
-    data: "Datos",
-    close: "Cerrar",
     newFlow: "Nuevo flujo",
     name: "Nombre del flujo",
     open: "Abrir",
@@ -128,7 +139,6 @@ export const MESSAGES = {
     nodes: (count: number) => `${String(count)} nodos`,
   },
   secrets: {
-    title: "Credenciales",
     name: "Nombre",
     value: "Valor",
     add: "Agregar",
@@ -173,14 +183,60 @@ export const MESSAGES = {
     publish: "Publicar en el hub…",
     exportFile: "Exportar archivo",
     importFile: "Importar archivo…",
-    sections: "Secciones",
-    editor: "Editor",
-    hub: "Hub",
-    export: "Exportar",
+    flowOptions: "Opciones del flujo",
+    newFlow: "Nuevo flujo",
     import: "Importar",
   },
+  rail: {
+    label: "Secciones del editor",
+    sections: {
+      nodes: "Nodos",
+      flows: "Mis flujos",
+      "my-nodes": "Mis nodos",
+      data: "Datos",
+      secrets: "Credenciales",
+      agent: "Agente",
+    },
+    panels: {
+      nodes: "Biblioteca de nodos",
+      flows: "Mis flujos",
+      "my-nodes": "Mis nodos",
+      data: "Datos",
+      secrets: "Credenciales",
+      agent: "Agente",
+    },
+    hidePanel: "Ocultar panel",
+    openHub: "Abrir el hub en otra pestaña",
+  },
+  agent: {
+    mockup: "Maqueta: el agente todavía no está conectado.",
+    request: "Marca las ventas fuera de lo normal antes de agrupar, y muéstralas en el gráfico.",
+    answer:
+      "Propongo 3 cambios sobre un borrador. Revisa cada uno: nada cambia en tu flujo hasta que lo aceptes.",
+    proposals: [
+      {
+        kind: "Nodo nuevo",
+        title: "Marcar atípicos",
+        reason:
+          "Agrega la columna es_atípico: ventas a más de 3 desvíos del promedio de su producto.",
+      },
+      {
+        kind: "Cambio",
+        title: "Agrupar conserva es_atípico",
+        reason: "Sin esto la marca se pierde al resumir por mes.",
+      },
+      {
+        kind: "Cambio",
+        title: "El gráfico resalta los meses con atípicos",
+        reason: "Los meses con al menos una venta atípica se pintan distinto.",
+      },
+    ],
+    accept: "Aceptar",
+    reject: "Rechazar",
+    composer: "Escribe al agente",
+    composerPlaceholder: "Pide un cambio o una explicación…",
+  },
   library: {
-    label: "Biblioteca de nodos",
     invalid: "Descartamos entradas inválidas de tu biblioteca personal.",
     unavailable:
       "Tu biblioteca personal se conservará solo en esta sesión: el almacenamiento no está disponible.",
@@ -222,6 +278,9 @@ export const MESSAGES = {
     closeEditor: "Cerrar editor",
     editorHint: "Tab indenta. Para salir del editor con el teclado, pulsa Esc y luego Tab.",
     ports: "Puertos",
+    details: "Detalle del nodo",
+    tabs: { params: "Parámetros", ports: "Puertos", history: "Historia" },
+    historyMockup: "Maqueta: aquí verás quién cambió este nodo, cuándo y por qué.",
     input: "Entrada",
     output: "Salida",
   },

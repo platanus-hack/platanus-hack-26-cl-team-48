@@ -45,6 +45,7 @@ const DEFAULT_HANDLERS: FakeHandlers = {
     sources: ["upload"],
   }),
   "nodes.list": () => ({ nodes: [] }),
+  "flow.set": ({ rev }) => ({ rev, stale: [], errors: [] }),
 };
 
 /**

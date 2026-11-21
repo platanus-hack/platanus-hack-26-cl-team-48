@@ -6,62 +6,44 @@ import { NODE_DRAG_TYPE } from "../canvas/drag-types.ts";
 import { groupLibrary } from "../canvas/library-groups.ts";
 import { iconOf } from "../canvas/node-views.ts";
 import { LAYOUT_MESSAGES } from "../layout/messages.ts";
-import { PanelToggle } from "../layout/PanelToggle.tsx";
 import { MESSAGES } from "../messages.ts";
 
 type LibraryPanelProps = {
-  readonly isOpen: boolean;
-  readonly onToggle: () => void;
   readonly onAdd: (manifest: NodeManifest) => void;
 };
 
-/** The node library, built from the engine's catalog (`nodes.list`) and the flow's custom nodes. */
-export function LibraryPanel({ isOpen, onToggle, onAdd }: LibraryPanelProps) {
+/**
+ * The node library, built from the engine's catalog (`nodes.list`) and the flow's custom nodes;
+ * the side panel frames it.
+ */
+export function LibraryPanel({ onAdd }: LibraryPanelProps) {
   const [search, setSearch] = useState("");
-  const groups = useLibraryGroups(isOpen ? search : "");
+  const groups = useLibraryGroups(search);
   return (
-    <aside
-      className="web-floating web-library"
-      data-open={isOpen}
-      data-canvas-inset="left"
-      aria-label={MESSAGES.library.label}
-    >
+    <>
       <div className="web-library-top">
-        {isOpen && (
-          <Input
-            icon="search"
-            label={LAYOUT_MESSAGES.searchNodes}
-            placeholder={`${LAYOUT_MESSAGES.searchNodes}…`}
-            value={search}
-            onChange={setSearch}
-          />
-        )}
-        <PanelToggle
-          isOpen={isOpen}
-          onToggle={onToggle}
-          labels={{ hide: LAYOUT_MESSAGES.hideLibrary, show: LAYOUT_MESSAGES.showLibrary }}
-          icons={{ hide: "panel-left-close", show: "panel-left-open" }}
+        <Input
+          type="search"
+          icon="search"
+          label={LAYOUT_MESSAGES.searchNodes}
+          placeholder={`${LAYOUT_MESSAGES.searchNodes}…`}
+          value={search}
+          onChange={setSearch}
         />
       </div>
       <div className="web-library-list">
-        {isOpen && groups.length === 0 && (
-          <p className="web-panel-hint">{MESSAGES.library.empty}</p>
-        )}
-        {groups.map((group, index) => (
+        {groups.length === 0 && <p className="web-panel-hint">{MESSAGES.library.empty}</p>}
+        {groups.map((group) => (
           <section key={group.category} className="web-library-group" aria-label={group.category}>
-            {isOpen ? (
-              <h3 className="web-overline">{group.category}</h3>
-            ) : (
-              index > 0 && <span className="web-library-separator" aria-hidden="true" />
-            )}
+            <h3 className="web-overline">{group.category}</h3>
             {group.nodes.map((manifest) => (
-              <LibraryItem key={manifest.id} manifest={manifest} isOpen={isOpen} onAdd={onAdd} />
+              <LibraryItem key={manifest.id} manifest={manifest} onAdd={onAdd} />
             ))}
           </section>
         ))}
       </div>
-      {isOpen && <p className="web-library-hint">{MESSAGES.library.hint}</p>}
-    </aside>
+      <p className="web-library-hint">{MESSAGES.library.hint}</p>
+    </>
   );
 }
 
@@ -80,11 +62,7 @@ function useLibraryGroups(search: string) {
   );
 }
 
-function LibraryItem({
-  manifest,
-  isOpen,
-  onAdd,
-}: { readonly manifest: NodeManifest } & Omit<LibraryPanelProps, "onToggle">) {
+function LibraryItem({ manifest, onAdd }: { readonly manifest: NodeManifest } & LibraryPanelProps) {
   return (
     <button
       type="button"
@@ -105,7 +83,7 @@ function LibraryItem({
       <span className="web-node-icon">
         <Icon name={iconOf(manifest)} size={ICON_SIZE.sm} />
       </span>
-      {isOpen && <span className="web-library-name">{manifest.name}</span>}
+      <span className="web-library-name">{manifest.name}</span>
     </button>
   );
 }

@@ -21,7 +21,7 @@ export function HubPage() {
   const results = useSearch(text, kind);
   return (
     <main className="web-hub-page">
-      <header className="web-hub-hero">
+      <div className="web-hub-hero">
         <h1>{MESSAGES.hub.title}</h1>
         <p className="web-hub-lead">{MESSAGES.hub.subtitle}</p>
         <div className="web-hub-search">
@@ -35,12 +35,32 @@ export function HubPage() {
           />
         </div>
         <KindChips kind={kind} onChange={setKind} />
-      </header>
+      </div>
+      <ForYouMockup />
       {results.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
       {results.status === "ready" && (
         <PublicationList publications={results.value} empty={MESSAGES.hub.noResults} />
       )}
     </main>
+  );
+}
+
+function ForYouMockup() {
+  const heading = useId();
+  return (
+    <section className="web-hub-for-you" aria-labelledby={heading}>
+      <h2 id={heading}>{MESSAGES.hub.forYou}</h2>
+      <p className="web-mockup-note">{MESSAGES.hub.forYouMockup}</p>
+      <ul className="web-hub-for-you-list" aria-hidden="true">
+        {MESSAGES.hub.forYouExamples.map((example) => (
+          <li key={example.title} className="web-hub-for-you-card">
+            <span className="web-hub-for-you-kind">{example.kind}</span>
+            <strong>{example.title}</strong>
+            <span className="web-hub-for-you-reason">{example.reason}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

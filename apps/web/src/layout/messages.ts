@@ -1,6 +1,4 @@
 export const LAYOUT_MESSAGES = {
-  hideLibrary: "Ocultar biblioteca",
-  showLibrary: "Mostrar biblioteca",
   searchNodes: "Buscar nodos",
   hideParams: "Ocultar parámetros",
   showParams: "Mostrar parámetros",

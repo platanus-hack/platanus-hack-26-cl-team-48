@@ -28,7 +28,7 @@ export function PreviewFrame({ size, onChange, children }: PreviewFrameProps) {
     <div
       ref={frame}
       id={contentId}
-      className="web-floating web-preview-frame"
+      className="web-preview-frame"
       data-mode={size.mode}
       data-canvas-inset="bottom"
     >

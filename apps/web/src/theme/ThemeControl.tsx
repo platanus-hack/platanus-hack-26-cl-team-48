@@ -12,8 +12,7 @@ export function ThemeControl({
   readonly onChange: (theme: Theme) => void;
 }) {
   useEffect(() => {
-    if (theme === "system") document.documentElement.removeAttribute("data-theme");
-    else document.documentElement.dataset["theme"] = theme;
+    applyTheme(theme);
   }, [theme]);
   return (
     <IconMenu
@@ -35,4 +34,10 @@ export function ThemeControl({
       }))}
     />
   );
+}
+
+/** "system" leaves the theme to the operating system's preference. */
+export function applyTheme(theme: Theme) {
+  if (theme === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset["theme"] = theme;
 }

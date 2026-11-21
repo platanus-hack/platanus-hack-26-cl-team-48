@@ -26,6 +26,10 @@ test.describe("step 5: share by link", () => {
     await waitForAllNodesReady(page, DEMO_NODE_COUNT);
 
     await page.getByRole("button", { name: "Compartir" }).click();
+    await page
+      .getByRole("menu", { name: "Compartir" })
+      .getByRole("menuitem", { name: "Copiar enlace" })
+      .click();
     await expect(
       page.getByRole("status").filter({ hasText: "Enlace listo para compartir" }),
     ).toContainText("Copiamos el enlace del flujo al portapapeles.");

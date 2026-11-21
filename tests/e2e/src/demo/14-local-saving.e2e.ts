@@ -10,6 +10,7 @@ import {
 import { dropCsvOnCanvas } from "../support/csv-drop.ts";
 import { openEmptyApp } from "../support/flow-files.ts";
 import { showPreview } from "../support/preview.ts";
+import { showSidePanel, sidePanelOf } from "../support/side-panel.ts";
 
 test("restores local flows and reconnects a saved CSV after reload", async ({ page }, testInfo) => {
   await openEmptyApp(page);
@@ -27,18 +28,17 @@ test("restores local flows and reconnects a saved CSV after reload", async ({ pa
   );
   await expect(nodeOnCanvas(page, "Datos de ejemplo")).toBeVisible();
   await expect(nodeOnCanvas(page, "Filtrar")).toBeVisible();
-  await page.getByRole("button", { name: "Mis flujos" }).click();
-  await page.getByRole("button", { name: "Nuevo flujo" }).click();
+  const flows = await showSidePanel(page, "Mis flujos");
+  await flows.getByRole("button", { name: "Nuevo flujo" }).click();
   await expect(nodeOnCanvas(page, "Datos de ejemplo")).toHaveCount(0);
-  await page.getByRole("button", { name: "Mis flujos" }).click();
-  await page
+  await flows
     .getByRole("article", { name: "Ventas locales" })
     .getByRole("button", { name: "Abrir", exact: true })
     .click();
   await expect(nodeOnCanvas(page, "Datos de ejemplo")).toBeVisible();
+  await expect(sidePanelOf(page, "Mis flujos")).toBeVisible();
 
-  await page.getByRole("button", { name: "Mis flujos" }).click();
-  await page.getByRole("button", { name: "Nuevo flujo" }).click();
+  await flows.getByRole("button", { name: "Nuevo flujo" }).click();
   const path = testInfo.outputPath("ventas.csv");
   await writeFile(path, "producto,stock\nTé,12\nCafé,7\n");
   await dropCsvOnCanvas(page, { name: "ventas.csv", path });
