@@ -351,6 +351,19 @@ describe("POST /feed/registration", () => {
     expect(sources).toEqual([]);
   });
 
+  it.each([
+    ["a string that decodes to zero bytes", "A"],
+    ["characters outside the base64 alphabet", "@@@@!!!!"],
+    ["a length that is not a multiple of 4", "QUJDRA="],
+  ])("replies 400 invalid_input for a PDF with %s", async (_name, pdfBase64) => {
+    const { routes, sources } = setup();
+
+    const reply = await register(routes, { pdfBase64 });
+
+    expect(reply).toEqual({ status: 400, body: { error: "invalid_input" } });
+    expect(sources).toEqual([]);
+  });
+
   it("accepts text of exactly 20000 chars", async () => {
     const { routes } = setup();
 

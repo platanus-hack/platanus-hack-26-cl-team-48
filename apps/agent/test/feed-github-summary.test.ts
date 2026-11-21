@@ -114,4 +114,34 @@ describe("createGithubSummary", () => {
 
     expect(result).toEqual({ ok: false, error: { code: "UPSTREAM" } });
   });
+
+  it.each([
+    ["a user without login", {}, REPOS],
+    ["a null user", null, REPOS],
+    ["a user that is a string", "octocat", REPOS],
+    ["repos with an empty object", PROFILE, [{}]],
+    ["repos that are an object", PROFILE, {}],
+    ["repos that are null", PROFILE, null],
+    ["a repo that is a string", PROFILE, ["hello-world"]],
+  ])("returns UPSTREAM for %s", async (_name, user, repos) => {
+    const { fetchImpl } = fakeFetch({
+      [USER_URL]: () => jsonResponse(user),
+      [REPOS_URL]: () => jsonResponse(repos),
+    });
+
+    const result = await createGithubSummary(fetchImpl).summarize("octocat");
+
+    expect(result).toEqual({ ok: false, error: { code: "UPSTREAM" } });
+  });
+
+  it("never prints undefined in the summary", async () => {
+    const { fetchImpl } = fakeFetch({
+      [USER_URL]: () => jsonResponse({ login: "octocat" }),
+      [REPOS_URL]: () => jsonResponse([{ name: "bare" }]),
+    });
+
+    const result = await createGithubSummary(fetchImpl).summarize("octocat");
+
+    if (result.ok) expect(result.value).not.toContain("undefined");
+  });
 });
