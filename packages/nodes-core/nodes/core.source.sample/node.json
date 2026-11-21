@@ -1,0 +1,30 @@
+{
+  "id": "core.source.sample",
+  "version": "0.1.0",
+  "name": "Datos de ejemplo",
+  "description": "Carga un conjunto de datos de ejemplo.",
+  "category": "Fuentes",
+  "icon": "database",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "dataset": {
+        "title": "Conjunto de datos",
+        "enum": ["ventas"],
+        "default": "ventas"
+      }
+    },
+    "required": ["dataset"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{source (concat 'sample.' dataset)}}"
+  }
+}

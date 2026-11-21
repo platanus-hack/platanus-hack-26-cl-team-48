@@ -1,0 +1,71 @@
+{
+  "cases": [
+    {
+      "name": "reads the ventas sample",
+      "params": {
+        "dataset": "ventas"
+      },
+      "inputs": {},
+      "sources": {
+        "sample.ventas": {
+          "columns": [
+            {
+              "name": "fecha",
+              "type": "date"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "producto",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            },
+            {
+              "name": "precio",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["2024-01-01", "Norte", "Café", 12, 12.5],
+            ["2024-01-02", "Sur", "Té", 4, 8.25]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "fecha",
+              "type": "date"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "producto",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            },
+            {
+              "name": "precio",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["2024-01-01", "Norte", "Café", 12, 12.5],
+            ["2024-01-02", "Sur", "Té", 4, 8.25]
+          ]
+        }
+      }
+    }
+  ]
+}

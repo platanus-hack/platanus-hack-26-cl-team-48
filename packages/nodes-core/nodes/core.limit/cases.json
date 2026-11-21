@@ -1,0 +1,47 @@
+{
+  "cases": [
+    {
+      "name": "keeps the first rows",
+      "params": {
+        "n": 2
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3]
+          ]
+        }
+      }
+    }
+  ]
+}

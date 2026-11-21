@@ -1,0 +1,136 @@
+{
+  "id": "core.view.table",
+  "version": "0.1.0",
+  "name": "Tabla",
+  "description": "Muestra las primeras filas de las columnas elegidas.",
+  "category": "Vistas",
+  "icon": "table-2",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "chart"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "columns": {
+        "title": "Columnas",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "title": "Columna",
+          "type": "string",
+          "x-nodomics": {
+            "widget": "column",
+            "of": "in"
+          }
+        }
+      },
+      "rows": {
+        "title": "Filas",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 20
+      }
+    },
+    "required": ["columns"]
+  },
+  "impl": {
+    "kind": "view",
+    "spec": {
+      "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+      "transform": [
+        {
+          "window": [
+            {
+              "op": "row_number",
+              "as": "fila"
+            }
+          ]
+        },
+        {
+          "filter": "datum.fila <= {{rows}}"
+        },
+        {
+          "fold": "{{columns}}",
+          "as": ["columna", "valor"]
+        }
+      ],
+      "encoding": {
+        "x": {
+          "field": "columna",
+          "type": "nominal",
+          "sort": "{{columns}}",
+          "bandPosition": 0,
+          "scale": {
+            "type": "band",
+            "paddingInner": 0,
+            "paddingOuter": 0
+          },
+          "axis": {
+            "orient": "top",
+            "title": null,
+            "labels": false,
+            "ticks": false
+          }
+        },
+        "y": {
+          "field": "fila",
+          "type": "ordinal",
+          "axis": {
+            "title": null,
+            "labels": false,
+            "ticks": false,
+            "domain": false,
+            "grid": true,
+            "bandPosition": 1
+          }
+        }
+      },
+      "layer": [
+        {
+          "transform": [
+            {
+              "filter": "datum.fila == 1"
+            }
+          ],
+          "mark": {
+            "type": "text",
+            "align": "left",
+            "dx": 8,
+            "dy": -12,
+            "fontWeight": "bold"
+          },
+          "encoding": {
+            "y": {
+              "value": 0
+            },
+            "text": {
+              "field": "columna"
+            }
+          }
+        },
+        {
+          "mark": {
+            "type": "text",
+            "align": "left",
+            "dx": 8
+          },
+          "encoding": {
+            "text": {
+              "field": "valor"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

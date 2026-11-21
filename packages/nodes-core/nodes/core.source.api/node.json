@@ -1,0 +1,103 @@
+{
+  "id": "core.source.api",
+  "version": "0.1.0",
+  "name": "API",
+  "description": "Lee datos de una API.",
+  "category": "Fuentes",
+  "icon": "globe",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "title": "Dirección"
+      },
+      "query": {
+        "title": "Parámetros de la consulta",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Nombre"
+            },
+            "value": {
+              "type": "string",
+              "title": "Valor"
+            },
+            "secret": {
+              "type": "string",
+              "title": "Credencial"
+            }
+          },
+          "required": ["name"]
+        },
+        "default": [],
+        "x-nodomics": {
+          "widget": "key-values"
+        }
+      },
+      "headers": {
+        "title": "Encabezados",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Nombre"
+            },
+            "value": {
+              "type": "string",
+              "title": "Valor"
+            },
+            "secret": {
+              "type": "string",
+              "title": "Credencial"
+            }
+          },
+          "required": ["name"]
+        },
+        "default": [],
+        "x-nodomics": {
+          "widget": "key-values"
+        }
+      },
+      "format": {
+        "oneOf": [
+          {
+            "const": "json",
+            "title": "JSON"
+          },
+          {
+            "const": "csv",
+            "title": "CSV"
+          },
+          {
+            "const": "txt",
+            "title": "Texto"
+          }
+        ],
+        "default": "json"
+      },
+      "records": {
+        "type": "string",
+        "title": "Ruta de los registros",
+        "description": "Por ejemplo: data.items"
+      }
+    },
+    "required": ["url"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{request url query=query headers=headers format=format records=records}}"
+  }
+}

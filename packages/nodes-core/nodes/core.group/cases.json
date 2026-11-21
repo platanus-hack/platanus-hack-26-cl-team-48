@@ -1,0 +1,106 @@
+{
+  "cases": [
+    {
+      "name": "sums per group, ordered by the group",
+      "params": {
+        "groupBy": ["region"],
+        "aggregations": [
+          {
+            "column": "unidades",
+            "fn": "SUM",
+            "name": "total"
+          }
+        ]
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "total",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 7],
+            ["Sur", 3]
+          ]
+        }
+      }
+    },
+    {
+      "name": "aggregates the whole table without groups",
+      "params": {
+        "groupBy": [],
+        "aggregations": [
+          {
+            "column": "unidades",
+            "fn": "COUNT",
+            "name": "filas"
+          },
+          {
+            "column": "unidades",
+            "fn": "MAX",
+            "name": "maximo"
+          }
+        ]
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "filas",
+              "type": "number"
+            },
+            {
+              "name": "maximo",
+              "type": "number"
+            }
+          ],
+          "rows": [[3, 5]]
+        }
+      }
+    }
+  ]
+}

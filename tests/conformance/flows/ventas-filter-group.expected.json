@@ -1,0 +1,15 @@
+{
+  "out": {
+    "columns": [
+      {
+        "name": "region",
+        "type": "text"
+      },
+      {
+        "name": "total",
+        "type": "number"
+      }
+    ],
+    "rows": [["Norte", 919]]
+  }
+}

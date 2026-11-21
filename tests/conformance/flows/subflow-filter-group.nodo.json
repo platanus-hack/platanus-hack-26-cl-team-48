@@ -1,0 +1,163 @@
+{
+  "format": "nodomics/flow@0",
+  "nodes": [
+    {
+      "id": "source",
+      "type": "core.source.sample",
+      "version": "0.1.0",
+      "params": {
+        "dataset": "ventas"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "result",
+      "type": "reference.summary",
+      "version": "0.1.0",
+      "params": {},
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": {
+        "node": "source",
+        "port": "out"
+      },
+      "to": {
+        "node": "result",
+        "port": "in"
+      }
+    }
+  ],
+  "customNodes": [
+    {
+      "id": "reference.summary",
+      "version": "0.1.0",
+      "name": "Resumen",
+      "category": "Conformance",
+      "inputs": [
+        {
+          "id": "in",
+          "type": "table"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "type": "table"
+        }
+      ],
+      "params": {
+        "type": "object",
+        "properties": {}
+      },
+      "impl": {
+        "kind": "flow",
+        "graph": {
+          "nodes": [
+            {
+              "id": "input",
+              "type": "flow.input",
+              "version": "0.1.0",
+              "params": {
+                "name": "in"
+              },
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            {
+              "id": "filter",
+              "type": "core.filter",
+              "version": "0.1.0",
+              "params": {
+                "column": "region",
+                "op": "=",
+                "value": "Norte"
+              },
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            {
+              "id": "result",
+              "type": "core.group",
+              "version": "0.1.0",
+              "params": {
+                "groupBy": ["region"],
+                "aggregations": [
+                  {
+                    "column": "unidades",
+                    "fn": "SUM",
+                    "name": "total"
+                  }
+                ]
+              },
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            {
+              "id": "output",
+              "type": "flow.output",
+              "version": "0.1.0",
+              "params": {
+                "name": "out"
+              },
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "e1",
+              "from": {
+                "node": "input",
+                "port": "out"
+              },
+              "to": {
+                "node": "filter",
+                "port": "in"
+              }
+            },
+            {
+              "id": "e2",
+              "from": {
+                "node": "filter",
+                "port": "out"
+              },
+              "to": {
+                "node": "result",
+                "port": "in"
+              }
+            },
+            {
+              "id": "e3",
+              "from": {
+                "node": "result",
+                "port": "out"
+              },
+              "to": {
+                "node": "output",
+                "port": "in"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

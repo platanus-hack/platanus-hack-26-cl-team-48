@@ -1,0 +1,93 @@
+{
+  "id": "core.python.custom",
+  "version": "0.1.0",
+  "name": "Código Python",
+  "description": "Transforma la tabla con tu propio código Python.",
+  "category": "Python",
+  "icon": "code",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "title": "Código",
+        "type": "string",
+        "default": "def transform(inputs):\n    return {\"out\": inputs[\"in\"]}\n",
+        "x-nodomics": {
+          "widget": "code",
+          "language": "python"
+        }
+      },
+      "columns": {
+        "title": "Columnas de salida",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Nombre",
+              "type": "string"
+            },
+            "type": {
+              "title": "Tipo",
+              "oneOf": [
+                {
+                  "const": "number",
+                  "title": "Número"
+                },
+                {
+                  "const": "text",
+                  "title": "Texto"
+                },
+                {
+                  "const": "date",
+                  "title": "Fecha"
+                },
+                {
+                  "const": "bool",
+                  "title": "Verdadero o falso"
+                }
+              ],
+              "default": "number"
+            }
+          },
+          "required": ["name", "type"]
+        },
+        "default": [],
+        "x-nodomics": {
+          "widget": "port-schema",
+          "port": "out"
+        }
+      },
+      "mustShow": {
+        "title": "Debe mostrar un gráfico",
+        "type": "boolean",
+        "default": false,
+        "x-nodomics": {
+          "widget": "switch",
+          "requires": "display"
+        }
+      }
+    },
+    "required": ["code"]
+  },
+  "impl": {
+    "kind": "python",
+    "entry": "run"
+  },
+  "requires": {
+    "runtime": "python",
+    "packages": ["pandas"]
+  }
+}

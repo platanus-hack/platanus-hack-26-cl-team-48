@@ -1,0 +1,21 @@
+{
+  "name": "@nodomics/executor-pyodide",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@nodomics/protocol": "workspace:*",
+    "@nodomics/rpc": "workspace:*",
+    "@sinclair/typebox": "0.34.52",
+    "pyodide": "314.0.7"
+  },
+  "devDependencies": {
+    "@nodomics/executor-conformance": "workspace:*"
+  }
+}

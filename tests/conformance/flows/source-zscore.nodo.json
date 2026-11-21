@@ -1,0 +1,43 @@
+{
+  "format": "nodomics/flow@0",
+  "nodes": [
+    {
+      "id": "source",
+      "type": "core.source.csv",
+      "version": "0.1.0",
+      "params": {
+        "sourceId": "reference.zscore"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "result",
+      "type": "core.python.zscore",
+      "version": "0.1.0",
+      "params": {
+        "column": "v",
+        "name": "z"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": {
+        "node": "source",
+        "port": "out"
+      },
+      "to": {
+        "node": "result",
+        "port": "in"
+      }
+    }
+  ]
+}

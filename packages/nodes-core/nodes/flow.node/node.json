@@ -1,0 +1,104 @@
+{
+  "id": "flow.node",
+  "version": "0.1.0",
+  "name": "Entrada de nodo",
+  "description": "Convierte este flujo en un nodo: define su nombre, sus entradas y sus parámetros. Conecta datos de prueba a cada entrada para probarlo.",
+  "category": "Flujo",
+  "icon": "log-in",
+  "inputs": [],
+  "outputs": [],
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Nombre del nodo",
+        "type": "string"
+      },
+      "description": {
+        "title": "Descripción",
+        "type": "string"
+      },
+      "inputs": {
+        "title": "Entradas",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Nombre",
+              "type": "string"
+            },
+            "type": {
+              "title": "Tipo",
+              "oneOf": [
+                {
+                  "const": "table",
+                  "title": "Tabla"
+                },
+                {
+                  "const": "column",
+                  "title": "Columna"
+                },
+                {
+                  "const": "value",
+                  "title": "Valor"
+                },
+                {
+                  "const": "geo",
+                  "title": "Geo"
+                },
+                {
+                  "const": "any",
+                  "title": "Cualquiera"
+                }
+              ],
+              "default": "table"
+            }
+          },
+          "required": ["name", "type"]
+        },
+        "default": [
+          {
+            "name": "entrada",
+            "type": "table"
+          }
+        ],
+        "x-nodomics": {
+          "widget": "ports"
+        }
+      },
+      "params": {
+        "title": "Parámetros del nodo",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "title": "Nombre",
+              "type": "string"
+            },
+            "node": {
+              "type": "string"
+            },
+            "param": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "title", "node", "param"]
+        },
+        "default": [],
+        "x-nodomics": {
+          "widget": "node-params"
+        }
+      }
+    },
+    "required": ["name"]
+  },
+  "impl": {
+    "kind": "builtin",
+    "name": "flow.node"
+  }
+}

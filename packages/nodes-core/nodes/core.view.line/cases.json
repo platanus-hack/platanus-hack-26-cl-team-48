@@ -1,0 +1,196 @@
+{
+  "cases": [
+    {
+      "name": "fills the spec with the chosen columns",
+      "params": {
+        "x": "fecha",
+        "y": "unidades",
+        "aggregate": "sum",
+        "timeUnit": "yearmonth"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "fecha",
+              "type": "date"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["2024-01-01", 5],
+            ["2024-01-02", 3]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "mark": {
+            "type": "line",
+            "point": true
+          },
+          "encoding": {
+            "x": {
+              "field": "fecha",
+              "type": "temporal",
+              "timeUnit": {
+                "unit": "yearmonth",
+                "utc": true
+              }
+            },
+            "y": {
+              "field": "unidades",
+              "type": "quantitative",
+              "aggregate": "sum"
+            }
+          },
+          "data": {
+            "values": [
+              {
+                "fecha": "2024-01-01",
+                "unidades": 5
+              },
+              {
+                "fecha": "2024-01-02",
+                "unidades": 3
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "draws a numeric X axis without grouping dates",
+      "params": {
+        "x": "mes",
+        "y": "unidades",
+        "aggregate": "sum",
+        "timeUnit": "yearmonth"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "mes",
+              "type": "number"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            [1, 5],
+            [2, 3]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "mark": {
+            "type": "line",
+            "point": true
+          },
+          "encoding": {
+            "x": {
+              "field": "mes",
+              "type": "quantitative"
+            },
+            "y": {
+              "field": "unidades",
+              "type": "quantitative",
+              "aggregate": "sum"
+            }
+          },
+          "data": {
+            "values": [
+              {
+                "mes": 1,
+                "unidades": 5
+              },
+              {
+                "mes": 2,
+                "unidades": 3
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "draws one line per series and leaves dates ungrouped when asked",
+      "params": {
+        "x": "fecha",
+        "y": "unidades",
+        "aggregate": "sum",
+        "timeUnit": null,
+        "series": "region"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "fecha",
+              "type": "date"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["2024-01-01", "Norte", 5],
+            ["2024-01-02", "Sur", 3]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "mark": {
+            "type": "line",
+            "point": true
+          },
+          "encoding": {
+            "x": {
+              "field": "fecha",
+              "type": "temporal"
+            },
+            "y": {
+              "field": "unidades",
+              "type": "quantitative",
+              "aggregate": "sum"
+            },
+            "color": {
+              "field": "region",
+              "type": "nominal"
+            }
+          },
+          "data": {
+            "values": [
+              {
+                "fecha": "2024-01-01",
+                "region": "Norte",
+                "unidades": 5
+              },
+              {
+                "fecha": "2024-01-02",
+                "region": "Sur",
+                "unidades": 3
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

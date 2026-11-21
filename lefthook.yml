@@ -1,0 +1,6 @@
+commit-msg:
+  commands:
+    conventional:
+      run: pnpm exec commitlint --edit {1}
+    no-ai-attribution:
+      run: node scripts/check-commit-msg.ts {1}

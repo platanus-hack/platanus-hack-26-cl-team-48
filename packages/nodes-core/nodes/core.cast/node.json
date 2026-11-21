@@ -1,0 +1,87 @@
+{
+  "id": "core.cast",
+  "version": "0.1.0",
+  "name": "Convertir tipos",
+  "description": "Cambia el tipo de las columnas que se leyeron mal, como fechas o números guardados como texto.",
+  "category": "Transformar",
+  "icon": "arrow-right-left",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversions": {
+        "title": "Conversiones",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "column": {
+              "title": "Columna",
+              "type": "string",
+              "x-nodomics": {
+                "widget": "column",
+                "of": "in"
+              }
+            },
+            "to": {
+              "title": "Convertir a",
+              "oneOf": [
+                {
+                  "const": "number",
+                  "title": "Número (1234.5)"
+                },
+                {
+                  "const": "number-comma",
+                  "title": "Número con coma decimal (1.234,5)"
+                },
+                {
+                  "const": "text",
+                  "title": "Texto"
+                },
+                {
+                  "const": "date-iso",
+                  "title": "Fecha (2024-12-31)"
+                },
+                {
+                  "const": "date-dmy",
+                  "title": "Fecha (31/12/2024)"
+                },
+                {
+                  "const": "date-mdy",
+                  "title": "Fecha (12/31/2024)"
+                },
+                {
+                  "const": "datetime",
+                  "title": "Fecha y hora"
+                },
+                {
+                  "const": "bool",
+                  "title": "Verdadero o falso"
+                }
+              ],
+              "default": "number"
+            }
+          },
+          "required": ["column", "to"]
+        },
+        "default": []
+      }
+    },
+    "required": ["conversions"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT *{{#if conversions}} REPLACE ({{#each conversions}}{{#unless @first}}, {{/unless}}{{#if (eq to \"number\")}}TRY_CAST({{ident column}} AS DOUBLE){{/if}}{{#if (eq to \"number-comma\")}}TRY_CAST(REPLACE(REPLACE(CAST({{ident column}} AS VARCHAR), '.', ''), ',', '.') AS DOUBLE){{/if}}{{#if (eq to \"text\")}}CAST({{ident column}} AS VARCHAR){{/if}}{{#if (eq to \"date-iso\")}}TRY_CAST(CAST({{ident column}} AS VARCHAR) AS DATE){{/if}}{{#if (eq to \"date-dmy\")}}COALESCE(CAST(TRY_STRPTIME(CAST({{ident column}} AS VARCHAR), '%d/%m/%Y') AS DATE), TRY_CAST(CAST({{ident column}} AS VARCHAR) AS DATE)){{/if}}{{#if (eq to \"date-mdy\")}}COALESCE(CAST(TRY_STRPTIME(CAST({{ident column}} AS VARCHAR), '%m/%d/%Y') AS DATE), TRY_CAST(CAST({{ident column}} AS VARCHAR) AS DATE)){{/if}}{{#if (eq to \"datetime\")}}TRY_CAST({{ident column}} AS TIMESTAMP){{/if}}{{#if (eq to \"bool\")}}TRY_CAST({{ident column}} AS BOOLEAN){{/if}} AS {{ident column}}{{/each}}){{/if}} FROM {{in}}"
+  }
+}

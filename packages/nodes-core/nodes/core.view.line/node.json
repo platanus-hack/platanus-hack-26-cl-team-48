@@ -1,0 +1,144 @@
+{
+  "id": "core.view.line",
+  "version": "0.1.0",
+  "name": "Gráfico de líneas",
+  "description": "Muestra cómo cambia un valor a lo largo de una fecha, un número o una categoría.",
+  "category": "Vistas",
+  "icon": "chart-line",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "chart"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "x": {
+        "title": "Eje X",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in",
+          "types": ["date", "number", "text"]
+        }
+      },
+      "y": {
+        "title": "Eje Y",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in",
+          "types": ["number"]
+        }
+      },
+      "aggregate": {
+        "title": "Agregación",
+        "oneOf": [
+          {
+            "const": "sum",
+            "title": "Suma"
+          },
+          {
+            "const": "mean",
+            "title": "Promedio"
+          },
+          {
+            "const": "count",
+            "title": "Conteo"
+          },
+          {
+            "const": "min",
+            "title": "Mínimo"
+          },
+          {
+            "const": "max",
+            "title": "Máximo"
+          }
+        ],
+        "default": "sum"
+      },
+      "timeUnit": {
+        "title": "Agrupar fechas por",
+        "oneOf": [
+          {
+            "const": null,
+            "title": "Sin agrupar"
+          },
+          {
+            "const": "yearmonthdate",
+            "title": "Día"
+          },
+          {
+            "const": "yearweek",
+            "title": "Semana"
+          },
+          {
+            "const": "yearmonth",
+            "title": "Mes"
+          },
+          {
+            "const": "yearquarter",
+            "title": "Trimestre"
+          },
+          {
+            "const": "year",
+            "title": "Año"
+          }
+        ],
+        "default": "yearmonth",
+        "x-nodomics": {
+          "when": {
+            "param": "x",
+            "types": ["date"]
+          }
+        }
+      },
+      "series": {
+        "title": "Series",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in",
+          "types": ["text", "bool"]
+        }
+      }
+    },
+    "required": ["x", "y"]
+  },
+  "impl": {
+    "kind": "view",
+    "spec": {
+      "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+      "mark": {
+        "type": "line",
+        "point": true
+      },
+      "encoding": {
+        "x": {
+          "field": "{{x}}",
+          "type": "{{vegaType x}}",
+          "timeUnit": {
+            "unit": "{{timeUnit}}",
+            "utc": true
+          }
+        },
+        "y": {
+          "field": "{{y}}",
+          "type": "quantitative",
+          "aggregate": "{{aggregate}}"
+        },
+        "color": {
+          "field": "{{series}}",
+          "type": "nominal"
+        }
+      }
+    }
+  }
+}

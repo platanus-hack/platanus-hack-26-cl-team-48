@@ -1,0 +1,134 @@
+import type { FlowNode } from "@nodomics/protocol";
+import { useId, useRef } from "react";
+import { ICON_SIZE, Icon } from "@nodomics/ui";
+import {
+  useCatalog,
+  useDispatch,
+  useEngineState,
+  useFlowState,
+  useSelectedIds,
+} from "../app-context.ts";
+import { iconOf } from "../canvas/node-views.ts";
+import { nodeParamEdit } from "../flow/node-param-edit.ts";
+import { ParamsForm } from "../form/ParamsForm.tsx";
+import { LAYOUT_MESSAGES } from "../layout/messages.ts";
+import { PanelToggle } from "../layout/PanelToggle.tsx";
+import { ResizeHandle } from "../layout/ResizeHandle.tsx";
+import { PARAMS_WIDTH_RANGE } from "../layout/size-range.ts";
+import { UpdateNode } from "./UpdateNode.tsx";
+import { PortList } from "./PortList.tsx";
+import { MESSAGES } from "../messages.ts";
+
+type ParamsPanelProps = {
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+  /** In multiples of `--panel-min`; the workspace applies it so the canvas makes room. */
+  readonly width: number;
+  readonly onResize: (width: number) => void;
+};
+
+export function ParamsPanel({ isOpen, onToggle, width, onResize }: ParamsPanelProps) {
+  const panelId = useId();
+  const panel = useRef<HTMLElement>(null);
+  const toggle = (
+    <PanelToggle
+      isOpen={isOpen}
+      onToggle={onToggle}
+      labels={{ hide: LAYOUT_MESSAGES.hideParams, show: LAYOUT_MESSAGES.showParams }}
+      icons={{ hide: "panel-right-close", show: "panel-right-open" }}
+    />
+  );
+  return (
+    <aside
+      ref={panel}
+      id={panelId}
+      className="web-floating web-params"
+      data-open={isOpen}
+      data-canvas-inset="right"
+      aria-label={MESSAGES.params.title}
+    >
+      {isOpen ? (
+        <>
+          <ResizeHandle
+            edge="left"
+            label={LAYOUT_MESSAGES.resizeParams}
+            controls={panelId}
+            range={PARAMS_WIDTH_RANGE}
+            value={width}
+            valueText={LAYOUT_MESSAGES.percent(width * 100)}
+            unitsPerPixel={() => widthPerPixel(panel.current, width)}
+            onResize={onResize}
+            className="web-resize-handle"
+          />
+          <header className="web-params-header">
+            <h2 className="web-params-title">{MESSAGES.params.title}</h2>
+            {toggle}
+          </header>
+          <SelectedNodeParams />
+        </>
+      ) : (
+        <div className="web-params-closed">{toggle}</div>
+      )}
+    </aside>
+  );
+}
+
+function SelectedNodeParams() {
+  const selectedIds = useSelectedIds();
+  const nodes = useFlowState((state) => state.flow.nodes);
+  // The selection may still name nodes of the flow that was open before.
+  const selected = nodes.filter((candidate) => selectedIds.includes(candidate.id));
+  const node = selected.length === 1 ? selected[0] : undefined;
+  return (
+    <div className="web-params-body">
+      {node === undefined ? (
+        <p className="web-panel-hint">{MESSAGES.params.empty}</p>
+      ) : (
+        <NodeParams node={node} />
+      )}
+    </div>
+  );
+}
+
+function NodeParams({ node }: { readonly node: FlowNode }) {
+  const manifest = useCatalog().find((candidate) => candidate.id === node.type);
+  const issues = useEngineState((state) => state.issues);
+  const runError = useEngineState((state) => state.nodes[node.id]?.error);
+  const dispatch = useDispatch();
+  const flow = useFlowState((state) => state.flow);
+  if (manifest === undefined)
+    return <p className="web-panel-hint">{MESSAGES.params.unknownNode}</p>;
+  return (
+    <>
+      <div className="web-params-node">
+        <div className="web-params-node-name">
+          <span className="web-node-icon">
+            <Icon name={iconOf(manifest)} size={ICON_SIZE.sm} />
+          </span>
+          <h3>{node.label ?? manifest.name}</h3>
+        </div>
+        {manifest.description !== undefined && (
+          <p className="web-params-description">{manifest.description}</p>
+        )}
+      </div>
+      <UpdateNode node={node} />
+      <ParamsForm
+        node={node}
+        manifest={manifest}
+        issues={[
+          ...issues.filter((issue) => issue.nodeId === node.id),
+          ...(runError?.param === undefined ? [] : [{ ...runError, nodeId: node.id }]),
+        ]}
+        onChange={(param, value) => {
+          dispatch(nodeParamEdit({ flow, node, manifest, param, value }));
+        }}
+      />
+      <PortList node={node} manifest={manifest} />
+    </>
+  );
+}
+
+const widthPerPixel = (panel: HTMLElement | null, width: number) => {
+  const pixels = panel?.getBoundingClientRect().width ?? 0;
+  return pixels > 0 ? width / pixels : 0;
+};

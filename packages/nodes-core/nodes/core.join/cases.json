@@ -1,0 +1,69 @@
+{
+  "cases": [
+    {
+      "name": "keeps the matching rows of both tables",
+      "params": {
+        "leftColumn": "region",
+        "rightColumn": "zona",
+        "how": "INNER"
+      },
+      "inputs": {
+        "left": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3]
+          ]
+        },
+        "right": {
+          "columns": [
+            {
+              "name": "zona",
+              "type": "text"
+            },
+            {
+              "name": "gerente",
+              "type": "text"
+            }
+          ],
+          "rows": [
+            ["Norte", "Ana"],
+            ["Este", "Luis"]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            },
+            {
+              "name": "zona",
+              "type": "text"
+            },
+            {
+              "name": "gerente",
+              "type": "text"
+            }
+          ],
+          "rows": [["Norte", 5, "Norte", "Ana"]]
+        }
+      }
+    }
+  ]
+}

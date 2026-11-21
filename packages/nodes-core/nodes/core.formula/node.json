@@ -1,0 +1,68 @@
+{
+  "id": "core.formula",
+  "version": "0.1.0",
+  "name": "Columna calculada",
+  "description": "Agrega una columna que opera otra columna con una columna o un valor.",
+  "category": "Transformar",
+  "icon": "calculator",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Nombre",
+        "type": "string",
+        "default": "resultado"
+      },
+      "column": {
+        "title": "Columna",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in"
+        }
+      },
+      "op": {
+        "title": "Operación",
+        "enum": ["+", "-", "*", "/"],
+        "default": "*"
+      },
+      "otherColumn": {
+        "title": "Otra columna",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in"
+        }
+      },
+      "value": {
+        "title": "Valor",
+        "type": "number"
+      }
+    },
+    "required": ["name", "column", "op"],
+    "oneOf": [
+      {
+        "required": ["otherColumn"]
+      },
+      {
+        "required": ["value"]
+      }
+    ]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT *, {{ident column}} {{op}} {{#if otherColumn}}{{ident otherColumn}}{{else}}{{lit value}}{{/if}} AS {{ident name}} FROM {{in}}"
+  }
+}

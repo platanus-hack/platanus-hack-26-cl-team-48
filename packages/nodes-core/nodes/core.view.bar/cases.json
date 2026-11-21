@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "name": "fills the spec with the chosen columns",
+      "params": {
+        "x": "region",
+        "y": "unidades",
+        "aggregate": "sum"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "mark": "bar",
+          "encoding": {
+            "x": {
+              "field": "region",
+              "type": "nominal"
+            },
+            "y": {
+              "field": "unidades",
+              "type": "quantitative",
+              "aggregate": "sum"
+            }
+          },
+          "data": {
+            "values": [
+              {
+                "region": "Norte",
+                "unidades": 5
+              },
+              {
+                "region": "Sur",
+                "unidades": 3
+              },
+              {
+                "region": "Norte",
+                "unidades": 2
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

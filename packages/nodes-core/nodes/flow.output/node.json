@@ -1,0 +1,29 @@
+{
+  "id": "flow.output",
+  "version": "0.1.0",
+  "name": "Salida de nodo",
+  "description": "Marca un resultado como salida del nodo que forma este flujo.",
+  "category": "Flujo",
+  "icon": "log-out",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "any"
+    }
+  ],
+  "outputs": [],
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Nombre de la salida",
+        "type": "string",
+        "default": "out"
+      }
+    }
+  },
+  "impl": {
+    "kind": "builtin",
+    "name": "flow.output"
+  }
+}

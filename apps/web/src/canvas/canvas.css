@@ -1,0 +1,13 @@
+.web-node-actions {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: calc(100% + var(--space-2));
+  display: flex;
+  gap: var(--space-0);
+  padding: calc(var(--space-1) - var(--stroke-hairline));
+  background: var(--surface-300);
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@nodomics/executor-conformance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@nodomics/protocol": "workspace:*",
+    "apache-arrow": "17.0.0",
+    "@nodomics/rpc": "workspace:*"
+  },
+  "devDependencies": {
+    "ws": "8.22.0"
+  }
+}

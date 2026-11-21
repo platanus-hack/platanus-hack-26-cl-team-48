@@ -1,0 +1,136 @@
+{
+  "cases": [
+    {
+      "name": "keeps the rows equal to the value",
+      "params": {
+        "column": "region",
+        "op": "=",
+        "value": "Norte"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Norte", 2]
+          ]
+        }
+      }
+    },
+    {
+      "name": "keeps the rows that contain the text",
+      "params": {
+        "column": "region",
+        "op": "contiene",
+        "value": "ur"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [["Sur", 3]]
+        }
+      }
+    },
+    {
+      "name": "compares numbers",
+      "params": {
+        "column": "unidades",
+        "op": ">",
+        "value": "2"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3]
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "id": "core.group",
+  "version": "0.1.0",
+  "name": "Agrupar",
+  "description": "Agrupa las filas y calcula agregaciones por grupo.",
+  "category": "Transformar",
+  "icon": "layers",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "groupBy": {
+        "title": "Agrupar por",
+        "type": "array",
+        "items": {
+          "title": "Columna",
+          "type": "string",
+          "x-nodomics": {
+            "widget": "column",
+            "of": "in"
+          }
+        },
+        "default": []
+      },
+      "aggregations": {
+        "title": "Agregaciones",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "properties": {
+            "column": {
+              "title": "Columna",
+              "type": "string",
+              "x-nodomics": {
+                "widget": "column",
+                "of": "in"
+              }
+            },
+            "fn": {
+              "title": "Función",
+              "enum": ["SUM", "AVG", "MIN", "MAX", "COUNT"],
+              "default": "SUM"
+            },
+            "name": {
+              "title": "Nombre",
+              "type": "string"
+            }
+          },
+          "required": ["column", "fn", "name"]
+        }
+      }
+    },
+    "required": ["aggregations"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT {{#each groupBy}}{{ident this}}, {{/each}}{{#each aggregations}}{{#unless @first}}, {{/unless}}{{fn}}({{ident column}}) AS {{ident name}}{{/each}} FROM {{in}}{{#if groupBy}} GROUP BY {{#each groupBy}}{{#unless @first}}, {{/unless}}{{ident this}}{{/each}} ORDER BY {{#each groupBy}}{{#unless @first}}, {{/unless}}{{ident this}}{{/each}}{{/if}}"
+  }
+}

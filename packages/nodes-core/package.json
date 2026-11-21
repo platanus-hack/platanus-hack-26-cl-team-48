@@ -1,0 +1,17 @@
+{
+  "name": "@nodomics/nodes-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "dev": "node --watch-path=nodes --watch-preserve-output scripts/regenerate-catalog.ts",
+    "generate": "node scripts/generate-catalog.ts && prettier --write src/catalog.generated.json"
+  },
+  "dependencies": {
+    "@nodomics/protocol": "workspace:*"
+  }
+}

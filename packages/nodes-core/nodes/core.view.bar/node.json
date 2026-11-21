@@ -1,0 +1,87 @@
+{
+  "id": "core.view.bar",
+  "version": "0.1.0",
+  "name": "Gráfico de barras",
+  "description": "Compara un valor agregado entre categorías.",
+  "category": "Vistas",
+  "icon": "chart-column",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "chart"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "x": {
+        "title": "Eje X",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in"
+        }
+      },
+      "y": {
+        "title": "Eje Y",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in",
+          "types": ["number"]
+        }
+      },
+      "aggregate": {
+        "title": "Agregación",
+        "oneOf": [
+          {
+            "const": "sum",
+            "title": "Suma"
+          },
+          {
+            "const": "mean",
+            "title": "Promedio"
+          },
+          {
+            "const": "count",
+            "title": "Conteo"
+          },
+          {
+            "const": "min",
+            "title": "Mínimo"
+          },
+          {
+            "const": "max",
+            "title": "Máximo"
+          }
+        ],
+        "default": "sum"
+      }
+    },
+    "required": ["x", "y"]
+  },
+  "impl": {
+    "kind": "view",
+    "spec": {
+      "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "{{x}}",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "{{y}}",
+          "type": "quantitative",
+          "aggregate": "{{aggregate}}"
+        }
+      }
+    }
+  }
+}

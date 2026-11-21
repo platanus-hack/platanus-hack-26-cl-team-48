@@ -1,0 +1,57 @@
+{
+  "id": "core.join",
+  "version": "0.1.0",
+  "name": "Unir tablas",
+  "description": "Une dos tablas por columnas que coinciden.",
+  "category": "Transformar",
+  "icon": "merge",
+  "inputs": [
+    {
+      "id": "left",
+      "name": "Izquierda",
+      "type": "table"
+    },
+    {
+      "id": "right",
+      "name": "Derecha",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "leftColumn": {
+        "title": "Columna izquierda",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "left"
+        }
+      },
+      "rightColumn": {
+        "title": "Columna derecha",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "right"
+        }
+      },
+      "how": {
+        "title": "Tipo de unión",
+        "enum": ["INNER", "LEFT", "RIGHT", "FULL"],
+        "default": "INNER"
+      }
+    },
+    "required": ["leftColumn", "rightColumn"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{left}} AS l {{how}} JOIN {{right}} AS r ON l.{{ident leftColumn}} = r.{{ident rightColumn}}"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "core.sql",
+  "version": "0.1.0",
+  "name": "SQL",
+  "description": "Consulta SQL libre sobre la tabla de entrada, que se llama entrada.",
+  "category": "Transformar",
+  "icon": "terminal",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "title": "Consulta",
+        "description": "Lee la tabla de entrada con el nombre entrada, por ejemplo: SELECT * FROM entrada",
+        "type": "string",
+        "default": "SELECT * FROM entrada",
+        "x-nodomics": {
+          "widget": "code",
+          "language": "sql"
+        }
+      }
+    },
+    "required": ["query"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "WITH entrada AS (SELECT * FROM {{in}}) {{query}}"
+  }
+}

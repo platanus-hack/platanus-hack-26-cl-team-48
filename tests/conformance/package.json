@@ -1,0 +1,21 @@
+{
+  "name": "@nodomics/conformance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@nodomics/protocol": "workspace:*",
+    "@nodomics/rpc": "workspace:*",
+    "@nodomics/client": "workspace:*",
+    "@nodomics/nodes-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@nodomics/engine-mock": "workspace:*"
+  }
+}

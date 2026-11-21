@@ -1,0 +1,204 @@
+{
+  "cases": [
+    {
+      "name": "passes the table through with the default code",
+      "params": {
+        "code": "def transform(inputs):\n    return {\"out\": inputs[\"in\"]}\n"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      }
+    },
+    {
+      "name": "runs the user's transform",
+      "params": {
+        "code": "def transform(inputs):\n    table = inputs[\"in\"]\n    return {\"out\": table[table[\"unidades\"] > 2]}\n"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3]
+          ]
+        }
+      }
+    },
+    {
+      "name": "shows the matplotlib figures the code draws",
+      "params": {
+        "code": "import matplotlib.pyplot as plt\n\ndef transform(inputs):\n    table = inputs[\"in\"]\n    plt.figure(figsize=(4, 3))\n    plt.bar(table[\"region\"], table[\"unidades\"])\n    plt.title(\"Unidades por región\")\n    plt.show()\n    return {\"out\": table}\n"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "displays": [
+        {
+          "width": 400,
+          "height": 300,
+          "title": "Unidades por región"
+        }
+      ]
+    },
+    {
+      "name": "meets its declared output columns and the figure it must show",
+      "params": {
+        "code": "import matplotlib.pyplot as plt\n\ndef transform(inputs):\n    table = inputs[\"in\"]\n    plt.figure(figsize=(4, 3))\n    plt.bar(table[\"region\"], table[\"unidades\"])\n    plt.title(\"Unidades por región\")\n    plt.show()\n    return {\"out\": table}\n",
+        "columns": [
+          {
+            "name": "region",
+            "type": "text"
+          },
+          {
+            "name": "unidades",
+            "type": "number"
+          }
+        ],
+        "mustShow": true
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "displays": [
+        {
+          "width": 400,
+          "height": 300,
+          "title": "Unidades por región"
+        }
+      ]
+    }
+  ]
+}

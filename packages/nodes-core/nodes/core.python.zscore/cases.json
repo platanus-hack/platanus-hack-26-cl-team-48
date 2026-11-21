@@ -1,0 +1,46 @@
+{
+  "cases": [
+    {
+      "name": "standardizes the column with the population deviation",
+      "params": {
+        "column": "v",
+        "name": "z"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "v",
+              "type": "number"
+            }
+          ],
+          "rows": [[2], [4], [4], [4], [5], [5], [7], [9]]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "v",
+              "type": "number"
+            },
+            {
+              "name": "z",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            [2, -1.5],
+            [4, -0.5],
+            [4, -0.5],
+            [4, -0.5],
+            [5, 0],
+            [5, 0],
+            [7, 1],
+            [9, 2]
+          ]
+        }
+      }
+    }
+  ]
+}

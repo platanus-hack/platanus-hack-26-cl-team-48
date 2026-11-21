@@ -1,0 +1,28 @@
+{
+  "id": "flow.input",
+  "version": "0.1.0",
+  "name": "Entrada",
+  "description": "Entrada de un flujo usado como nodo.",
+  "category": "Flujo",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "any"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Nombre",
+        "type": "string",
+        "default": "in"
+      }
+    }
+  },
+  "impl": {
+    "kind": "builtin",
+    "name": "flow.input"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "core.filter",
+  "version": "0.1.0",
+  "name": "Filtrar",
+  "description": "Conserva las filas que cumplen una condición.",
+  "category": "Transformar",
+  "icon": "filter",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "column": {
+        "title": "Columna",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in"
+        }
+      },
+      "op": {
+        "title": "Operador",
+        "enum": ["=", "!=", ">", "<", ">=", "<=", "contiene"],
+        "default": "="
+      },
+      "value": {
+        "title": "Valor",
+        "type": "string"
+      }
+    },
+    "required": ["column", "value"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{in}} WHERE {{#if (eq op 'contiene')}}CAST({{ident column}} AS VARCHAR) ILIKE {{lit (concat '%' value '%')}}{{else}}{{ident column}} {{op}} {{lit value}}{{/if}}"
+  }
+}

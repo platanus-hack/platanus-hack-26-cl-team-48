@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "name": "converts text columns to dates, numbers and booleans, in place",
+      "params": {
+        "conversions": [
+          { "column": "fecha", "to": "date-dmy" },
+          { "column": "importe", "to": "number-comma" },
+          { "column": "unidades", "to": "number" },
+          { "column": "activo", "to": "bool" }
+        ]
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            { "name": "fecha", "type": "text" },
+            { "name": "importe", "type": "text" },
+            { "name": "unidades", "type": "text" },
+            { "name": "activo", "type": "text" },
+            { "name": "region", "type": "text" }
+          ],
+          "rows": [
+            ["1/2/2024", "1.234,5", "12", "true", "Norte"],
+            ["31/12/2024", "7", "doce", "false", "Sur"]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            { "name": "fecha", "type": "date" },
+            { "name": "importe", "type": "number" },
+            { "name": "unidades", "type": "number" },
+            { "name": "activo", "type": "bool" },
+            { "name": "region", "type": "text" }
+          ],
+          "rows": [
+            ["2024-02-01", 1234.5, 12, true, "Norte"],
+            ["2024-12-31", 7, null, false, "Sur"]
+          ]
+        }
+      }
+    },
+    {
+      "name": "reads ISO and month-first dates and turns numbers into text",
+      "params": {
+        "conversions": [
+          { "column": "alta", "to": "date-iso" },
+          { "column": "baja", "to": "date-mdy" },
+          { "column": "codigo", "to": "text" }
+        ]
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            { "name": "alta", "type": "text" },
+            { "name": "baja", "type": "text" },
+            { "name": "codigo", "type": "number" }
+          ],
+          "rows": [
+            ["2024-03-05", "12/31/2024", 1001],
+            ["no es fecha", "2/1/2024", 2002]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            { "name": "alta", "type": "date" },
+            { "name": "baja", "type": "date" },
+            { "name": "codigo", "type": "text" }
+          ],
+          "rows": [
+            ["2024-03-05", "2024-12-31", "1001"],
+            [null, "2024-02-01", "2002"]
+          ]
+        }
+      }
+    },
+    {
+      "name": "passes the table through when there is nothing to convert",
+      "params": { "conversions": [] },
+      "inputs": {
+        "in": {
+          "columns": [{ "name": "x", "type": "number" }],
+          "rows": [[1], [2]]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [{ "name": "x", "type": "number" }],
+          "rows": [[1], [2]]
+        }
+      }
+    }
+  ]
+}

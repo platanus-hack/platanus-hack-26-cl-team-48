@@ -1,0 +1,47 @@
+{
+  "id": "core.python.zscore",
+  "version": "0.1.0",
+  "name": "Puntaje Z",
+  "description": "Agrega el puntaje Z (desviaciones de la media) de una columna.",
+  "category": "Python",
+  "icon": "sigma",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "column": {
+        "title": "Columna",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in"
+        }
+      },
+      "name": {
+        "title": "Nombre",
+        "type": "string",
+        "default": "zscore"
+      }
+    },
+    "required": ["column"]
+  },
+  "impl": {
+    "kind": "python",
+    "entry": "run"
+  },
+  "requires": {
+    "runtime": "python",
+    "packages": ["pandas"]
+  }
+}

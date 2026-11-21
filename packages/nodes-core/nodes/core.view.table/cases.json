@@ -1,0 +1,135 @@
+{
+  "cases": [
+    {
+      "name": "fills the spec with the chosen columns and rows",
+      "params": {
+        "columns": ["region", "unidades"],
+        "rows": 20
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "transform": [
+            {
+              "window": [
+                {
+                  "op": "row_number",
+                  "as": "fila"
+                }
+              ]
+            },
+            {
+              "filter": "datum.fila <= 20"
+            },
+            {
+              "fold": ["region", "unidades"],
+              "as": ["columna", "valor"]
+            }
+          ],
+          "encoding": {
+            "x": {
+              "field": "columna",
+              "type": "nominal",
+              "sort": ["region", "unidades"],
+              "bandPosition": 0,
+              "scale": {
+                "type": "band",
+                "paddingInner": 0,
+                "paddingOuter": 0
+              },
+              "axis": {
+                "orient": "top",
+                "title": null,
+                "labels": false,
+                "ticks": false
+              }
+            },
+            "y": {
+              "field": "fila",
+              "type": "ordinal",
+              "axis": {
+                "title": null,
+                "labels": false,
+                "ticks": false,
+                "domain": false,
+                "grid": true,
+                "bandPosition": 1
+              }
+            }
+          },
+          "data": {
+            "values": [
+              {
+                "region": "Norte",
+                "unidades": 5
+              },
+              {
+                "region": "Sur",
+                "unidades": 3
+              },
+              {
+                "region": "Norte",
+                "unidades": 2
+              }
+            ]
+          },
+          "layer": [
+            {
+              "transform": [
+                {
+                  "filter": "datum.fila == 1"
+                }
+              ],
+              "mark": {
+                "type": "text",
+                "align": "left",
+                "dx": 8,
+                "dy": -12,
+                "fontWeight": "bold"
+              },
+              "encoding": {
+                "y": {
+                  "value": 0
+                },
+                "text": {
+                  "field": "columna"
+                }
+              }
+            },
+            {
+              "mark": {
+                "type": "text",
+                "align": "left",
+                "dx": 8
+              },
+              "encoding": {
+                "text": {
+                  "field": "valor"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

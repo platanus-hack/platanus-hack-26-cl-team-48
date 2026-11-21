@@ -1,0 +1,43 @@
+{
+  "id": "core.sort",
+  "version": "0.1.0",
+  "name": "Ordenar",
+  "description": "Ordena las filas por una columna.",
+  "category": "Transformar",
+  "icon": "arrow-up-down",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "column": {
+        "title": "Columna",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "column",
+          "of": "in"
+        }
+      },
+      "direction": {
+        "title": "Dirección",
+        "enum": ["ASC", "DESC"],
+        "default": "ASC"
+      }
+    },
+    "required": ["column"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{in}} ORDER BY {{ident column}} {{direction}}"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "core.select",
+  "version": "0.1.0",
+  "name": "Seleccionar columnas",
+  "description": "Conserva solo las columnas elegidas, en ese orden.",
+  "category": "Transformar",
+  "icon": "columns-3",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "columns": {
+        "title": "Columnas",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "title": "Columna",
+          "type": "string",
+          "x-nodomics": {
+            "widget": "column",
+            "of": "in"
+          }
+        }
+      }
+    },
+    "required": ["columns"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT {{#each columns}}{{#unless @first}}, {{/unless}}{{ident this}}{{/each}} FROM {{in}}"
+  }
+}

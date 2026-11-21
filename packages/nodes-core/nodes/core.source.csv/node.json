@@ -1,0 +1,32 @@
+{
+  "id": "core.source.csv",
+  "version": "0.1.0",
+  "name": "Archivo",
+  "description": "Lee un archivo CSV, JSON, Parquet o de texto que subiste.",
+  "category": "Fuentes",
+  "icon": "file-spreadsheet",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "title": "Archivo",
+        "type": "string",
+        "x-nodomics": {
+          "widget": "source"
+        }
+      }
+    },
+    "required": ["sourceId"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{source sourceId}}"
+  }
+}

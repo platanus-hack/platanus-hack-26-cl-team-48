@@ -1,0 +1,48 @@
+{
+  "cases": [
+    {
+      "name": "keeps the chosen columns in order",
+      "params": {
+        "columns": ["unidades", "region"]
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "unidades",
+              "type": "number"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            }
+          ],
+          "rows": [
+            [5, "Norte"],
+            [3, "Sur"],
+            [2, "Norte"]
+          ]
+        }
+      }
+    }
+  ]
+}

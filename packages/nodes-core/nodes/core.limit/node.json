@@ -1,0 +1,36 @@
+{
+  "id": "core.limit",
+  "version": "0.1.0",
+  "name": "Limitar filas",
+  "description": "Conserva las primeras filas.",
+  "category": "Transformar",
+  "icon": "list-end",
+  "inputs": [
+    {
+      "id": "in",
+      "type": "table"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "type": "table"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "n": {
+        "title": "Filas",
+        "type": "integer",
+        "minimum": 0,
+        "default": 100
+      }
+    },
+    "required": ["n"]
+  },
+  "impl": {
+    "kind": "sql",
+    "template": "SELECT * FROM {{in}} LIMIT {{lit n}}"
+  }
+}

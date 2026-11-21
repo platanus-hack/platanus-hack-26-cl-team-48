@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "name": "runs the query against the input table",
+      "params": {
+        "query": "SELECT region FROM entrada WHERE unidades > 2"
+      },
+      "inputs": {
+        "in": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            },
+            {
+              "name": "unidades",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            ["Norte", 5],
+            ["Sur", 3],
+            ["Norte", 2]
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "region",
+              "type": "text"
+            }
+          ],
+          "rows": [["Norte"], ["Sur"]]
+        }
+      }
+    }
+  ]
+}

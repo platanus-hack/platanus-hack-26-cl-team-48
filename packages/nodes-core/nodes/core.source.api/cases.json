@@ -1,0 +1,124 @@
+{
+  "cases": [
+    {
+      "name": "reads nested JSON records",
+      "params": {
+        "url": "https://api.example.test/items",
+        "records": "data.items"
+      },
+      "inputs": {},
+      "responses": {
+        "https://api.example.test/items": {
+          "body": {
+            "data": {
+              "items": [
+                {
+                  "cantidad": 2,
+                  "region": "Norte"
+                },
+                {
+                  "cantidad": 3,
+                  "region": "Sur"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "cantidad",
+              "type": "number"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            }
+          ],
+          "rows": [
+            [2, "Norte"],
+            [3, "Sur"]
+          ]
+        }
+      }
+    },
+    {
+      "name": "reads CSV responses",
+      "params": {
+        "url": "https://api.example.test/items",
+        "format": "csv"
+      },
+      "inputs": {},
+      "responses": {
+        "https://api.example.test/items": {
+          "body": "cantidad,region\n2,Norte\n3,Sur\n"
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "cantidad",
+              "type": "number"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            }
+          ],
+          "rows": [
+            [2, "Norte"],
+            [3, "Sur"]
+          ]
+        }
+      }
+    },
+    {
+      "name": "adds query parameters to the request URL",
+      "params": {
+        "url": "https://api.example.test/items",
+        "query": [
+          {
+            "name": "region",
+            "value": "Norte"
+          }
+        ]
+      },
+      "inputs": {},
+      "responses": {
+        "https://api.example.test/items?region=Norte": {
+          "body": [
+            {
+              "cantidad": 2,
+              "region": "Norte"
+            },
+            {
+              "cantidad": 3,
+              "region": "Sur"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "out": {
+          "columns": [
+            {
+              "name": "cantidad",
+              "type": "number"
+            },
+            {
+              "name": "region",
+              "type": "text"
+            }
+          ],
+          "rows": [
+            [2, "Norte"],
+            [3, "Sur"]
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@nodomics/executor-duckdb-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.33.1-dev57.0",
+    "@nodomics/protocol": "workspace:*",
+    "@nodomics/rpc": "workspace:*",
+    "apache-arrow": "17.0.0"
+  },
+  "devDependencies": {
+    "@nodomics/executor-conformance": "workspace:*",
+    "@nodomics/executor-pyodide": "workspace:*",
+    "pyodide": "314.0.7"
+  }
+}
