@@ -1,7 +1,12 @@
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import type { AgentConfig } from "../src/config.ts";
-import { buildRequestDeps, buildServer } from "../src/requests/wiring.ts";
+import { ok } from "@nodomics/protocol";
+import type { LlmPort, LlmTurn } from "../src/llm/llm-port.ts";
+import { createFakeMcp } from "../src/mcp/fake-mcp.ts";
+import { createFakeMemory } from "../src/memory/fake-memory.ts";
+import { createDevIdentity } from "../src/requests/identity.ts";
+import { assembleServer, buildRequestDeps, buildServer } from "../src/requests/wiring.ts";
 
 const CONFIG: AgentConfig = {
   anthropicApiKey: "fixture-anthropic",
@@ -11,6 +16,7 @@ const CONFIG: AgentConfig = {
   mcpUrl: "fake",
   port: 8787,
   devIdentity: false,
+  memory: "fake",
 };
 
 describe("buildRequestDeps", () => {
@@ -42,5 +48,57 @@ describe("buildServer", () => {
     await new Promise((resolve) => server.close(resolve));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid_query" });
+  });
+});
+
+const toolCall = (id: string, name: string, args: unknown): LlmTurn => ({
+  kind: "tool_calls",
+  calls: [{ id, name, args }],
+});
+
+/** Agent turns follow a script; story turns (no tools offered) cite the first episode they are shown. */
+function scriptedAgentAndStoryLlm(): LlmPort {
+  const agentTurns: LlmTurn[] = [
+    toolCall("c1", "flows.create_draft", {}),
+    toolCall("c2", "flows.add_node", { draftId: "draft-1", type: "table.filter", nodeId: "n1" }),
+    { kind: "text", text: "Listo" },
+  ];
+  return {
+    complete: (request) => {
+      if (request.tools.length > 0) {
+        return Promise.resolve(ok(agentTurns.shift() ?? { kind: "text" as const, text: "fin" }));
+      }
+      const text = JSON.stringify(request.messages);
+      const id = /"id":"([0-9a-f-]{36})"/.exec(text.replaceAll("\\", ""))?.[1] ?? "none";
+      return Promise.resolve(ok({ kind: "text" as const, text: `Se creó el nodo [${id}].` }));
+    },
+  };
+}
+
+async function call(base: string, path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${base}${path}`, init);
+}
+
+describe("shared memory", () => {
+  it("a request leaves episodes that the why route can explain", async () => {
+    const deps = {
+      identity: createDevIdentity(),
+      llm: scriptedAgentAndStoryLlm(),
+      mcp: createFakeMcp(),
+    };
+    const server = assembleServer(deps, createFakeMemory());
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+
+    const request = await call(base, "/agent/requests", {
+      method: "POST",
+      body: JSON.stringify({ goal: "haz un filtro" }),
+    });
+    const why = await call(base, "/agent/components/n1/why?q=por%20que");
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(request.status).toBe(200);
+    expect(why.status).toBe(200);
+    expect(await why.json()).toMatchObject({ citations: [expect.any(String)] });
   });
 });

@@ -61,6 +61,7 @@ it("loads all required values and defaults to port 8787", () => {
       mcpUrl: VALID_ENV.MCP_URL,
       port: 8787,
       devIdentity: false,
+      memory: "fake",
     },
   });
 });
@@ -105,5 +106,19 @@ it.each([
   expect(loadConfig({ ...VALID_ENV, AGENT_DEV_IDENTITY })).toMatchObject({
     ok: true,
     value: { devIdentity },
+  });
+});
+
+it.each(["fake", "supabase"])("AGENT_MEMORY accepts %s", (AGENT_MEMORY) => {
+  expect(loadConfig({ ...VALID_ENV, AGENT_MEMORY })).toMatchObject({
+    ok: true,
+    value: { memory: AGENT_MEMORY },
+  });
+});
+
+it.each(["", "redis", "FAKE"])("AGENT_MEMORY rejects %j", (AGENT_MEMORY) => {
+  expect(loadConfig({ ...VALID_ENV, AGENT_MEMORY })).toEqual({
+    ok: false,
+    error: { issues: [{ variable: "AGENT_MEMORY", kind: "invalid" }] },
   });
 });
