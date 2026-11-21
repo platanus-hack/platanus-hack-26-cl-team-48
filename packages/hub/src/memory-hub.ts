@@ -9,6 +9,8 @@ import type {
   SearchQuery,
   SignInMethod,
 } from "./hub.ts";
+import type { FlowStore } from "./flow-store.ts";
+import { createMemoryFlowStore } from "./memory-flow-store.ts";
 import { isNewerVersion } from "./versions.ts";
 
 type StoredPublication = Omit<PublicationSummary, "owner"> & {
@@ -25,7 +27,7 @@ export type MemoryHubOptions = {
  * A hub that lives in memory, for tests and for running the interface without Supabase. Signing
  * in by email picks the profile whose handle is the email; a provider picks the first profile.
  */
-export function createMemoryHub({ profiles, now }: MemoryHubOptions): Hub {
+export function createMemoryHub({ profiles, now }: MemoryHubOptions): Hub & FlowStore {
   const state = {
     current: undefined as HubProfile | undefined,
     publications: [] as StoredPublication[],
@@ -39,6 +41,7 @@ export function createMemoryHub({ profiles, now }: MemoryHubOptions): Hub {
   };
   const summaryOf = (stored: StoredPublication): PublicationSummary => toSummary(stored, profiles);
   return {
+    ...createMemoryFlowStore({ current: () => state.current, now }),
     currentProfile: () => Promise.resolve(state.current),
     onProfileChange: (listener) => {
       listeners.add(listener);

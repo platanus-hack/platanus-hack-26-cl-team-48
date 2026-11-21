@@ -1,5 +1,6 @@
 import { err, Flow, NodeManifest, ok, parse, type Result } from "@nodomics/protocol";
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
+import type { StoredFlow } from "./flow-store.ts";
 import type {
   HubError,
   HubProfile,
@@ -121,4 +122,21 @@ export function toVersion(row: unknown): Result<Omit<PublishedVersion, "snapshot
   if (!parsed.ok) return parsed;
   const { version, created_at, flow, manifest } = parsed.value;
   return ok({ version, createdAt: created_at, flow, ...(manifest === null ? {} : { manifest }) });
+}
+
+const FlowRow = Type.Object({
+  id: Type.String(),
+  owner_id: Type.String(),
+  visibility: Type.Union([Type.Literal("private"), Type.Literal("public")]),
+  document: Type.Unknown(),
+  updated_at: Type.String(),
+});
+
+/** The document stays unknown here: the interface parses it into its own saved flow. */
+export function toStoredFlow(row: unknown): StoredFlow | undefined {
+  const parsed = parse(FlowRow, row);
+  if (!parsed.ok || parsed.value.document === undefined || parsed.value.document === null)
+    return undefined;
+  const { id, owner_id, visibility, document, updated_at } = parsed.value;
+  return { id, ownerId: owner_id, visibility, document, updatedAt: updated_at };
 }

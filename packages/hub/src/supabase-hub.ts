@@ -13,6 +13,8 @@ import type {
 } from "./hub.ts";
 import { toProfile, toSummaries, toVersion, toVersionSummaries } from "./hub-rows.ts";
 import { parseSnapshot, type Snapshot } from "./snapshot.ts";
+import type { FlowStore } from "./flow-store.ts";
+import { createSupabaseFlowStore } from "./supabase-flow-store.ts";
 import { isNewerVersion } from "./versions.ts";
 
 /** Untyped on purpose: every row is parsed at the boundary (hub-rows.ts). */
@@ -37,12 +39,13 @@ export type SupabaseHubOptions = {
 };
 
 /** The hub on Supabase: Auth, Postgres with row level security and Storage (ADR 0018). */
-export const createSupabaseHub = (options: SupabaseHubOptions): Hub =>
+export const createSupabaseHub = (options: SupabaseHubOptions): Hub & FlowStore =>
   createHubOnClient(createHubClient(options.url, options.publishableKey), options.redirectTo);
 
 /** The same hub on a client created elsewhere, e.g. one already signed in by a script. */
-export function createHubOnClient(client: HubClient, redirectTo: () => string): Hub {
+export function createHubOnClient(client: HubClient, redirectTo: () => string): Hub & FlowStore {
   return {
+    ...createSupabaseFlowStore(client),
     currentProfile: () => currentProfile(client),
     onProfileChange: (listener) => {
       const { data } = client.auth.onAuthStateChange((_event, session) => {
@@ -265,7 +268,7 @@ function firstSummary(rows: Rows): HubResult<PublicationSummary | undefined> {
   return found.ok ? ok(found.value[0]) : found;
 }
 
-function fromPostgrest(error: PostgrestError): HubError {
+export function fromPostgrest(error: PostgrestError): HubError {
   switch (error.code) {
     case CHECK_VIOLATION:
       return { kind: "stale-version", detail: error.message };
