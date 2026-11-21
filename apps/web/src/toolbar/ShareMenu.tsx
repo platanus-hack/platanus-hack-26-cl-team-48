@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useFlowFiles } from "../flow/use-flow-files.ts";
+import { useHubProfile } from "../hub/hub-context.ts";
 import { PublishOrSignIn } from "../hub/PublishOrSignIn.tsx";
 import { IconMenu } from "../layout/IconMenu.tsx";
 import { MESSAGES } from "../messages.ts";
@@ -8,6 +9,7 @@ import { MESSAGES } from "../messages.ts";
 export function ShareMenu() {
   const { shareFlow } = useFlowFiles();
   const [isPublishing, setPublishing] = useState(false);
+  const isSignedIn = useHubProfile() !== undefined;
   return (
     <>
       <IconMenu
@@ -17,12 +19,17 @@ export function ShareMenu() {
         label={MESSAGES.toolbar.share}
         items={[
           { label: MESSAGES.toolbar.copyLink, onSelect: () => void shareFlow() },
-          {
-            label: MESSAGES.toolbar.publish,
-            onSelect: () => {
-              setPublishing(true);
-            },
-          },
+          // Publishing needs an account, so signed out the menu only copies the link.
+          ...(isSignedIn
+            ? [
+                {
+                  label: MESSAGES.toolbar.publish,
+                  onSelect: () => {
+                    setPublishing(true);
+                  },
+                },
+              ]
+            : []),
         ]}
       />
       {isPublishing && (

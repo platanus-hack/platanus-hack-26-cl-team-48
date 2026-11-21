@@ -1,13 +1,11 @@
 import { useId } from "react";
 import { MESSAGES } from "../messages.ts";
-import { ALL_KINDS, HUB_VIEWS, type HubView, type KindFilter } from "./hub-filters.ts";
+import { ALL_KINDS, type HubView, type KindFilter } from "./hub-filters.ts";
 
 const KIND_OPTIONS = ([ALL_KINDS, "flow", "node"] as const).map((value) => ({
   value,
   label: MESSAGES.hub.kinds[value],
 }));
-
-const VIEW_OPTIONS = HUB_VIEWS.map((value) => ({ value, label: MESSAGES.hub.views[value] }));
 
 export type HubFilterState = {
   readonly view: HubView;
@@ -17,6 +15,8 @@ export type HubFilterState = {
 
 type HubFiltersProps = {
   readonly filters: HubFilterState;
+  /** The views this user can explore; "Mis publicaciones" needs an account. */
+  readonly views: ReadonlyArray<HubView>;
   readonly tags: ReadonlyArray<string>;
   readonly onView: (view: HubView) => void;
   readonly onKind: (kind: KindFilter) => void;
@@ -24,12 +24,12 @@ type HubFiltersProps = {
 };
 
 /** The hub's sidebar: what to explore, which kind and which tags. */
-export function HubFilters({ filters, tags, onView, onKind, onTag }: HubFiltersProps) {
+export function HubFilters({ filters, views, tags, onView, onKind, onTag }: HubFiltersProps) {
   return (
     <aside className="web-hub-filters" aria-label={MESSAGES.hub.filters}>
       <RadioList
         label={MESSAGES.hub.explore}
-        options={VIEW_OPTIONS}
+        options={views.map((value) => ({ value, label: MESSAGES.hub.views[value] }))}
         value={filters.view}
         onChange={onView}
       />

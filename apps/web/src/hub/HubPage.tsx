@@ -7,6 +7,8 @@ import { useHub, useHubProfile } from "./hub-context.ts";
 import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
 import {
   ALL_KINDS,
+  HUB_VIEWS,
+  PUBLIC_VIEWS,
   matching,
   offeredTags,
   toggled,
@@ -17,8 +19,7 @@ import { PublicationList } from "./PublicationCard.tsx";
 import { useHubQuery, type HubQuery } from "./use-hub-query.ts";
 
 const SEARCH_DELAY_MS = 200;
-const SIGNED_OUT = "signed-out";
-type Listed = HubQuery<ReadonlyArray<PublicationSummary>> | typeof SIGNED_OUT;
+type Listed = HubQuery<ReadonlyArray<PublicationSummary>>;
 
 const INITIAL_FILTERS: HubFilterState = {
   view: "for-you",
@@ -28,8 +29,10 @@ const INITIAL_FILTERS: HubFilterState = {
 
 /** Everything published (ADR 0018, `/hub`), filtered by the text typed in the hub's header. */
 export function HubPage({ text }: { readonly text: string }) {
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
-  const listed = useListed(filters, text);
+  const [chosen, setFilters] = useState(INITIAL_FILTERS);
+  const handle = useHubProfile()?.handle;
+  const filters = reachableFilters(chosen, handle !== undefined);
+  const listed = useListed({ filters, text, handle });
   const change = (patch: (current: HubFilterState) => Partial<HubFilterState>) => {
     setFilters((current) => ({ ...current, ...patch(current) }));
   };
@@ -37,10 +40,8 @@ export function HubPage({ text }: { readonly text: string }) {
     <div className="web-hub-browse">
       <HubFilters
         filters={filters}
-        tags={offeredTags(
-          listed !== SIGNED_OUT && listed.status === "ready" ? listed.value : [],
-          filters.pressedTags,
-        )}
+        views={handle === undefined ? PUBLIC_VIEWS : HUB_VIEWS}
+        tags={offeredTags(listed.status === "ready" ? listed.value : [], filters.pressedTags)}
         onView={(view) => {
           change(() => ({ view }));
         }}
@@ -85,7 +86,6 @@ function SectionBody({
   readonly listed: Listed;
   readonly pressedTags: ReadonlySet<string>;
 }) {
-  if (listed === SIGNED_OUT) return <p className="web-panel-hint">{MESSAGES.hub.signInForMine}</p>;
   if (listed.status === "failed") return <Notice tone="error" title={MESSAGES.hub.failed} />;
   if (listed.status === "loading") return null;
   return (
@@ -120,14 +120,24 @@ function ForYouMockup() {
   );
 }
 
+/** "Mis publicaciones" needs an account: signed out, it goes back to "Para ti". */
+const reachableFilters = (filters: HubFilterState, isSignedIn: boolean): HubFilterState =>
+  isSignedIn || filters.view !== "mine" ? filters : { ...filters, view: "for-you" };
+
 /** What the chosen view lists before the tags narrow it. */
-function useListed(filters: HubFilterState, text: string): Listed {
-  const handle = useHubProfile()?.handle;
+function useListed({
+  filters,
+  text,
+  handle,
+}: {
+  readonly filters: HubFilterState;
+  readonly text: string;
+  readonly handle: string | undefined;
+}): Listed {
   const isMine = filters.view === "mine";
   const searched = useSearch(text, filters.kind);
   const mine = useOwnPublications(isMine ? handle : undefined);
   if (!isMine) return searched;
-  if (handle === undefined) return SIGNED_OUT;
   return mine.status === "ready"
     ? { status: "ready", value: matching(mine.value, { text, kind: filters.kind }) }
     : mine;

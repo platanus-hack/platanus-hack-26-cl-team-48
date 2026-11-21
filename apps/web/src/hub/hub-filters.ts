@@ -4,6 +4,7 @@ export const ALL_KINDS = "all";
 export type KindFilter = PublicationKind | typeof ALL_KINDS;
 export type HubView = "for-you" | "recent" | "mine";
 export const HUB_VIEWS: readonly HubView[] = ["for-you", "recent", "mine"];
+export const PUBLIC_VIEWS: readonly HubView[] = HUB_VIEWS.filter((view) => view !== "mine");
 
 type Publications = ReadonlyArray<PublicationSummary>;
 

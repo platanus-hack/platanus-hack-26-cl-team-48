@@ -29,6 +29,8 @@ import type { CSSProperties } from "react";
 import { ActivityRail, focusRailSection } from "./workspace/ActivityRail.tsx";
 import { RouteLinkTargetContext } from "./routing/route-link-target.ts";
 import { SidePanel } from "./workspace/SidePanel.tsx";
+import { reachableSection, sectionsFor } from "./workspace/account-sections.ts";
+import { useHubProfile } from "./hub/hub-context.ts";
 import { PreviewLocationControl } from "./toolbar/PreviewLocationControl.tsx";
 
 export type AppProps = {
@@ -71,6 +73,8 @@ function Workspace(props: {
   const { preferences, setPreferences } = useWorkspacePreferences(preferenceStorage);
   const viewport = useViewportSize();
   const rail = useRef<HTMLElement>(null);
+  const isSignedIn = useHubProfile() !== undefined;
+  const sideSection = reachableSection(preferences.sideSection, isSignedIn);
   const change = (patch: Partial<WorkspacePreferences>) => {
     setPreferences({ ...preferences, ...patch });
   };
@@ -92,9 +96,10 @@ function Workspace(props: {
         <Toolbar {...engine} />
         <ActivityRail
           ref={rail}
-          shown={preferences.isSidePanelOpen ? preferences.sideSection : undefined}
+          sections={sectionsFor(isSignedIn)}
+          shown={preferences.isSidePanelOpen ? sideSection : undefined}
           onSelect={(section) => {
-            change(sectionToggle(preferences, section));
+            change(sectionToggle({ ...preferences, sideSection }, section));
           }}
           theme={preferences.theme}
           onThemeChange={(theme) => {
@@ -103,10 +108,10 @@ function Workspace(props: {
         />
         {preferences.isSidePanelOpen && (
           <SidePanel
-            section={preferences.sideSection}
+            section={sideSection}
             onHide={() => {
               change({ isSidePanelOpen: false });
-              focusRailSection(rail.current, preferences.sideSection);
+              focusRailSection(rail.current, sideSection);
             }}
             onAdd={(manifest) => {
               addNode(manifest);

@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useStore } from "zustand";
 import { useAppStores } from "../app-context.ts";
 import { downloadFlow } from "../flow/download-flow.ts";
-import { SignInDialog } from "../hub/SignInDialog.tsx";
 import { MESSAGES } from "../messages.ts";
 import type { FlowLibrary, SavedFlow } from "./flow-library.ts";
 
@@ -21,37 +20,13 @@ export function SavedFlowList() {
       >
         {MESSAGES.savedFlows.newFlow}
       </Button>
-      {isSignedOut ? <SignInToSave /> : flows.length === 0 && <p>{MESSAGES.savedFlows.empty}</p>}
+      {!isSignedOut && flows.length === 0 && <p>{MESSAGES.savedFlows.empty}</p>}
       {flows.map((flow) => (
         <SavedFlowCard key={flow.id} flow={flow} />
       ))}
     </div>
   );
 }
-function SignInToSave() {
-  const [isSigningIn, setSigningIn] = useState(false);
-  return (
-    <>
-      <p>{MESSAGES.savedFlows.signInToSave}</p>
-      <Button
-        variant="primary"
-        onClick={() => {
-          setSigningIn(true);
-        }}
-      >
-        {MESSAGES.account.signIn}
-      </Button>
-      {isSigningIn && (
-        <SignInDialog
-          onClose={() => {
-            setSigningIn(false);
-          }}
-        />
-      )}
-    </>
-  );
-}
-
 function SavedFlowCard({ flow }: { readonly flow: SavedFlow }) {
   const { savedFlowStore } = useAppStores();
   const [isRenaming, setRenaming] = useState(false);

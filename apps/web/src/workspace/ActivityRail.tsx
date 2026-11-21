@@ -1,6 +1,6 @@
 import { Icon, type IconName } from "@nodomics/ui";
 import type { Ref } from "react";
-import { SIDE_SECTIONS, type SideSection, type Theme } from "../layout/workspace-preferences.ts";
+import { type SideSection, type Theme } from "../layout/workspace-preferences.ts";
 import { pathOf } from "../routing/routes.ts";
 import { MESSAGES } from "../messages.ts";
 import { ThemeControl } from "../theme/ThemeControl.tsx";
@@ -15,6 +15,8 @@ const SECTION_ICONS: Record<SideSection, IconName> = {
 };
 
 type ActivityRailProps = {
+  /** The sections this user can open; account sections need a session. */
+  readonly sections: ReadonlyArray<SideSection>;
   /** The section shown in the side panel, or `undefined` when the panel is hidden. */
   readonly shown: SideSection | undefined;
   readonly onSelect: (section: SideSection) => void;
@@ -24,10 +26,17 @@ type ActivityRailProps = {
 };
 
 /** The editor's sections down the left edge, the hub (in its own tab) and the theme. */
-export function ActivityRail({ shown, onSelect, theme, onThemeChange, ref }: ActivityRailProps) {
+export function ActivityRail({
+  sections,
+  shown,
+  onSelect,
+  theme,
+  onThemeChange,
+  ref,
+}: ActivityRailProps) {
   return (
     <nav ref={ref} className="web-rail" aria-label={MESSAGES.rail.label}>
-      {SIDE_SECTIONS.map((section) => (
+      {sections.map((section) => (
         <RailButton
           key={section}
           section={section}
