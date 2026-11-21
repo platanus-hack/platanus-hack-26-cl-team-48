@@ -1,49 +1,94 @@
-import type { PublicationKind } from "@nodomics/hub";
-import { Input, Notice } from "@nodomics/ui";
+import type { PublicationSummary } from "@nodomics/hub";
+import { Notice } from "@nodomics/ui";
 import { useCallback, useId, useState } from "react";
 import { MESSAGES } from "../messages.ts";
-import { useHub } from "./hub-context.ts";
+import { useHub, useHubProfile } from "./hub-context.ts";
+import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
+import { ALL_KINDS, matching, tagsOf, toggled, withTags, type KindFilter } from "./hub-filters.ts";
 import { PublicationList } from "./PublicationCard.tsx";
-import { useHubQuery } from "./use-hub-query.ts";
+import { useHubQuery, type HubQuery } from "./use-hub-query.ts";
 
 const SEARCH_DELAY_MS = 200;
-const ALL = "all";
-type KindFilter = PublicationKind | typeof ALL;
-const KIND_OPTIONS = (["all", "flow", "node"] as const).map((value) => ({
-  value,
-  label: MESSAGES.hub.kinds[value],
-}));
+const SIGNED_OUT = "signed-out";
+type Listed = HubQuery<ReadonlyArray<PublicationSummary>> | typeof SIGNED_OUT;
 
-/** Search of everything published (ADR 0018, `/hub`). */
-export function HubPage() {
-  const [text, setText] = useState("");
-  const [kind, setKind] = useState<KindFilter>(ALL);
-  const results = useSearch(text, kind);
+const INITIAL_FILTERS: HubFilterState = {
+  view: "for-you",
+  kind: ALL_KINDS,
+  pressedTags: new Set(),
+};
+
+/** Everything published (ADR 0018, `/hub`), filtered by the text typed in the hub's header. */
+export function HubPage({ text }: { readonly text: string }) {
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const listed = useListed(filters, text);
+  const change = (patch: Partial<HubFilterState>) => {
+    setFilters({ ...filters, ...patch });
+  };
   return (
-    <main className="web-hub-page">
-      <div className="web-hub-hero">
-        <h1>{MESSAGES.hub.title}</h1>
-        <p className="web-hub-lead">{MESSAGES.hub.subtitle}</p>
-        <div className="web-hub-search">
-          <Input
-            type="search"
-            icon="search"
-            label={MESSAGES.hub.search}
-            placeholder={MESSAGES.hub.search}
-            value={text}
-            onChange={setText}
-          />
-        </div>
-        <KindChips kind={kind} onChange={setKind} />
-      </div>
-      <ForYouMockup />
-      {results.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
-      {results.status === "ready" && (
-        <PublicationList publications={results.value} empty={MESSAGES.hub.noResults} />
-      )}
-    </main>
+    <div className="web-hub-browse">
+      <HubFilters
+        filters={filters}
+        tags={listed !== SIGNED_OUT && listed.status === "ready" ? tagsOf(listed.value) : []}
+        onView={(view) => {
+          change({ view });
+        }}
+        onKind={(kind) => {
+          change({ kind });
+        }}
+        onTag={(tag) => {
+          change({ pressedTags: toggled(filters.pressedTags, tag) });
+        }}
+      />
+      <main className="web-hub-page">
+        <h1 className="web-visually-hidden">{MESSAGES.hub.title}</h1>
+        {filters.view === "for-you" && <ForYouMockup />}
+        <PublicationsSection
+          heading={listHeading(filters, text)}
+          listed={listed}
+          pressedTags={filters.pressedTags}
+        />
+      </main>
+    </div>
   );
 }
+
+function PublicationsSection(props: {
+  readonly heading: string;
+  readonly listed: Listed;
+  readonly pressedTags: ReadonlySet<string>;
+}) {
+  const heading = useId();
+  return (
+    <section className="web-hub-section" aria-labelledby={heading}>
+      <h2 id={heading}>{props.heading}</h2>
+      <SectionBody {...props} />
+    </section>
+  );
+}
+
+function SectionBody({
+  listed,
+  pressedTags,
+}: {
+  readonly listed: Listed;
+  readonly pressedTags: ReadonlySet<string>;
+}) {
+  if (listed === SIGNED_OUT) return <p className="web-panel-hint">{MESSAGES.hub.signInForMine}</p>;
+  if (listed.status === "failed") return <Notice tone="error" title={MESSAGES.hub.failed} />;
+  if (listed.status === "loading") return null;
+  return (
+    <PublicationList
+      publications={withTags(listed.value, pressedTags)}
+      empty={MESSAGES.hub.noResults}
+    />
+  );
+}
+
+const listHeading = ({ view }: HubFilterState, text: string) => {
+  if (view === "mine") return MESSAGES.hub.views.mine;
+  return text.trim() === "" ? MESSAGES.hub.views.recent : MESSAGES.hub.results;
+};
 
 function ForYouMockup() {
   const heading = useId();
@@ -64,38 +109,29 @@ function ForYouMockup() {
   );
 }
 
-function KindChips({
-  kind,
-  onChange,
-}: {
-  readonly kind: KindFilter;
-  readonly onChange: (kind: KindFilter) => void;
-}) {
-  const name = useId();
-  return (
-    <fieldset className="web-hub-chips" role="radiogroup" aria-label={MESSAGES.hub.kind}>
-      {KIND_OPTIONS.map((option) => (
-        <label key={option.value}>
-          <input
-            type="radio"
-            name={name}
-            checked={kind === option.value}
-            onChange={() => {
-              onChange(option.value);
-            }}
-          />
-          {option.label}
-        </label>
-      ))}
-    </fieldset>
-  );
+/** What the chosen view lists before the tags narrow it. */
+function useListed(filters: HubFilterState, text: string): Listed {
+  const searched = useSearch(text, filters.kind);
+  const mine = useMine(text, filters.kind);
+  return filters.view === "mine" ? mine : searched;
 }
 
 function useSearch(text: string, kind: KindFilter) {
   const hub = useHub();
   const search = useCallback(
-    () => hub.search({ text: text.trim(), ...(kind === ALL ? {} : { kind }) }),
+    () => hub.search({ text: text.trim(), ...(kind === ALL_KINDS ? {} : { kind }) }),
     [hub, text, kind],
   );
   return useHubQuery(search, SEARCH_DELAY_MS);
+}
+
+function useMine(text: string, kind: KindFilter): Listed {
+  const hub = useHub();
+  const handle = useHubProfile()?.handle;
+  const ask = useCallback(() => hub.publicationsOf(handle ?? ""), [hub, handle]);
+  const query = useHubQuery(ask);
+  if (handle === undefined) return SIGNED_OUT;
+  return query.status === "ready"
+    ? { status: "ready", value: matching(query.value, { text, kind }) }
+    : query;
 }
