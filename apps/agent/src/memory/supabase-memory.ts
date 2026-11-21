@@ -1,7 +1,7 @@
 import { err, ok, type Result } from "@nodomics/protocol";
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Edge, Episode, MemoryError, MemoryPort } from "./memory-port.ts";
 import { edgesValidAt } from "./temporal-graph.ts";
 
@@ -112,8 +112,12 @@ async function openEdge(client: SupabaseClient, edge: Parameters<MemoryPort["ope
   return parsed.ok ? ok(toEdge(parsed.value)) : parsed;
 }
 
-async function closeEdge(client: SupabaseClient, id: string, at: string): Promise<Outcome<void>> {
-  const query = client.from("agent_edges").update({ valid_to: at }).eq("id", id).select("id");
+type EdgeClose = { readonly id: string; readonly at: string; readonly actorId: string };
+
+async function closeEdge(client: SupabaseClient, target: EdgeClose): Promise<Outcome<void>> {
+  const { id, at, actorId } = target;
+  const update = client.from("agent_edges").update({ valid_to: at });
+  const query = update.eq("id", id).eq("actor_id", actorId).select("id");
   const { data, error }: Reply = await query;
   if (error) return storeFailed(error.message);
   return Array.isArray(data) && data.length > 0
@@ -148,11 +152,56 @@ export function createSupabaseMemory(client: SupabaseClient): MemoryPort {
     upsertEntity: (entity) =>
       write(client.from("agent_entities").upsert(entity, { onConflict: "actor_id,id" })),
     openEdge: (edge) => openEdge(client, edge),
-    closeEdge: (id, at) => closeEdge(client, id, at),
+    closeEdge: (id, at, actorId) => closeEdge(client, { id, at, actorId }),
     edgesAt: async (entityId, at, actorId) => {
       const touching = await edgesTouching(client, { entityId, actorId });
       return touching.ok ? ok(edgesValidAt(touching.value, at)) : touching;
     },
     episodesFor: (entityId) => episodesFor(client, entityId),
   };
+}
+
+export type UserScopedConfig = {
+  readonly supabaseUrl: string;
+  readonly anonKey: string;
+  readonly accessToken: string;
+};
+
+type ClientFactory = (
+  url: string,
+  key: string,
+  options: {
+    readonly global: { readonly headers: Readonly<Record<string, string>> };
+    readonly auth: { readonly persistSession: false; readonly autoRefreshToken: false };
+  },
+) => SupabaseClient;
+
+const SERVICE_ROLE = "service_role";
+
+function jwtRole(key: string): unknown {
+  try {
+    const payload: unknown = JSON.parse(atob(key.split(".")[1] ?? ""));
+    return typeof payload === "object" && payload !== null && "role" in payload
+      ? payload.role
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function createUserScopedMemory(
+  config: UserScopedConfig,
+  factory: ClientFactory = createClient,
+): Outcome<MemoryPort> {
+  if (config.accessToken === "") {
+    return storeFailed("A user access token is required for the agent memory");
+  }
+  if (jwtRole(config.anonKey) === SERVICE_ROLE) {
+    return storeFailed("The agent memory must not use a service role key");
+  }
+  const client = factory(config.supabaseUrl, config.anonKey, {
+    global: { headers: { Authorization: `Bearer ${config.accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return ok(createSupabaseMemory(client));
 }

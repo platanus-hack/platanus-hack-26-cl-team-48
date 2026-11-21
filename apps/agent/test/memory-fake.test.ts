@@ -58,7 +58,10 @@ describe("fake memory contract", () => {
       actorId: ACTOR,
     });
     if (!opened.ok) throw new Error("setup failed");
-    expect(await memory.closeEdge(opened.value.id, T2)).toEqual({ ok: true, value: undefined });
+    expect(await memory.closeEdge(opened.value.id, T2, ACTOR)).toEqual({
+      ok: true,
+      value: undefined,
+    });
     const before = await memory.edgesAt("a", T1, ACTOR);
     const after = await memory.edgesAt("a", T3, ACTOR);
     expect(before.ok && before.value).toHaveLength(1);
@@ -66,8 +69,24 @@ describe("fake memory contract", () => {
   });
 
   it("fails with NOT_FOUND when closing an unknown edge", async () => {
-    const result = await createFakeMemory().closeEdge("nope", T1);
+    const result = await createFakeMemory().closeEdge("nope", T1, ACTOR);
     expect(result).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+  });
+
+  it("closeEdge never closes another actor's edge", async () => {
+    const memory = createFakeMemory();
+    const theirs = await memory.openEdge({
+      src: "a",
+      dst: "b",
+      relation: "uses",
+      at: T1,
+      actorId: "user-2",
+    });
+    if (!theirs.ok) throw new Error("setup failed");
+    const result = await memory.closeEdge(theirs.value.id, T2, ACTOR);
+    expect(result).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+    const still = await memory.edgesAt("a", T3, "user-2");
+    expect(still.ok && still.value.map((e) => e.validTo)).toEqual([null]);
   });
 
   it("edgesAt never returns another actor's edges", async () => {
