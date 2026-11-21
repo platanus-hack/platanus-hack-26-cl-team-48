@@ -71,7 +71,10 @@ const hub = createAppHub(import.meta.env);
 
 // The hub port does not expose the Supabase access token yet, so the agent service sees no session.
 const getNoAccessTokenYet = () => Promise.resolve(undefined);
-const feed = createAppFeed(import.meta.env, getNoAccessTokenYet);
+const feed = createAppFeed(import.meta.env, {
+  getAccessToken: getNoAccessTokenYet,
+  currentHandle: async () => (await hub.currentProfile())?.handle,
+});
 
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.

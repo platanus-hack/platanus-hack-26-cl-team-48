@@ -29,7 +29,8 @@ export function ProfileCardEditor({ feed, initial, onSaved, onCancel }: ProfileC
       }}
     >
       <RegistrationFields
-        isBusy={busy === "generating"}
+        isGenerating={busy === "generating"}
+        isSaving={busy === "saving"}
         onGenerate={(sources) => void generate(sources)}
       />
       {notice !== undefined && (
@@ -88,7 +89,12 @@ export function ProfileCardEditor({ feed, initial, onSaved, onCancel }: ProfileC
         <Button variant="ghost" onClick={onCancel}>
           {MESSAGES.feed.editor.cancel}
         </Button>
-        <Button variant="primary" loading={busy === "saving"} onClick={() => void save()}>
+        <Button
+          variant="primary"
+          loading={busy === "saving"}
+          disabled={busy === "generating"}
+          onClick={() => void save()}
+        >
           {MESSAGES.feed.editor.save}
         </Button>
       </footer>

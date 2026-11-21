@@ -6,12 +6,17 @@ import { PdfInput } from "./PdfInput.tsx";
 import { hasSources, type RegistrationSources } from "./extract-card.ts";
 
 type RegistrationFieldsProps = {
-  readonly isBusy: boolean;
+  readonly isGenerating: boolean;
+  readonly isSaving: boolean;
   readonly onGenerate: (sources: RegistrationSources) => void;
 };
 
 /** "Generar desde mi CV": the sources the registration agent reads (ADR 0022 §6). */
-export function RegistrationFields({ isBusy, onGenerate }: RegistrationFieldsProps) {
+export function RegistrationFields({
+  isGenerating,
+  isSaving,
+  onGenerate,
+}: RegistrationFieldsProps) {
   const [sources, setSources] = useState<RegistrationSources>({
     pdf: undefined,
     text: "",
@@ -44,8 +49,8 @@ export function RegistrationFields({ isBusy, onGenerate }: RegistrationFieldsPro
       </Field>
       <Button
         icon="sparkles"
-        loading={isBusy}
-        disabled={!hasSources(sources)}
+        loading={isGenerating}
+        disabled={isSaving || !hasSources(sources)}
         onClick={() => {
           onGenerate(sources);
         }}

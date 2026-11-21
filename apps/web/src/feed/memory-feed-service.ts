@@ -7,6 +7,8 @@ export type MemoryFeedSeed = {
   readonly cards: Readonly<Record<string, ProfileCard>>;
   /** The handle of the signed-in person; without it the service behaves as signed out. */
   readonly ownHandle?: string;
+  /** Asked on every call when `ownHandle` is absent, so the service follows the hub session. */
+  readonly currentHandle?: () => Promise<string | undefined>;
 };
 
 type CardEntry = readonly [handle: string, card: ProfileCard];
@@ -16,21 +18,23 @@ const MEMORY_SIMILARITY = 1;
 /** The Feed without the agent service: cards kept in memory and found by plain text. */
 export function createMemoryFeedService(seed: MemoryFeedSeed): FeedService {
   const cards = new Map(Object.entries(seed.cards));
-  const { ownHandle } = seed;
+  const handleOfSession = async () => seed.ownHandle ?? (await seed.currentHandle?.());
   return {
     search: (text) => Promise.resolve(ok(profileHitsOf(cards, ([, card]) => mentions(card, text)))),
-    matches: () => {
-      if (ownHandle === undefined) return Promise.resolve(feedFailure("UNAUTHENTICATED"));
-      if (!cards.has(ownHandle)) return Promise.resolve(feedFailure("NO_PROFILE"));
-      return Promise.resolve(ok(profileHitsOf(cards, ([handle]) => handle !== ownHandle)));
+    matches: async () => {
+      const ownHandle = await handleOfSession();
+      if (ownHandle === undefined) return feedFailure("UNAUTHENTICATED");
+      if (!cards.has(ownHandle)) return feedFailure("NO_PROFILE");
+      return ok(profileHitsOf(cards, ([handle]) => handle !== ownHandle));
     },
     card: (handle) => Promise.resolve(ok(cards.get(handle))),
-    saveProfile: (card) => {
-      if (ownHandle === undefined) return Promise.resolve(feedFailure("UNAUTHENTICATED"));
+    saveProfile: async (card) => {
+      const ownHandle = await handleOfSession();
+      if (ownHandle === undefined) return feedFailure("UNAUTHENTICATED");
       const parsed = parseProfileCard(card);
-      if (!parsed.ok) return Promise.resolve(feedFailure("INVALID_CARD", parsed.error));
+      if (!parsed.ok) return feedFailure("INVALID_CARD", parsed.error);
       cards.set(ownHandle, parsed.value);
-      return Promise.resolve(ok(parsed.value));
+      return ok(parsed.value);
     },
     extractProfile: () => Promise.resolve(feedFailure("UNAVAILABLE")),
   };
