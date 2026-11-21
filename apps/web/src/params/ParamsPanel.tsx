@@ -17,6 +17,7 @@ import { ResizeHandle } from "../layout/ResizeHandle.tsx";
 import { PARAMS_WIDTH_RANGE } from "../layout/size-range.ts";
 import { UpdateNode } from "./UpdateNode.tsx";
 import { PortList } from "./PortList.tsx";
+import { NodeDetailTabs } from "./NodeDetailTabs.tsx";
 import { MESSAGES } from "../messages.ts";
 
 type ParamsPanelProps = {
@@ -42,7 +43,7 @@ export function ParamsPanel({ isOpen, onToggle, width, onResize }: ParamsPanelPr
     <aside
       ref={panel}
       id={panelId}
-      className="web-floating web-params"
+      className="web-params"
       data-open={isOpen}
       data-canvas-inset="right"
       aria-label={MESSAGES.params.title}
@@ -98,6 +99,10 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
   const flow = useFlowState((state) => state.flow);
   if (manifest === undefined)
     return <p className="web-panel-hint">{MESSAGES.params.unknownNode}</p>;
+  const nodeIssues = [
+    ...issues.filter((issue) => issue.nodeId === node.id),
+    ...(runError?.param === undefined ? [] : [{ ...runError, nodeId: node.id }]),
+  ];
   return (
     <>
       <div className="web-params-node">
@@ -111,19 +116,26 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
           <p className="web-params-description">{manifest.description}</p>
         )}
       </div>
-      <UpdateNode node={node} />
-      <ParamsForm
-        node={node}
-        manifest={manifest}
-        issues={[
-          ...issues.filter((issue) => issue.nodeId === node.id),
-          ...(runError?.param === undefined ? [] : [{ ...runError, nodeId: node.id }]),
-        ]}
-        onChange={(param, value) => {
-          dispatch(nodeParamEdit({ flow, node, manifest, param, value }));
+      <NodeDetailTabs>
+        {(tab) => {
+          if (tab === "ports") return <PortList node={node} manifest={manifest} />;
+          if (tab === "history")
+            return <p className="web-mockup-note">{MESSAGES.params.historyMockup}</p>;
+          return (
+            <>
+              <UpdateNode node={node} />
+              <ParamsForm
+                node={node}
+                manifest={manifest}
+                issues={nodeIssues}
+                onChange={(param, value) => {
+                  dispatch(nodeParamEdit({ flow, node, manifest, param, value }));
+                }}
+              />
+            </>
+          );
         }}
-      />
-      <PortList node={node} manifest={manifest} />
+      </NodeDetailTabs>
     </>
   );
 }

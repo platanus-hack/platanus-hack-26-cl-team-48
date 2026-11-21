@@ -6,14 +6,11 @@ import { useAddNode } from "./canvas/use-add-node.ts";
 import { EngineConnectionContext } from "./engine/engine-connection.ts";
 import type { EngineEntry } from "./engine/engine-entry.ts";
 import { useEngineLifecycle } from "./engine/use-engine-lifecycle.ts";
-import { LibraryPanel } from "./library/LibraryPanel.tsx";
 import { NoticeArea } from "./NoticeArea.tsx";
 import { CodeEditorSizeContext } from "./layout/code-editor-size.ts";
 import { ParamsPanel } from "./params/ParamsPanel.tsx";
 import { PreviewPanel } from "./preview/PreviewPanel.tsx";
 import { Toolbar } from "./toolbar/Toolbar.tsx";
-import { HubLayer } from "./hub/HubLayer.tsx";
-import { useRoute } from "./routing/use-route.ts";
 import { useRunOnConnect } from "./engine/use-run-on-connect.ts";
 
 import { useAppStores } from "./app-context.ts";
@@ -24,11 +21,13 @@ import { useWorkspacePreferences } from "./layout/use-workspace-preferences.ts";
 import { useViewportSize } from "./layout/viewport-size.ts";
 import type {
   PreviewLocation,
+  SideSection,
   WorkspacePreferences,
   WorkspacePreferenceStorage,
 } from "./layout/workspace-preferences.ts";
 import type { CSSProperties } from "react";
-import { ThemeControl } from "./theme/ThemeControl.tsx";
+import { ActivityRail } from "./workspace/ActivityRail.tsx";
+import { SidePanel } from "./workspace/SidePanel.tsx";
 import { PreviewLocationControl } from "./toolbar/PreviewLocationControl.tsx";
 
 export type AppProps = {
@@ -79,41 +78,61 @@ function Workspace(props: {
       <div
         className="web-app"
         data-canvas-frame
-        data-library-open={preferences.isLibraryOpen}
+        data-side-panel-open={preferences.isSidePanelOpen}
         data-params-open={preferences.isParamsOpen}
         data-preview-location={preferences.previewLocation}
         data-preview-mode={preferences.preview.mode}
         data-viewport={viewport}
         style={workspaceSizes(preferences)}
       >
-        <Canvas />
-        <Toolbar {...engine}>
-          <ThemeControl
-            theme={preferences.theme}
-            onChange={(theme) => {
-              change({ theme });
-            }}
-          />
-        </Toolbar>
-        <LibraryPanel
-          isOpen={preferences.isLibraryOpen}
-          onToggle={() => {
-            change({ isLibraryOpen: !preferences.isLibraryOpen });
+        <Toolbar {...engine} />
+        <ActivityRail
+          shown={preferences.isSidePanelOpen ? preferences.sideSection : undefined}
+          onSelect={(section) => {
+            change(sectionToggle(preferences, section));
           }}
-          onAdd={(manifest) => {
-            addNode(manifest);
+          theme={preferences.theme}
+          onThemeChange={(theme) => {
+            change({ theme });
           }}
         />
-        {preferences.previewLocation === "panel" && (
-          <PreviewFrame
-            size={preferences.preview}
-            onChange={(preview) => {
-              change({ preview });
+        {preferences.isSidePanelOpen && (
+          <SidePanel
+            section={preferences.sideSection}
+            onHide={() => {
+              change({ isSidePanelOpen: false });
             }}
-          >
-            {(actions) => <PreviewPanel actions={actions} />}
-          </PreviewFrame>
+            onAdd={(manifest) => {
+              addNode(manifest);
+            }}
+          />
         )}
+        <div className="web-stage">
+          <div className="web-stage-canvas">
+            <Canvas />
+            <div className="web-canvas-controls">
+              <CanvasZoom />
+              <div className="web-floating web-preview-location">
+                <PreviewLocationControl
+                  location={preferences.previewLocation}
+                  onChange={(previewLocation) => {
+                    change({ previewLocation });
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          {preferences.previewLocation === "panel" && (
+            <PreviewFrame
+              size={preferences.preview}
+              onChange={(preview) => {
+                change({ preview });
+              }}
+            >
+              {(actions) => <PreviewPanel actions={actions} />}
+            </PreviewFrame>
+          )}
+        </div>
         <CodeEditorSizeContext
           value={{
             rows: preferences.codeEditorRows,
@@ -133,22 +152,19 @@ function Workspace(props: {
             }}
           />
         </CodeEditorSizeContext>
-        <div className="web-canvas-controls">
-          <CanvasZoom />
-          <div className="web-floating web-preview-location">
-            <PreviewLocationControl
-              location={preferences.previewLocation}
-              onChange={(previewLocation) => {
-                change({ previewLocation });
-              }}
-            />
-          </div>
-        </div>
-        <HubOverlay />
       </div>
     </PreviewLocationContext>
   );
 }
+
+/** Choosing the shown section hides the panel; any other choice shows that section. */
+const sectionToggle = (
+  preferences: WorkspacePreferences,
+  section: SideSection,
+): Partial<WorkspacePreferences> =>
+  preferences.isSidePanelOpen && section === preferences.sideSection
+    ? { isSidePanelOpen: false }
+    : { isSidePanelOpen: true, sideSection: section };
 
 /** "Abrir tabla" in a node moves the preview to the panel, showing that node. */
 function usePreviewLocationControls(
@@ -179,10 +195,4 @@ function AutoRun({ isEnabled }: { readonly isEnabled: boolean }) {
   useSourceReconnection();
   useRunOnConnect(isEnabled);
   return null;
-}
-
-/** The hub's pages cover the editor, which stays mounted so its flow and engine survive. */
-function HubOverlay() {
-  const route = useRoute();
-  return route.page === "workspace" ? null : <HubLayer route={route} />;
 }

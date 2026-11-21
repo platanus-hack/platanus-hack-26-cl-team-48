@@ -46,7 +46,7 @@ function ProfileHeader({
   readonly count: number;
 }) {
   return (
-    <header className="web-hub-profile">
+    <div className="web-hub-profile">
       <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
       <div>
         <h1>{profile.displayName}</h1>
@@ -56,7 +56,7 @@ function ProfileHeader({
           <span>{MESSAGES.hub.publications(count)}</span>
         </p>
       </div>
-    </header>
+    </div>
   );
 }
 
