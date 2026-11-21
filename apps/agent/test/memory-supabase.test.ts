@@ -144,10 +144,12 @@ describe("supabase memory", () => {
     const closed = await createSupabaseMemory(hit.client).closeEdge(
       "x",
       "2026-11-21T11:00:00.000Z",
+      "user-1",
     );
     const missing = await createSupabaseMemory(miss.client).closeEdge(
       "x",
       "2026-11-21T11:00:00.000Z",
+      "user-1",
     );
     expect(closed).toEqual({ ok: true, value: undefined });
     expect(hit.calls[0]).toMatchObject({
@@ -155,6 +157,7 @@ describe("supabase memory", () => {
       payload: { valid_to: "2026-11-21T11:00:00.000Z" },
     });
     expect(hit.calls[0]?.filters).toContainEqual(["eq", ["id", "x"]]);
+    expect(hit.calls[0]?.filters).toContainEqual(["eq", ["actor_id", "user-1"]]);
     expect(missing).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
   });
 

@@ -66,7 +66,7 @@ async function persistChange(
     (edge, index) => index < before.length && edge.validTo !== before[index]?.validTo,
   );
   for (const edge of closed) {
-    const result = await memory.closeEdge(edge.id, edge.validTo ?? "");
+    const result = await memory.closeEdge(edge.id, edge.validTo ?? "", edge.actorId);
     if (!result.ok) return result;
   }
   const opened = after[after.length - 1];
