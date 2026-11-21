@@ -45,6 +45,15 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.3)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0))
 
+  apps/agent:
+    dependencies:
+      '@nodomics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@sinclair/typebox':
+        specifier: 0.34.52
+        version: 0.34.52
+
   apps/web:
     dependencies:
       '@codemirror/autocomplete':

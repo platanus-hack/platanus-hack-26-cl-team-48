@@ -1,0 +1,14 @@
+{
+  "name": "@nodomics/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/start.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@nodomics/protocol": "workspace:*",
+    "@sinclair/typebox": "0.34.52"
+  }
+}
