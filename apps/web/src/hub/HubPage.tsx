@@ -1,6 +1,8 @@
 import type { PublicationKind } from "@nodomics/hub";
 import { Input, Notice } from "@nodomics/ui";
 import { useCallback, useId, useState } from "react";
+import { ForYouSection } from "../feed/ForYouSection.tsx";
+import { PeopleSection } from "../feed/PeopleSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
 import { PublicationList } from "./PublicationCard.tsx";
@@ -36,31 +38,13 @@ export function HubPage() {
         </div>
         <KindChips kind={kind} onChange={setKind} />
       </div>
-      <ForYouMockup />
+      <ForYouSection />
+      <PeopleSection text={text} />
       {results.status === "failed" && <Notice tone="error" title={MESSAGES.hub.failed} />}
       {results.status === "ready" && (
         <PublicationList publications={results.value} empty={MESSAGES.hub.noResults} />
       )}
     </main>
-  );
-}
-
-function ForYouMockup() {
-  const heading = useId();
-  return (
-    <section className="web-hub-for-you" aria-labelledby={heading}>
-      <h2 id={heading}>{MESSAGES.hub.forYou}</h2>
-      <p className="web-mockup-note">{MESSAGES.hub.forYouMockup}</p>
-      <ul className="web-hub-for-you-list" aria-hidden="true">
-        {MESSAGES.hub.forYouExamples.map((example) => (
-          <li key={example.title} className="web-hub-for-you-card">
-            <span className="web-hub-for-you-kind">{example.kind}</span>
-            <strong>{example.title}</strong>
-            <span className="web-hub-for-you-reason">{example.reason}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 

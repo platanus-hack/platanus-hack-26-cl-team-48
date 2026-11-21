@@ -2,6 +2,7 @@ import type { HubProfile, PublicationSummary } from "@nodomics/hub";
 import { ok } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
 import { useCallback } from "react";
+import { ProfileCardSection } from "../feed/ProfileCardSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
 import { Avatar } from "./Avatar.tsx";
@@ -31,6 +32,7 @@ export function ProfilePage({ handle }: { readonly handle: string }) {
       ) : (
         <>
           <ProfileHeader profile={profile} count={publications.length} />
+          <ProfileCardSection handle={profile.handle} />
           <PublicationList publications={publications} empty={MESSAGES.hub.noPublications} />
         </>
       )}
