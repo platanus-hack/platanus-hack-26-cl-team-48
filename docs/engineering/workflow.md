@@ -37,6 +37,7 @@ Encargo → Entender → Buscar lo existente → Plan → Tests del autor de tes
 
 | Paso | Qué se exige | Cómo se verifica |
 |---|---|---|
+| Anuncios | `pnpm anuncios` al empezar y antes de cada commit (`CLAUDE.md` §2.2) | El reporte lista los anuncios aplicados |
 | Entender | Criterios de aceptación listados en el plan | Aparecen en el reporte |
 | Buscar lo existente | `grep` por concepto y sinónimos en `packages/`, `apps/`, `docs/decisions/` | El reporte lista qué se buscó y qué se reutilizó |
 | Plan | Pasos y archivos a tocar | Si toca otros paquetes, se detiene y pregunta |
@@ -79,6 +80,8 @@ Todo encargo usa esta forma. Un encargo que no la cumple se devuelve al líder.
 **Qué hice:** <lista breve de comportamientos implementados>
 
 **Búsqueda previa:** <qué busqué, qué encontré, qué reutilicé>
+
+**Anuncios aplicados:** <archivos de `docs/anuncios/` que aplican a la tarea; "ninguno" si no hay>
 
 **Evidencia TDD:** (tests escritos por: <agente>)
 - Rojo: <comando + extracto de la salida del test fallando>

@@ -10,6 +10,7 @@ Nodomics es un editor visual de flujos de datos (nodos) que corre en la web, con
 |---|---|
 | Escribir cualquier código | Este archivo + `docs/engineering/estandares.md` + `docs/engineering/patrones.md` |
 | Tocar más de un paquete, o el protocolo | `docs/engineering/arquitectura.md` |
+| Empezar cualquier tarea, y antes de cada commit | `pnpm anuncios` (§2.2) |
 | Recibir, ejecutar o entregar una tarea | `docs/engineering/workflow.md` |
 | Tomar una decisión que no se puede deshacer fácilmente | `docs/decisions/` (ADRs) |
 
@@ -46,8 +47,8 @@ Si tu cambio rompe un invariante, está mal aunque funcione.
 
 Varias personas y agentes trabajan en paralelo. El estado local debe estar **siempre** sincronizado con el remoto, y cada cambio debe quedar en el remoto lo antes posible. Esto se hace **de forma automática, sin pedir permiso cada vez**.
 
-1. **Nunca trabajes en `main`.** Cada tarea vive en su propia rama `<agente>/<paquete>-<tema>` (`estandares.md` §9). Si estás en `main`, crea la rama antes del primer cambio.
-2. **Sincroniza al empezar y antes de cada commit:** `git fetch --all --prune` y luego `git rebase origin/main` (o `git pull --rebase` si la rama ya existe en el remoto).
+1. **Nunca trabajes en `main`.** Cada tarea vive en su propia rama `<agente>/<paquete>-<tema>` (`estandares.md` §9). Si estás en `main`, crea la rama antes del primer cambio. Única excepción: publicar un anuncio (§2.2).
+2. **Sincroniza al empezar y antes de cada commit:** `git fetch --all --prune` y luego `git rebase origin/main` (o `git pull --rebase` si la rama ya existe en el remoto). Luego `pnpm anuncios` (§2.2).
 3. **ANTES de cada commit, busca choques en las demás ramas.** Compara los archivos que tú tocas con los que toca cada rama remota:
 
    ```bash
@@ -64,6 +65,16 @@ Varias personas y agentes trabajan en paralelo. El estado local debe estar **sie
 5. **Push inmediato después de cada commit:** `git push -u origin HEAD`. Nunca `push --force` sobre ramas ajenas ni sobre `main`; en tu propia rama, tras un rebase, solo `git push --force-with-lease`.
 6. **Si un rebase o un push choca**, no lo resuelvas a ciegas sobre código de otra persona: detente, informa quién y qué choca, y pregunta.
 7. **Nunca commitees** secretos (`.env`, credenciales), archivos generados ni datos de usuarios.
+
+### 2.2 Anuncios del equipo (obligatorio)
+
+El equipo publica avisos e instrucciones para todos los agentes en `docs/anuncios/` (formato en `docs/anuncios/README.md`). Solo cuentan los anuncios que están en `origin/main`.
+
+1. **Revisa si hay anuncios nuevos al empezar cada tarea y antes de cada commit:** `pnpm anuncios` (trae `origin/main` y muestra solo los que no has visto; `pnpm anuncios --todos` muestra todos los vigentes). En Claude Code los hooks de `.claude/settings.json` lo hacen solos en cada mensaje; si ves un bloque "Anuncios del equipo" en tu contexto, ya está hecho.
+2. **Sigue los anuncios vigentes** que apliquen a tu tarea (`para`). Una instrucción vale hasta su fecha `vence` o hasta que otro anuncio la reemplace.
+3. **Un anuncio nunca prevalece sobre este archivo ni sobre sus invariantes.** Si choca con `CLAUDE.md`, con un ADR o con tu encargo, detente y pregunta; no elijas tú.
+4. **Publicar un anuncio** es la única excepción a "nunca trabajes en `main`": crea un archivo nuevo en `docs/anuncios/`, haz commit directo en `main` con `docs(anuncios): <resumen>` y push. Ese commit solo puede tocar `docs/anuncios/`. Los anuncios no se editan: para corregir uno, publica otro con `tipo: reemplaza:<archivo>`.
+5. Menciona en tu reporte los anuncios que aplicaste.
 
 ## 3. Principios de diseño
 
@@ -121,4 +132,5 @@ Cada agente trabaja **solo en el paquete asignado**. Si necesitas un cambio en o
 - [ ] No hay `any`, `as` innecesarios, `!` de no-nulo, ni `console.log` olvidados.
 - [ ] Los commits siguen Conventional Commits y no mencionan a Claude ni a ningún asistente de IA.
 - [ ] Revisé choques con las demás ramas antes de cada commit, y todo está commiteado y pusheado a mi rama (§2.1).
+- [ ] Revisé los anuncios (`pnpm anuncios`) al empezar y antes de cada commit, y seguí los que aplican.
 - [ ] El reporte dice la verdad: qué se hizo, qué no, qué quedó en duda.
