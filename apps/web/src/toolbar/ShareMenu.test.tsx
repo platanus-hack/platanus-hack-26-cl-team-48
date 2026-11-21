@@ -19,14 +19,7 @@ const EDITOR_FLOW: Flow = flowOf(
   [edgeOf("s-f", ["s", "out"], ["f", "in"])],
 );
 
-const IMPORTED_FLOW: Flow = { ...flowOf([nodeOf("imported", FILTER.id)]), name: "Importado" };
-
-const MENU_ITEMS = [
-  "Copiar enlace",
-  "Publicar en el hub…",
-  "Exportar archivo",
-  "Importar archivo…",
-];
+const MENU_ITEMS = ["Copiar enlace", "Publicar en el hub…"];
 
 const COLUMNS = [
   { name: "region", type: "text" as const },
@@ -157,9 +150,6 @@ async function latestVersionOf(hub: Hub, slug: string) {
   return { detail: detail.value, summary: latest, version: version.value };
 }
 
-const flowFile = (flow: Flow) =>
-  new File([JSON.stringify(flow)], "importado.nodo.json", { type: "application/json" });
-
 afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
@@ -177,7 +167,7 @@ describe("ShareMenu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("offers copying, publishing, exporting and importing", async () => {
+  it("offers only copying the link and publishing", async () => {
     await setup();
 
     const menu = await openMenu();
@@ -206,6 +196,12 @@ describe("ShareMenu", () => {
 
     expect(document.activeElement).toBe(shareButton());
   });
+
+  it("leaves importing flow files to the flow options", async () => {
+    await setup();
+
+    expect(screen.queryByLabelText("Importar")).toBeNull();
+  });
 });
 
 describe("ShareMenu Copiar enlace", () => {
@@ -225,39 +221,6 @@ describe("ShareMenu Copiar enlace", () => {
     await chooseItem("Copiar enlace");
 
     expect(screen.queryByRole("menu")).toBeNull();
-  });
-});
-
-describe("ShareMenu Importar archivo…", () => {
-  it("keeps a file input labelled Importar", async () => {
-    await setup();
-
-    expect(screen.getByLabelText<HTMLInputElement>("Importar").type).toBe("file");
-  });
-
-  it("opens the file picker", async () => {
-    await setup();
-    const opened: string[] = [];
-    screen.getByLabelText("Importar").addEventListener("click", (event) => {
-      event.preventDefault();
-      opened.push("picker");
-    });
-
-    await chooseItem("Importar archivo…");
-
-    expect(opened).toEqual(["picker"]);
-  });
-
-  it("loads the chosen flow file into the editor", async () => {
-    const { stores } = await setup();
-
-    await userEvent.upload(screen.getByLabelText("Importar"), flowFile(IMPORTED_FLOW));
-
-    await waitFor(() => {
-      expect(stores.flowStore.getState().state.flow.nodes.map(({ id }) => id)).toEqual([
-        "imported",
-      ]);
-    });
   });
 });
 

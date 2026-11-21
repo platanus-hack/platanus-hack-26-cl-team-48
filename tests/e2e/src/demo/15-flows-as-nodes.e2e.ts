@@ -9,6 +9,7 @@ import {
 } from "../support/canvas.ts";
 import { openEmptyApp } from "../support/flow-files.ts";
 import { showPreview } from "../support/preview.ts";
+import { showSidePanel } from "../support/side-panel.ts";
 import { SALES_COLUMNS, salesAbove } from "../support/sample-sales.ts";
 
 const NODE_NAME = "Ventas altas";
@@ -37,8 +38,8 @@ async function chooseColumn(page: Page) {
 }
 
 async function openSaved(page: Page, name: string) {
-  await page.getByRole("button", { name: "Mis flujos" }).click();
-  await page
+  const flows = await showSidePanel(page, "Mis flujos");
+  await flows
     .getByRole("article", { name, exact: true })
     .getByRole("button", { name: "Abrir", exact: true })
     .click();
@@ -78,8 +79,8 @@ test("creates, reuses and explicitly updates a saved flow as a node", async ({ p
   await runButton(page).click();
   await waitForAllNodesReady(page, 4);
   await expect(saved(page)).toBeVisible();
-  await page.getByRole("button", { name: "Mis flujos" }).click();
-  await page.getByRole("button", { name: "Nuevo flujo" }).click();
+  const flows = await showSidePanel(page, "Mis flujos");
+  await flows.getByRole("button", { name: "Nuevo flujo" }).click();
   await page.getByRole("textbox", { name: "Nombre del flujo" }).fill(CONSUMER);
   await addNodeFromLibrary(page, "Datos de ejemplo");
   await addSpacedNode(page, NODE_NAME);

@@ -15,7 +15,7 @@ const NODE = manifestOf("personal.filter", { name: "Mi filtro", category: "Mis n
 const EMPTY: Flow = { format: FLOW_FORMAT, nodes: [], edges: [] };
 
 function Library() {
-  return <LibraryPanel isOpen onToggle={() => undefined} onAdd={useAddNode()} />;
+  return <LibraryPanel onAdd={useAddNode()} />;
 }
 
 function renderPersonalLibrary() {

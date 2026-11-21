@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { manifestOf } from "../canvas/canvas-fixtures.ts";
 import { MESSAGES } from "../messages.ts";
 import { createMemoryPersonalLibrary } from "./memory-personal-library.ts";
+import type { PersonalLibrarySnapshot } from "./personal-library.ts";
 import { createPersonalLibraryStore } from "./personal-library-store.ts";
 import { createStoragePersonalLibrary } from "./storage-personal-library.ts";
 
@@ -140,5 +141,71 @@ describe("install", () => {
     store.getState().install([FIRST, SECOND]);
 
     expect(store.getState().nodes).toEqual([FIRST, SECOND]);
+  });
+});
+
+describe("reload", () => {
+  it("picks up nodes added to the library by another tab", () => {
+    const storage = createStorage();
+    const store = createPersonalLibraryStore(
+      createStoragePersonalLibrary(() => storage),
+      vi.fn(),
+    );
+    createStoragePersonalLibrary(() => storage).add(FIRST);
+
+    store.getState().reload();
+
+    expect(idsOf(store.getState().nodes)).toEqual([FIRST.id]);
+  });
+
+  it("replaces the nodes with what the library reads now", () => {
+    const library = createMemoryPersonalLibrary([FIRST]);
+    const store = createPersonalLibraryStore(library, vi.fn());
+    library.add(SECOND);
+
+    store.getState().reload();
+
+    expect(store.getState().nodes).toEqual([FIRST, SECOND]);
+  });
+
+  it("keeps the same nodes when the library did not change", () => {
+    const store = createPersonalLibraryStore(createMemoryPersonalLibrary([FIRST]), vi.fn());
+
+    store.getState().reload();
+
+    expect(store.getState().nodes).toEqual([FIRST]);
+  });
+
+  it("does not show a notice when the library reads fine", () => {
+    const show = vi.fn();
+    const store = createPersonalLibraryStore(createMemoryPersonalLibrary([FIRST]), show);
+
+    store.getState().reload();
+
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  it("reports an invalid library found while reloading", () => {
+    const show = vi.fn();
+    let snapshot: PersonalLibrarySnapshot = { nodes: [FIRST] };
+    const store = createPersonalLibraryStore({ read: () => snapshot, add: () => snapshot }, show);
+    snapshot = { nodes: [], issue: "invalid" };
+
+    store.getState().reload();
+
+    expect(show).toHaveBeenCalledWith(expect.objectContaining({ title: MESSAGES.library.invalid }));
+  });
+
+  it("reports an unavailable library found while reloading", () => {
+    const show = vi.fn();
+    let snapshot: PersonalLibrarySnapshot = { nodes: [FIRST] };
+    const store = createPersonalLibraryStore({ read: () => snapshot, add: () => snapshot }, show);
+    snapshot = { nodes: [], issue: "unavailable" };
+
+    store.getState().reload();
+
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: "warn", title: MESSAGES.library.unavailable }),
+    );
   });
 });
