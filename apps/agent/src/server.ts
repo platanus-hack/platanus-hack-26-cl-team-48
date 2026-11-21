@@ -4,10 +4,12 @@ import {
   type Server,
   type ServerResponse,
 } from "node:http";
+import type { Router } from "./http/router.ts";
 import type { HttpReply, RequestInput } from "./requests/handle-request.ts";
 
 export type ServerDeps = {
   readonly handleRequest: (input: RequestInput) => Promise<HttpReply>;
+  readonly router?: Router;
 };
 
 const HTTP_OK = 200;
@@ -54,6 +56,26 @@ async function serveRequests(
   sendJson(response, reply.status, reply.body);
 }
 
+async function serveRouter(
+  router: Router,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const rawBody = await readBody(request);
+  if (rawBody === undefined) {
+    sendJson(response, HTTP_BAD_REQUEST, { error: "invalid_body" });
+    return;
+  }
+  const reply = await router.dispatch({
+    method: request.method ?? "",
+    url: request.url ?? "",
+    authorization: request.headers.authorization,
+    rawBody,
+  });
+  if (reply) sendJson(response, reply.status, reply.body);
+  else sendJson(response, HTTP_NOT_FOUND, { error: "not_found" });
+}
+
 async function route(
   deps: ServerDeps,
   request: IncomingMessage,
@@ -63,6 +85,8 @@ async function route(
     sendJson(response, HTTP_OK, { status: "ok" });
   } else if (isRoute(request, "POST", REQUESTS_PATH)) {
     await serveRequests(deps, request, response);
+  } else if (deps.router) {
+    await serveRouter(deps.router, request, response);
   } else {
     sendJson(response, HTTP_NOT_FOUND, { error: "not_found" });
   }
