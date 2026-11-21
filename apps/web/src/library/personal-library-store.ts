@@ -15,10 +15,15 @@ export function createPersonalLibraryStore(
   return createStore<{
     readonly nodes: ReadonlyArray<NodeManifest>;
     readonly install: (manifests: ReadonlyArray<NodeManifest>) => void;
-  }>((set) => ({
+    /** Reads the library again, to pick up nodes another tab installed. */
+    readonly reload: () => void;
+  }>((set, get) => ({
     nodes: initial.nodes,
     install: (manifests) => {
       manifests.forEach((manifest) => library.add(manifest));
+      get().reload();
+    },
+    reload: () => {
       const snapshot = library.read();
       reportIssue(snapshot, show);
       set({ nodes: snapshot.nodes });

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { showSidePanel } from "./side-panel.ts";
 
 const SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 // A node's accessible name is "<title>, <state>"; both ready states mean a usable result.
@@ -55,8 +56,8 @@ export async function waitForEngineReady(page: Page): Promise<void> {
 }
 
 export async function addNodeFromLibrary(page: Page, name: string): Promise<void> {
-  await page
-    .getByRole("complementary", { name: "Biblioteca de nodos" })
+  const library = await showSidePanel(page, "Nodos");
+  await library
     .getByRole("button", { name: new RegExp(`^${escapeForPattern(name)}\\b`) })
     .dblclick();
 }

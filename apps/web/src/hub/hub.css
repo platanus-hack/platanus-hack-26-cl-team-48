@@ -1,21 +1,53 @@
 /* The hub (ADR 0018): a large panel under the app bar, its pages, cards and dialogs.
    Every color, size, radius and font comes from the tokens of @nodomics/ui. */
 
-/* Layer ----------------------------------------------------------------------------------- */
+/* The hub's own tab: its bar and the scrolling page ---------------------------------------- */
 
-.web-hub-layer {
-  grid-row: 2;
-  grid-column: 1 / -1;
-  position: relative;
-  z-index: calc(var(--z-panel) + 1);
-  min-height: 0;
-  overflow: auto;
-  border: var(--stroke-hairline) solid var(--line);
-  border-radius: var(--radius-lg);
+.web-hub-app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
   background: var(--surface-100);
-  box-shadow: var(--shadow-pop);
   color: var(--ink);
   font: var(--text-body);
+}
+
+.web-hub-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--space-12);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  box-sizing: border-box;
+  background: var(--surface-200);
+  border-bottom: var(--stroke-hairline) solid var(--line);
+}
+
+.web-hub-bar-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.web-hub-bar-end a {
+  text-decoration: none;
+}
+
+.web-hub-scroll {
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Mockup of the recommendations feed, still in development. */
+.web-hub-for-you {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.web-hub-for-you h2 {
+  margin: 0;
+  font: var(--text-title);
 }
 
 .web-hub-page {
@@ -56,12 +88,12 @@
   color: var(--ink-muted);
 }
 
-.web-hub-layer a {
+.web-hub-scroll a {
   color: inherit;
   text-decoration: none;
 }
 
-.web-hub-layer a:focus-visible {
+.web-hub-scroll a:focus-visible {
   outline: var(--stroke-strong) solid var(--focus-ring);
   outline-offset: var(--stroke-strong);
   border-radius: var(--radius-xs);
@@ -222,7 +254,7 @@
   font: var(--text-body-sm);
 }
 
-.web-hub-layer .web-hub-owner:hover {
+.web-hub-scroll .web-hub-owner:hover {
   color: var(--ink);
 }
 
@@ -595,4 +627,42 @@
   .web-hub-card {
     transition: none;
   }
+}
+
+.web-hub-for-you-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--node-width) * 1.2), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.web-hub-for-you-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-200);
+  border: var(--stroke-hairline) dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.web-hub-for-you-kind {
+  justify-self: start;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-300);
+  color: var(--ink-muted);
+  font: var(--text-label);
+}
+
+.web-hub-for-you-reason {
+  color: var(--ai-pending);
+  font: var(--text-caption);
+}
+
+.web-hub-bar-section {
+  margin-left: var(--space-2);
+  color: var(--ink-muted);
+  font-weight: var(--text-body-weight);
 }

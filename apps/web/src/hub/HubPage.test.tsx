@@ -169,3 +169,19 @@ describe("HubPage", () => {
     expect(window.location.pathname).toBe("/hub/ana/ventas");
   });
 });
+
+describe("HubPage Para ti mockup", () => {
+  it("shows a Para ti section", async () => {
+    renderWithHub(<HubPage />, await createSeededHub());
+
+    expect(screen.getByRole("heading", { name: "Para ti" })).toBeTruthy();
+  });
+
+  it("says the recommendations are a mockup", async () => {
+    renderWithHub(<HubPage />, await createSeededHub());
+
+    expect(
+      screen.getByText(/Maqueta: recomendaciones según los flujos en los que trabajas\./),
+    ).toBeTruthy();
+  });
+});

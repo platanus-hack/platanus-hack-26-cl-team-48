@@ -4,6 +4,7 @@ import { pythonCodeFlow, salesDemoFlow, sampleOnlyFlow } from "./support/demo-fl
 import { openSharedFlow } from "./support/flow-files.ts";
 import { openEmptyApp } from "./support/flow-files.ts";
 import { openPreviewPanel, previewOf } from "./support/preview.ts";
+import { railButton, railOf, sidePanelOf } from "./support/side-panel.ts";
 
 // A node shows this many rows of its result, plus the header row.
 const IN_NODE_ROWS = 6;
@@ -124,20 +125,31 @@ test("labels each connection with the size of the table it carries", async ({ pa
 
 test("hides and restores the library and parameters across reloads", async ({ page }) => {
   await openEmptyApp(page);
-  await page.getByRole("button", { name: "Ocultar biblioteca" }).click();
+  await sidePanelOf(page, "Nodos").getByRole("button", { name: "Ocultar panel" }).click();
   await page.getByRole("button", { name: "Ocultar parámetros" }).click();
-  await expect(page.getByRole("textbox", { name: "Buscar nodos" })).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "Buscar nodos" })).toHaveCount(0);
+  await expect(railButton(page, "Nodos")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("heading", { name: "Parámetros" })).toHaveCount(0);
   await page.reload();
-  await page.getByRole("button", { name: "Mostrar biblioteca" }).click();
+  await expect(sidePanelOf(page, "Nodos")).toHaveCount(0);
+  await railButton(page, "Nodos").click();
   await page.getByRole("button", { name: "Mostrar parámetros" }).click();
-  await expect(page.getByRole("textbox", { name: "Buscar nodos" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Buscar nodos" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Parámetros" })).toBeVisible();
+});
+
+test("hides the library by choosing Nodos again in the rail", async ({ page }) => {
+  await openEmptyApp(page);
+  await expect(railButton(page, "Nodos")).toHaveAttribute("aria-pressed", "true");
+  await railButton(page, "Nodos").click();
+  await expect(sidePanelOf(page, "Nodos")).toHaveCount(0);
+  await railButton(page, "Nodos").click();
+  await expect(sidePanelOf(page, "Nodos")).toBeVisible();
 });
 
 test("applies token colors, persists explicit themes and follows the system", async ({ page }) => {
   await openEmptyApp(page);
-  const theme = page.getByRole("button", { name: "Tema", exact: true });
+  const theme = railOf(page).getByRole("button", { name: "Tema", exact: true });
   await theme.click();
   await page.getByRole("menuitemradio", { name: "Claro" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -178,8 +190,6 @@ test("uses icon controls, a styled search field and a preview location control",
   for (const name of [
     "Deshacer",
     "Rehacer",
-    "Exportar",
-    "Importar",
     "Tema",
     "Alejar",
     "Acercar",
@@ -190,7 +200,7 @@ test("uses icon controls, a styled search field and a preview location control",
     await expect(control.locator("svg")).toHaveCount(1);
     await expect(control).toHaveText("");
   }
-  const search = page.getByRole("textbox", { name: "Buscar nodos" });
+  const search = page.getByRole("searchbox", { name: "Buscar nodos" });
   const searchHeight = await search.evaluate((element) => element.getBoundingClientRect().height);
   const controlHeight = await search.evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).getPropertyValue("--control-md")),

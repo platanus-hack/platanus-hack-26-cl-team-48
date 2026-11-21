@@ -72,7 +72,7 @@ function PublicationView({ detail, ...actions }: { readonly detail: PublicationD
 
 function PublicationHeader({ detail }: { readonly detail: PublicationDetail }) {
   return (
-    <header className="web-hub-publication">
+    <div className="web-hub-publication">
       <span className="web-kind-tag" data-kind={detail.kind}>
         {MESSAGES.hub.kindLabel[detail.kind]}
       </span>
@@ -85,7 +85,7 @@ function PublicationHeader({ detail }: { readonly detail: PublicationDetail }) {
           </span>
         ))}
       </div>
-    </header>
+    </div>
   );
 }
 

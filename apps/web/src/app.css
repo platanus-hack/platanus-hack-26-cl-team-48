@@ -14,34 +14,26 @@ body {
   font: var(--text-body-sm);
 }
 
-/* Workspace geometry ---------------------------------------------------------------------- */
+/* Workspace geometry: a bar on top, the rail, the side panel, the stage and the parameters -- */
 
 .web-app {
   --gutter: var(--space-3);
-  --library-width: var(--panel-min);
+  --side-width: var(--panel-min);
   --params-scale: 1;
   --params-width: calc(var(--panel-min) * var(--params-scale));
-  --edge-left: calc(var(--gutter) * 2 + var(--library-width));
-  --edge-right: calc(var(--gutter) * 2 + var(--params-width));
   --preview-chosen-height: 38%;
   --preview-height: var(--preview-chosen-height);
-  --zoom-bottom: var(--gutter);
   --tight: calc(var(--space-1) + var(--space-0));
-  /* The side panels sit in the row below the top bar, so they follow it when it wraps. */
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--gutter);
+  grid-template-columns: var(--space-12) auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "bar bar bar bar"
+    "rail side stage params";
   height: 100%;
-  padding: var(--gutter);
-  box-sizing: border-box;
   overflow: hidden;
   background: var(--canvas);
-}
-
-.web-app[data-library-open="false"] {
-  --library-width: var(--space-12);
 }
 
 .web-app[data-params-open="false"] {
@@ -52,8 +44,20 @@ body {
   --preview-height: 64%;
 }
 
-.web-app[data-preview-location="panel"] {
-  --zoom-bottom: calc(var(--preview-height) + var(--gutter) * 2);
+/* The stage holds the canvas and, under it, the preview panel. */
+.web-stage {
+  position: relative;
+  grid-area: stage;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.web-stage-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Floating surfaces ----------------------------------------------------------------------- */
@@ -186,30 +190,23 @@ body {
   outline-offset: var(--stroke-hairline);
 }
 
-/* App bar: one strip, the same in the editor and the hub ---------------------------------- */
+/* App bar ------------------------------------------------------------------------------- */
 
 .web-toolbar {
   position: relative;
   z-index: calc(var(--z-panel) + 2);
-  grid-row: 1;
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+  grid-area: bar;
+  display: flex;
   align-items: center;
   gap: var(--space-4);
   min-height: var(--space-12);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
   box-sizing: border-box;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
-  border: var(--stroke-hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop);
+  background: var(--surface-200);
+  border-bottom: var(--stroke-hairline) solid var(--line);
 }
 
 .web-toolbar-start,
-.web-toolbar-middle,
 .web-toolbar-end {
   display: flex;
   align-items: center;
@@ -218,16 +215,7 @@ body {
 }
 
 .web-toolbar-start {
-  gap: var(--space-4);
-}
-
-.web-toolbar-middle {
-  grid-column: 2;
-}
-
-.web-toolbar-end {
-  grid-column: 3;
-  justify-content: flex-end;
+  flex: 1;
 }
 
 .web-toolbar-group {
@@ -253,14 +241,10 @@ body {
   transform: rotate(45deg) scale(0.75);
 }
 
-.web-sections .web-seg-button {
-  text-decoration: none;
-}
-
-.web-sections .web-seg-button[aria-current="page"] {
-  background: var(--surface-300);
-  color: var(--ink);
-  box-shadow: var(--shadow-node);
+.web-toolbar-divider {
+  width: var(--stroke-hairline);
+  height: var(--icon-md);
+  background: var(--line-subtle);
 }
 
 .web-toolbar .web-flow-name {
@@ -287,11 +271,170 @@ body {
   white-space: nowrap;
 }
 
+/* Activity rail ----------------------------------------------------------------------------- */
+
+.web-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  box-sizing: border-box;
+  background: var(--surface-200);
+  border-right: var(--stroke-hairline) solid var(--line);
+}
+
+.web-rail-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.web-rail-button:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.web-rail-button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.web-rail-button[data-section="agent"] {
+  color: var(--ai-pending);
+}
+
+.web-rail-button[data-section="agent"][aria-pressed="true"] {
+  background: var(--ai-pending-soft);
+}
+
+.web-rail-button:focus-visible {
+  outline: var(--stroke-strong) solid var(--focus-ring);
+  outline-offset: var(--stroke-strong);
+}
+
+.web-rail-divider {
+  width: var(--space-6);
+  height: var(--stroke-hairline);
+  margin: var(--space-1) 0;
+  background: var(--line-subtle);
+}
+
+.web-rail-spacer {
+  flex: 1;
+}
+
+/* Side panel -------------------------------------------------------------------------------- */
+
+.web-side-panel {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  width: var(--side-width);
+  min-height: 0;
+  box-sizing: border-box;
+  background: var(--surface-200);
+  border-right: var(--stroke-hairline) solid var(--line);
+}
+
+.web-side-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: var(--space-12);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-bottom: var(--stroke-hairline) solid var(--line-subtle);
+}
+
+.web-side-header h2 {
+  margin: 0;
+  font: var(--text-title);
+}
+
+.web-side-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.web-side-body > .web-saved-list {
+  padding: var(--space-3);
+}
+
+/* Mockups of features still in development -------------------------------------------------- */
+
+.web-mockup-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--stroke-hairline) dashed var(--ai-pending);
+  border-radius: var(--radius-sm);
+  background: var(--ai-pending-soft);
+  font: var(--text-caption);
+  color: var(--ink);
+}
+
+.web-agent {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.web-agent-message {
+  margin: 0;
+  line-height: var(--text-body-sm-line);
+}
+
+.web-agent-message[data-from="user"] {
+  align-self: flex-end;
+  margin-left: var(--space-6);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.web-agent-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--stroke-hairline) dashed var(--ai-pending);
+  border-radius: var(--radius-md);
+}
+
+.web-agent-proposal .web-overline {
+  color: var(--ai-pending);
+}
+
+.web-agent-proposal-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.web-agent-composer {
+  margin-top: auto;
+}
+
 .web-canvas-controls {
   position: absolute;
   z-index: var(--z-panel);
-  left: var(--edge-left);
-  bottom: var(--zoom-bottom);
+  left: var(--gutter);
+  bottom: var(--gutter);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -621,19 +764,7 @@ body {
   overflow: auto;
 }
 
-/* Library --------------------------------------------------------------------------------- */
-
-.web-library {
-  position: relative;
-  z-index: var(--z-panel);
-  grid-row: 2;
-  grid-column: 1;
-  display: flex;
-  flex-direction: column;
-  width: var(--library-width);
-  box-sizing: border-box;
-  overflow: hidden auto;
-}
+/* Library ---------------------------------------------------------------------------------- */
 
 .web-library-top {
   display: flex;
@@ -648,13 +779,13 @@ body {
   background: var(--surface-sunken);
 }
 
-.web-library-top .nd-btn:only-child {
-  margin: 0 auto;
-}
-
+/* Only the list scrolls, so the search and the hint stay in view. */
 .web-library-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  flex: 1;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
   padding: 0 var(--space-2) var(--space-2);
 }
 
@@ -690,22 +821,10 @@ body {
   outline: var(--stroke-strong) solid var(--focus-ring);
 }
 
-.web-library[data-open="false"] .web-library-item {
-  justify-content: center;
-  padding: 0;
-}
-
 .web-library-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.web-library-separator {
-  display: block;
-  height: var(--stroke-hairline);
-  margin: var(--space-2) var(--tight);
-  background: var(--line-subtle);
 }
 
 .web-library-hint {
@@ -721,13 +840,15 @@ body {
 .web-params {
   position: relative;
   z-index: var(--z-panel);
-  grid-row: 2;
-  grid-column: 3;
+  grid-area: params;
   display: flex;
   flex-direction: column;
   width: var(--params-width);
+  min-height: 0;
   box-sizing: border-box;
   overflow: hidden auto;
+  background: var(--surface-200);
+  border-left: var(--stroke-hairline) solid var(--line);
 }
 
 .web-params-header {
@@ -1063,15 +1184,15 @@ body {
 /* Preview panel --------------------------------------------------------------------------- */
 
 .web-preview-frame {
-  position: absolute;
+  position: relative;
   z-index: var(--z-panel);
-  left: var(--edge-left);
-  right: var(--edge-right);
-  bottom: var(--gutter);
   display: flex;
+  flex: none;
   flex-direction: column;
   height: var(--preview-height);
   overflow: hidden;
+  background: var(--surface-200);
+  border-top: var(--stroke-hairline) solid var(--line);
 }
 
 /* A separator on one edge of what it resizes (ResizeHandle). */
@@ -1243,6 +1364,16 @@ body {
   color: var(--ink-muted);
 }
 
+/* At the foot of the rail, menus open upward and to the right, into the editor. */
+.web-rail .web-icon-menu-items {
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: 100%;
+  margin-top: 0;
+  margin-left: var(--space-1);
+}
+
 /* Menus and notices ----------------------------------------------------------------------- */
 
 .web-icon-menu {
@@ -1282,32 +1413,10 @@ body {
 /* Smaller windows: see viewport-size.ts for the breakpoints -------------------------------- */
 
 .web-app:not([data-viewport="wide"]) {
-  --library-width: var(--space-12);
-}
-
-.web-app:not([data-viewport="wide"])
-  :is(.web-library .nd-input, .web-library .web-overline, .web-library-name, .web-library-hint) {
-  display: none;
-}
-
-.web-app:not([data-viewport="wide"]) .web-library-item {
-  justify-content: center;
-  padding: 0;
-}
-
-.web-app:not([data-viewport="wide"]) .web-library-top .nd-btn {
-  margin: 0 auto;
-}
-
-.web-app:is([data-viewport="narrow"], [data-viewport="phone"]) {
-  --edge-right: var(--gutter);
+  --side-width: calc(var(--panel-min) - var(--space-12));
 }
 
 .web-app:is([data-viewport="narrow"], [data-viewport="phone"]) .web-params,
-.web-app[data-viewport="phone"] .web-library {
+.web-app[data-viewport="phone"] .web-side-panel {
   display: none;
-}
-
-.web-app[data-viewport="phone"] {
-  --edge-left: var(--gutter);
 }

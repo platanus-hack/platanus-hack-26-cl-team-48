@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { addNodeFromLibrary, runButton, waitForAllNodesReady } from "../support/canvas.ts";
 import { exportFlow, openEmptyApp } from "../support/flow-files.ts";
 import { showPreview } from "../support/preview.ts";
+import { showSidePanel } from "../support/side-panel.ts";
 
 const API_URL = "https://api.example.test/ventas";
 const CORS_HEADERS = {
@@ -33,14 +34,12 @@ async function answerSales(route: Route) {
 }
 
 async function createCredential(page: Page) {
-  await page.getByRole("button", { name: "Mis flujos" }).click();
-  await page.getByRole("tab", { name: "Credenciales" }).click();
-  await page.getByRole("textbox", { name: "Nombre", exact: true }).fill("ventas-token");
-  await page.getByLabel("Valor", { exact: true }).fill("Bearer secreto");
-  await page.getByRole("button", { name: "Agregar", exact: true }).click();
-  await expect(page.getByRole("article", { name: "ventas-token" })).toBeVisible();
-  await expect(page.getByLabel("Valor", { exact: true })).toHaveValue("");
-  await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  const credentials = await showSidePanel(page, "Credenciales");
+  await credentials.getByRole("textbox", { name: "Nombre", exact: true }).fill("ventas-token");
+  await credentials.getByLabel("Valor", { exact: true }).fill("Bearer secreto");
+  await credentials.getByRole("button", { name: "Agregar", exact: true }).click();
+  await expect(credentials.getByRole("article", { name: "ventas-token" })).toBeVisible();
+  await expect(credentials.getByLabel("Valor", { exact: true })).toHaveValue("");
 }
 
 async function configureApi(page: Page) {

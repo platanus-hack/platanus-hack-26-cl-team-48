@@ -5,8 +5,23 @@ import {
 } from "./storage-workspace-preferences.ts";
 import { DEFAULT_WORKSPACE_PREFERENCES } from "./workspace-preferences.ts";
 
+const STORED = {
+  theme: "system",
+  isSidePanelOpen: true,
+  sideSection: "nodes",
+  isParamsOpen: true,
+  previewLocation: "nodes",
+  preview: { height: 40, mode: "expanded" },
+};
+
+const readStored = (value: string | null) =>
+  createStorageWorkspacePreferences(() => ({
+    getItem: (key: string) => (key === WORKSPACE_PREFERENCES_KEY ? value : null),
+    setItem: () => undefined,
+  })).read();
+
 describe("workspace preferences storage", () => {
-  it("persists and restores theme, panels, preview location and the sizes chosen", () => {
+  it("persists and restores theme, panels, side section, preview location and the sizes chosen", () => {
     const values = new Map<string, string>();
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
@@ -17,7 +32,8 @@ describe("workspace preferences storage", () => {
     const preferences = {
       ...DEFAULT_WORKSPACE_PREFERENCES,
       theme: "dark" as const,
-      isLibraryOpen: false,
+      isSidePanelOpen: false,
+      sideSection: "secrets" as const,
       isParamsOpen: false,
       previewLocation: "panel" as const,
       preview: { height: 55, mode: "maximized" as const },
@@ -38,9 +54,9 @@ describe("workspace preferences storage", () => {
     "{",
     '{"theme":"invalid"}',
     '{"theme":"dark","preview":{"height":999,"mode":"expanded"}}',
-    '{"theme":"dark","isLibraryOpen":true,"isParamsOpen":true,"previewLocation":"aside","preview":{"height":40,"mode":"expanded"}}',
-    '{"theme":"dark","isLibraryOpen":true,"isParamsOpen":true,"previewLocation":"panel","preview":{"height":40,"mode":"expanded"},"paramsWidth":40}',
-    '{"theme":"dark","isLibraryOpen":true,"isParamsOpen":true,"previewLocation":"panel","preview":{"height":40,"mode":"expanded"},"codeEditorRows":"x"}',
+    '{"theme":"dark","isSidePanelOpen":true,"isParamsOpen":true,"previewLocation":"aside","preview":{"height":40,"mode":"expanded"}}',
+    '{"theme":"dark","isSidePanelOpen":true,"isParamsOpen":true,"previewLocation":"panel","preview":{"height":40,"mode":"expanded"},"paramsWidth":40}',
+    '{"theme":"dark","isSidePanelOpen":true,"isParamsOpen":true,"previewLocation":"panel","preview":{"height":40,"mode":"expanded"},"codeEditorRows":"x"}',
   ])("rejects invalid stored data %s", (value) => {
     expect(
       createStorageWorkspacePreferences(() => ({
@@ -64,9 +80,56 @@ describe("workspace preferences storage", () => {
     ).toEqual({
       ...DEFAULT_WORKSPACE_PREFERENCES,
       theme: "dark",
-      isLibraryOpen: false,
+      isSidePanelOpen: false,
       preview: { height: 40, mode: "expanded" },
     });
+  });
+  it("defaults to the nodes section, shown, when nothing is stored", () => {
+    const preferences = readStored(null);
+
+    expect({
+      section: preferences.sideSection,
+      isOpen: preferences.isSidePanelOpen,
+    }).toEqual({ section: "nodes", isOpen: true });
+  });
+  it.each(["nodes", "flows", "my-nodes", "data", "secrets", "agent"] as const)(
+    "restores the %s side section",
+    (sideSection) => {
+      const preferences = readStored(JSON.stringify({ ...STORED, sideSection }));
+
+      expect(preferences.sideSection).toBe(sideSection);
+    },
+  );
+  it.each([undefined, "hub", 3, null])(
+    "falls back to the nodes section for the stored side section %s",
+    (sideSection) => {
+      const preferences = readStored(JSON.stringify({ ...STORED, theme: "dark", sideSection }));
+
+      expect({ theme: preferences.theme, section: preferences.sideSection }).toEqual({
+        theme: "dark",
+        section: "nodes",
+      });
+    },
+  );
+  it("reads a legacy hidden library as a hidden side panel", () => {
+    const legacy = JSON.stringify({
+      theme: "system",
+      isLibraryOpen: false,
+      isParamsOpen: true,
+      previewLocation: "nodes",
+      preview: { height: 40, mode: "expanded" },
+    });
+
+    const preferences = readStored(legacy);
+
+    expect(preferences.isSidePanelOpen).toBe(false);
+  });
+  it("prefers the side panel choice over a legacy library choice", () => {
+    const preferences = readStored(
+      JSON.stringify({ ...STORED, isLibraryOpen: false, isSidePanelOpen: true }),
+    );
+
+    expect(preferences.isSidePanelOpen).toBe(true);
   });
   it("keeps the latest value after a failed write", () => {
     const storage = createStorageWorkspacePreferences(() => ({

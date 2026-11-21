@@ -1,13 +1,15 @@
 import type { Hub } from "@nodomics/hub";
-import { screen, within } from "@testing-library/react";
+import type { Flow } from "@nodomics/protocol";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
-import { nodeOf } from "../canvas/canvas-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createAppStores, type AppStores } from "../app-stores.ts";
+import { FILTER, flowOf, nodeOf, SAMPLE } from "../canvas/canvas-fixtures.ts";
 import type { EngineEntry } from "../engine/engine-entry.ts";
 import { HubContext } from "../hub/hub-context.ts";
 import { ANA, createTestHub } from "../hub/hub-pages-fixtures.tsx";
 import { startFakeEngine } from "../testing/fake-engine.ts";
+import { recordDownloads } from "../testing/record-downloads.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
 import { Toolbar } from "./Toolbar.tsx";
 
@@ -20,16 +22,18 @@ const entry = (id: string, label: string): EngineEntry => ({
 
 const ENGINES = [entry("mock", "Simulado"), entry("local", "Python local")];
 
-const HUB_PATHS = ["/hub", "/hub/ana/ventas", "/u/ana"];
+const OPTIONS_ITEMS = ["Nuevo flujo", "Importar archivo…", "Exportar archivo"];
+
+const EDITOR_FLOW: Flow = { ...flowOf([nodeOf("s", SAMPLE.id)]), name: "Ventas" };
+
+const IMPORTED_FLOW: Flow = { ...flowOf([nodeOf("imported", FILTER.id)]), name: "Importado" };
 
 type Setup = {
-  readonly path?: string;
   readonly hub?: Hub;
-  readonly children?: ReactNode;
+  readonly stores?: AppStores;
 };
 
-function renderToolbar({ path = "/", hub = createTestHub(), children }: Setup = {}) {
-  window.history.pushState(null, "", path);
+function renderToolbar({ hub = createTestHub(), stores = createAppStores() }: Setup = {}) {
   const picked: EngineEntry[] = [];
   const rendered = renderWithStores(
     <HubContext value={hub}>
@@ -37,23 +41,267 @@ function renderToolbar({ path = "/", hub = createTestHub(), children }: Setup = 
         engines={ENGINES}
         engine={ENGINES[0] ?? entry("none", "")}
         onEngineChange={(engine) => picked.push(engine)}
-      >
-        {children}
-      </Toolbar>
+      />
     </HubContext>,
+    stores,
   );
   return { picked, ...rendered };
 }
 
-const sections = () => screen.getByRole("navigation", { name: "Secciones" });
+async function storesWithOpenSavedFlow() {
+  const stores = createAppStores(EDITOR_FLOW);
+  const { library, refresh, openFlow } = stores.savedFlowStore.getState();
+  await library.saveFlow({ id: "one", name: "Ventas", flow: EDITOR_FLOW, files: {}, updatedAt: 1 });
+  await refresh();
+  await openFlow("one");
+  return stores;
+}
 
-const sectionLink = (name: string) => within(sections()).getByRole("link", { name });
+const header = () => screen.getByRole("banner", { name: "Acciones del flujo" });
 
-afterEach(() => {
+const optionsButton = () => screen.getByRole("button", { name: "Opciones del flujo" });
+
+async function openOptions() {
+  await userEvent.click(optionsButton());
+  return screen.findByRole("menu", { name: "Opciones del flujo" });
+}
+
+async function chooseOption(name: string) {
+  const menu = await openOptions();
+  await userEvent.click(within(menu).getByRole("menuitem", { name }));
+}
+
+const flowFile = (flow: Flow) =>
+  new File([JSON.stringify(flow)], "importado.nodo.json", { type: "application/json" });
+
+const isBefore = (first: Element, second: Element) =>
+  (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+beforeEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-describe("Toolbar", () => {
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("Toolbar layout", () => {
+  it("is a header named Acciones del flujo", () => {
+    renderToolbar();
+
+    expect(header().tagName).toBe("HEADER");
+  });
+
+  it("shows the Nodomics title as the main heading", () => {
+    renderToolbar();
+
+    expect(within(header()).getByRole("heading", { level: 1, name: "Nodomics" })).toBeTruthy();
+  });
+
+  it("orders its controls from the flow to the account", async () => {
+    renderToolbar();
+    const controls = [
+      within(header()).getByRole("heading", { level: 1, name: "Nodomics" }),
+      within(header()).getByRole("textbox", { name: "Nombre del flujo" }),
+      within(header()).getByRole("button", { name: "Opciones del flujo" }),
+      within(header()).getByRole("button", { name: "Deshacer" }),
+      within(header()).getByRole("button", { name: "Rehacer" }),
+      within(header()).getByRole("combobox", { name: "Motor" }),
+      within(header()).getByRole("button", { name: "Compartir" }),
+      within(header()).getByRole("button", { name: /Ejecutar/ }),
+      await within(header()).findByRole("button", { name: "Entrar" }),
+    ];
+
+    const pairs = controls.slice(1).map((control, index) => {
+      const previous = controls[index];
+      return previous !== undefined && isBefore(previous, control);
+    });
+
+    expect(pairs).toEqual(controls.slice(1).map(() => true));
+  });
+
+  it("has no sections navigation", () => {
+    renderToolbar();
+
+    expect(screen.queryByRole("navigation", { name: "Secciones" })).toBeNull();
+  });
+
+  it("has no links to the editor or the hub", () => {
+    renderToolbar();
+
+    expect({
+      editor: screen.queryByRole("link", { name: "Editor" }),
+      hub: screen.queryByRole("link", { name: "Hub" }),
+    }).toEqual({ editor: null, hub: null });
+  });
+
+  it("has no Mis flujos button", () => {
+    renderToolbar();
+
+    expect(screen.queryByRole("button", { name: "Mis flujos" })).toBeNull();
+  });
+
+  it("has no theme control", () => {
+    renderToolbar();
+
+    expect(screen.queryByRole("button", { name: "Tema" })).toBeNull();
+  });
+});
+
+describe("Toolbar flow name", () => {
+  it("renames the open flow through an undoable command", () => {
+    const { stores } = renderToolbar();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del flujo" }), {
+      target: { value: "Análisis" },
+    });
+
+    expect({
+      name: stores.flowStore.getState().state.flow.name,
+      undo: stores.flowStore.getState().state.undo.length,
+    }).toEqual({ name: "Análisis", undo: 1 });
+  });
+
+  it("shows the saving status", () => {
+    const { stores } = renderToolbar();
+
+    act(() => {
+      stores.savedFlowStore.setState({ status: "saving" });
+    });
+
+    expect(
+      within(header())
+        .getAllByRole("status")
+        .map((status) => status.textContent),
+    ).toContain("Guardando…");
+  });
+});
+
+describe("Toolbar Opciones del flujo", () => {
+  it("announces that the button opens a menu", () => {
+    renderToolbar();
+
+    expect(optionsButton().getAttribute("aria-haspopup")).toBe("menu");
+  });
+
+  it("starts closed", () => {
+    renderToolbar();
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("offers a new flow, importing and exporting", async () => {
+    renderToolbar();
+
+    const menu = await openOptions();
+
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(OPTIONS_ITEMS);
+  });
+
+  it("closes with Escape", async () => {
+    renderToolbar();
+    await openOptions();
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+describe("Toolbar Nuevo flujo", () => {
+  it("opens a new empty flow", async () => {
+    const stores = await storesWithOpenSavedFlow();
+    renderToolbar({ stores });
+
+    await chooseOption("Nuevo flujo");
+
+    await waitFor(() => {
+      expect({
+        currentId: stores.savedFlowStore.getState().currentId,
+        nodes: stores.flowStore.getState().state.flow.nodes,
+      }).toEqual({ currentId: undefined, nodes: [] });
+    });
+  });
+
+  it("closes the menu", async () => {
+    renderToolbar();
+
+    await chooseOption("Nuevo flujo");
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+describe("Toolbar Importar archivo…", () => {
+  it("keeps a hidden file input labelled Importar that accepts flow files", () => {
+    renderToolbar();
+
+    const input = screen.getByLabelText<HTMLInputElement>("Importar");
+
+    expect({ type: input.type, accept: input.accept }).toEqual({
+      type: "file",
+      accept: ".json,application/json",
+    });
+  });
+
+  it("opens the file picker", async () => {
+    renderToolbar();
+    const opened: string[] = [];
+    screen.getByLabelText("Importar").addEventListener("click", (event) => {
+      event.preventDefault();
+      opened.push("picker");
+    });
+
+    await chooseOption("Importar archivo…");
+
+    expect(opened).toEqual(["picker"]);
+  });
+
+  it("loads the chosen flow file into the editor", async () => {
+    const { stores } = renderToolbar();
+
+    await userEvent.upload(screen.getByLabelText("Importar"), flowFile(IMPORTED_FLOW));
+
+    await waitFor(() => {
+      expect(stores.flowStore.getState().state.flow.nodes.map(({ id }) => id)).toEqual([
+        "imported",
+      ]);
+    });
+  });
+});
+
+describe("Toolbar Exportar archivo", () => {
+  it("downloads the current flow as a file named after it", async () => {
+    const downloads = recordDownloads();
+    renderToolbar({ stores: createAppStores(EDITOR_FLOW) });
+
+    await chooseOption("Exportar archivo");
+
+    await waitFor(() => {
+      expect(downloads.map(({ name }) => name)).toEqual(["Ventas.nodo.json"]);
+    });
+  });
+
+  it("puts the current flow's nodes in the downloaded file", async () => {
+    const downloads = recordDownloads();
+    renderToolbar({ stores: createAppStores(EDITOR_FLOW) });
+
+    await chooseOption("Exportar archivo");
+
+    await waitFor(() => {
+      expect(downloads).toHaveLength(1);
+    });
+    const [download] = downloads;
+    const exported: unknown = JSON.parse((await download?.blob.text()) ?? "null");
+    expect(exported).toMatchObject({ nodes: [{ id: "s", type: SAMPLE.id }] });
+  });
+});
+
+describe("Toolbar editing and running", () => {
   it("lets the user pick another engine", async () => {
     const { picked } = renderToolbar();
 
@@ -93,93 +341,13 @@ describe("Toolbar", () => {
 
     expect(screen.queryByRole("button", { name: "Convertir en nodo" })).toBeNull();
   });
-});
 
-describe("Toolbar sections", () => {
-  it("links to the editor and to the hub", () => {
+  it("offers sharing through the Compartir menu", () => {
     renderToolbar();
 
-    expect({
-      editor: sectionLink("Editor").getAttribute("href"),
-      hub: sectionLink("Hub").getAttribute("href"),
-    }).toEqual({ editor: "/", hub: "/hub" });
-  });
-
-  it("marks the editor as the current section in the editor", () => {
-    renderToolbar();
-
-    expect({
-      editor: sectionLink("Editor").getAttribute("aria-current"),
-      hub: sectionLink("Hub").getAttribute("aria-current"),
-    }).toEqual({ editor: "page", hub: null });
-  });
-
-  it("marks the hub as the current section in the hub", () => {
-    renderToolbar({ path: "/hub" });
-
-    expect({
-      editor: sectionLink("Editor").getAttribute("aria-current"),
-      hub: sectionLink("Hub").getAttribute("aria-current"),
-    }).toEqual({ editor: null, hub: "page" });
-  });
-});
-
-describe("Toolbar in the editor", () => {
-  it("shows the flow name field and Mis flujos", () => {
-    renderToolbar();
-
-    expect({
-      name: screen.queryByRole("textbox", { name: "Nombre del flujo" }) !== null,
-      savedFlows: screen.queryByRole("button", { name: "Mis flujos" }) !== null,
-    }).toEqual({ name: true, savedFlows: true });
-  });
-
-  it("shows the editing, running and sharing controls", () => {
-    renderToolbar();
-
-    expect({
-      undo: screen.queryByRole("button", { name: "Deshacer" }) !== null,
-      run: screen.queryByRole("button", { name: /Ejecutar/ }) !== null,
-      share: screen.queryByRole("button", { name: "Compartir" }) !== null,
-    }).toEqual({ undo: true, run: true, share: true });
-  });
-
-  it("renders its children", () => {
-    renderToolbar({ children: <button type="button">Tema</button> });
-
-    expect(screen.getByRole("button", { name: "Tema" })).toBeTruthy();
-  });
-});
-
-describe.each(HUB_PATHS)("Toolbar in the hub at %s", (path) => {
-  it("hides the editor controls", () => {
-    renderToolbar({ path });
-
-    expect({
-      name: screen.queryByRole("textbox", { name: "Nombre del flujo" }) !== null,
-      undo: screen.queryByRole("button", { name: "Deshacer" }) !== null,
-      run: screen.queryByRole("button", { name: /Ejecutar/ }) !== null,
-      share: screen.queryByRole("button", { name: "Compartir" }) !== null,
-      engine: screen.queryByRole("combobox", { name: "Motor" }) !== null,
-    }).toEqual({ name: false, undo: false, run: false, share: false, engine: false });
-  });
-
-  it("keeps the sections", () => {
-    renderToolbar({ path });
-
-    expect(screen.getByRole("navigation", { name: "Secciones" })).toBeTruthy();
-  });
-
-  it("keeps the account control", async () => {
-    renderToolbar({ path });
-
-    expect(await screen.findByRole("button", { name: "Entrar" })).toBeTruthy();
-  });
-
-  it("renders its children", () => {
-    renderToolbar({ path, children: <button type="button">Tema</button> });
-
-    expect(screen.getByRole("button", { name: "Tema" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Compartir" }).getAttribute("aria-haspopup")).toBe(
+      "menu",
+    );
   });
 });
 

@@ -1,29 +1,15 @@
 import type { NodeManifest } from "@nodomics/protocol";
 import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../canvas/canvas-fixtures.ts";
 import { NODE_DRAG_TYPE } from "../canvas/drag-types.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
 import { LibraryPanel } from "./LibraryPanel.tsx";
 
-function Library({ onAdd }: { readonly onAdd: (manifest: NodeManifest) => void }) {
-  const [isOpen, setOpen] = useState(true);
-  return (
-    <LibraryPanel
-      isOpen={isOpen}
-      onToggle={() => {
-        setOpen(!isOpen);
-      }}
-      onAdd={onAdd}
-    />
-  );
-}
-
 function renderLibrary() {
   const added: NodeManifest[] = [];
-  const rendered = renderWithStores(<Library onAdd={(manifest) => added.push(manifest)} />);
+  const rendered = renderWithStores(<LibraryPanel onAdd={(manifest) => added.push(manifest)} />);
   rendered.stores.engineStore.getState().dispatch({ type: "catalog.loaded", nodes: CATALOG });
   return { added, ...rendered };
 }
@@ -73,23 +59,35 @@ describe("LibraryPanel", () => {
     expect(data.get(NODE_DRAG_TYPE)).toBe("core.filter");
   });
 
-  it("collapses to a rail of icons that still adds nodes", async () => {
-    const { added } = renderLibrary();
+  it("explains how to add a node", () => {
+    renderLibrary();
 
-    await userEvent.click(screen.getByRole("button", { name: "Ocultar biblioteca" }));
+    expect(
+      screen.getByText("Arrastra un nodo al lienzo, o haz doble clic para agregarlo"),
+    ).toBeDefined();
+  });
 
-    expect(screen.queryByRole("textbox", { name: "Buscar nodos" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Fuentes" })).toBeNull();
-    await userEvent.dblClick(screen.getByRole("button", { name: "Filtrar" }));
-    expect(added.map((manifest) => manifest.id)).toEqual(["core.filter"]);
-    await userEvent.click(screen.getByRole("button", { name: "Mostrar biblioteca" }));
-    expect(screen.getByRole("textbox", { name: "Buscar nodos" })).toBeDefined();
+  it("offers a search field for the nodes", () => {
+    renderLibrary();
+
+    expect(screen.getByRole("searchbox", { name: "Buscar nodos" })).toBeDefined();
+  });
+
+  it("has no aside or collapse control of its own", () => {
+    renderLibrary();
+
+    expect({
+      aside: screen.queryByRole("complementary"),
+      hide: screen.queryByRole("button", { name: "Ocultar biblioteca" }),
+    }).toEqual({ aside: null, hide: null });
   });
 });
 
 it("filters the catalog by node name and description", async () => {
   renderLibrary();
-  await userEvent.type(await screen.findByRole("textbox", { name: "Buscar nodos" }), "filtrar");
+
+  await userEvent.type(await screen.findByRole("searchbox", { name: "Buscar nodos" }), "filtrar");
+
   expect(screen.getByRole("button", { name: "Filtrar" })).toBeDefined();
   expect(screen.queryByRole("button", { name: "Unir tablas" })).toBeNull();
 });

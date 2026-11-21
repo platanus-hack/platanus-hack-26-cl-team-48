@@ -14,11 +14,20 @@ export async function openEmptyApp(page: Page): Promise<void> {
   await waitForEngineReady(page);
 }
 
-/** Loads a `.nodo.json` file through "Importar", as a user picks it in the file dialog. */
+/** Opens the "Opciones del flujo" menu of the top bar and picks one of its items. */
+export async function chooseFlowOption(page: Page, item: string): Promise<void> {
+  await page.getByRole("button", { name: "Opciones del flujo" }).click();
+  await page
+    .getByRole("menu", { name: "Opciones del flujo" })
+    .getByRole("menuitem", { name: item })
+    .click();
+}
+
+/** Loads a `.nodo.json` file through "Importar archivo…", as a user picks it in the file dialog. */
 export async function importFlowFile(page: Page, path: string): Promise<void> {
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
-    page.getByRole("button", { name: "Importar" }).click(),
+    chooseFlowOption(page, "Importar archivo…"),
   ]);
   await chooser.setFiles(path);
 }
@@ -34,11 +43,11 @@ export type ExportedFlow = {
   readonly flow: unknown;
 };
 
-/** Clicks "Exportar" and keeps the downloaded file at `path`. */
+/** Chooses "Exportar archivo" and keeps the downloaded file at `path`. */
 export async function exportFlow(page: Page, path: string): Promise<ExportedFlow> {
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Exportar" }).click(),
+    chooseFlowOption(page, "Exportar archivo"),
   ]);
   await download.saveAs(path);
   return {

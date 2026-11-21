@@ -6,15 +6,14 @@ import { MESSAGES } from "../messages.ts";
 import { nodeFromFlow } from "./flow-node.ts";
 import type { SavedFlow } from "./flow-library.ts";
 
-type CloseProps = { readonly onClose: () => void };
-export function SavedNodeList({ onClose }: CloseProps) {
+export function SavedNodeList() {
   const flows = useStore(useAppStores().savedFlowStore, ({ flows }) => flows);
   return (
     <div className="web-saved-list">
       {flows
         .filter((saved) => saved.flow.nodes.some((node) => node.type === "flow.node"))
         .map((saved) => (
-          <SavedNode key={saved.id} saved={saved} onClose={onClose} />
+          <SavedNode key={saved.id} saved={saved} />
         ))}
       <LegacyNodes />
     </div>
@@ -36,7 +35,7 @@ function LegacyNodes() {
   );
 }
 
-function SavedNode({ saved, onClose }: CloseProps & { readonly saved: SavedFlow }) {
+function SavedNode({ saved }: { readonly saved: SavedFlow }) {
   const result = nodeFromFlow(
     { id: saved.id, flow: saved.flow, version: saved.node?.version ?? "0.1.0" },
     [...useCatalog(), ...(saved.flow.customNodes ?? [])],
@@ -49,21 +48,17 @@ function SavedNode({ saved, onClose }: CloseProps & { readonly saved: SavedFlow 
       ) : (
         <p>{MESSAGES.flowNodes.issues[result.error]}</p>
       )}
-      <OpenNodeFlow saved={saved} onClose={onClose} />
+      <OpenNodeFlow saved={saved} />
     </article>
   );
 }
 
-function OpenNodeFlow({ saved, onClose }: CloseProps & { readonly saved: SavedFlow }) {
+function OpenNodeFlow({ saved }: { readonly saved: SavedFlow }) {
   const { savedFlowStore } = useAppStores();
-  const open = async () => {
-    await savedFlowStore.getState().openFlow(saved.id);
-    onClose();
-  };
   return (
     <Button
       onClick={() => {
-        void open();
+        void savedFlowStore.getState().openFlow(saved.id);
       }}
     >
       {MESSAGES.flowNodes.open}

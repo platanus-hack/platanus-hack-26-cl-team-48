@@ -29,12 +29,32 @@ function renderParams() {
   return renderWithStores(<Panel />, stores);
 }
 
+const detailTabs = () => screen.getByRole("tablist", { name: "Detalle del nodo" });
+
+const detailTab = (name: string) => within(detailTabs()).getByRole("tab", { name });
+
+const tabNames = () =>
+  within(detailTabs())
+    .getAllByRole("tab")
+    .map((tab) => tab.textContent);
+
+const selectedTabName = () =>
+  within(detailTabs())
+    .getAllByRole("tab")
+    .find((tab) => tab.getAttribute("aria-selected") === "true")?.textContent;
+
 it("heads the selected node's parameters with its name and description", () => {
   renderParams();
 
   expect(screen.getByRole("heading", { level: 2, name: "Parámetros" })).toBeDefined();
   expect(screen.getByRole("heading", { level: 3, name: "Filtrar" })).toBeDefined();
   expect(screen.getByText("Conserva las filas que cumplen una condición.")).toBeDefined();
+});
+
+it("lets the keyboard reach the tab panel", () => {
+  renderParams();
+
+  expect(screen.getByRole("tabpanel").getAttribute("tabindex")).toBe("0");
 });
 
 it("hides the parameters and keeps a control to show them again", async () => {
@@ -59,7 +79,7 @@ it("widens from its left edge while it is open", async () => {
   expect(screen.queryByRole("separator")).toBeNull();
 });
 
-it("lists the node's ports and what feeds each input", () => {
+it("lists the node's ports and what feeds each input in the Puertos tab", async () => {
   const stores = createAppStores(
     flowOf(
       [nodeOf("src", SAMPLE.id), nodeOf("f", FILTER.id)],
@@ -69,6 +89,8 @@ it("lists the node's ports and what feeds each input", () => {
   stores.engineStore.getState().dispatch({ type: "catalog.loaded", nodes: CATALOG });
   stores.selectionStore.getState().select(["f"]);
   renderWithStores(<Panel />, stores);
+
+  await userEvent.click(detailTab("Puertos"));
 
   const ports = screen.getByRole("list", { name: "Puertos" });
   const [input, output] = within(ports).getAllByRole("listitem");
@@ -134,4 +156,99 @@ it("ignores selected ids of nodes that are not in the open flow, as after openin
   renderWithStores(<Panel />, stores);
 
   expect(screen.getByRole("heading", { level: 3, name: "Filtrar" })).toBeDefined();
+});
+
+it("details the selected node in the tabs Parámetros, Puertos and Historia", () => {
+  renderParams();
+
+  expect(tabNames()).toEqual(["Parámetros", "Puertos", "Historia"]);
+});
+
+it("starts on the Parámetros tab with the parameters form", () => {
+  renderParams();
+
+  expect({
+    selected: selectedTabName(),
+    ports: screen.queryByRole("list", { name: "Puertos" }),
+  }).toEqual({ selected: "Parámetros", ports: null });
+});
+
+it("shows each tab's panel labelled by its tab", async () => {
+  renderParams();
+
+  await userEvent.click(detailTab("Puertos"));
+
+  const panel = screen.getByRole("tabpanel");
+  expect({
+    controls: detailTab("Puertos").getAttribute("aria-controls"),
+    name: panel.getAttribute("aria-labelledby"),
+  }).toEqual({ controls: panel.id, name: detailTab("Puertos").id });
+});
+
+it("shows the ports when the Puertos tab is chosen", async () => {
+  renderParams();
+
+  await userEvent.click(detailTab("Puertos"));
+
+  expect({
+    selected: selectedTabName(),
+    ports: screen.queryByRole("list", { name: "Puertos" }) !== null,
+  }).toEqual({ selected: "Puertos", ports: true });
+});
+
+it("shows the history mockup note in the Historia tab", async () => {
+  renderParams();
+
+  await userEvent.click(detailTab("Historia"));
+
+  expect(
+    within(screen.getByRole("tabpanel")).getByText(
+      /Maqueta: aquí verás quién cambió este nodo, cuándo y por qué\./,
+    ),
+  ).toBeDefined();
+});
+
+it("moves to the next tab with the right arrow", async () => {
+  renderParams();
+  detailTab("Parámetros").focus();
+
+  await userEvent.keyboard("{ArrowRight}");
+
+  expect({ selected: selectedTabName(), focused: document.activeElement }).toEqual({
+    selected: "Puertos",
+    focused: detailTab("Puertos"),
+  });
+});
+
+it("moves to the previous tab with the left arrow", async () => {
+  renderParams();
+  await userEvent.click(detailTab("Historia"));
+
+  await userEvent.keyboard("{ArrowLeft}");
+
+  expect({ selected: selectedTabName(), focused: document.activeElement }).toEqual({
+    selected: "Puertos",
+    focused: detailTab("Puertos"),
+  });
+});
+
+it("keeps only the selected tab in the tab order", async () => {
+  renderParams();
+
+  await userEvent.click(detailTab("Puertos"));
+
+  expect(
+    within(detailTabs())
+      .getAllByRole("tab")
+      .map((tab) => tab.getAttribute("tabindex")),
+  ).toEqual(["-1", "0", "-1"]);
+});
+
+it("has no node detail tabs without a selected node", () => {
+  const stores = createAppStores(flowOf([nodeOf("f", FILTER.id)]));
+  stores.engineStore.getState().dispatch({ type: "catalog.loaded", nodes: CATALOG });
+
+  renderWithStores(<Panel />, stores);
+
+  expect(screen.queryByRole("tablist", { name: "Detalle del nodo" })).toBeNull();
 });

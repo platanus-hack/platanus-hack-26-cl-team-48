@@ -7,12 +7,24 @@ type LibraryStorage = Pick<Storage, "getItem" | "setItem">;
 
 export function createStoragePersonalLibrary(getStorage: () => LibraryStorage): PersonalLibrary {
   const loaded = readStorage(getStorage);
-  const memory = createMemoryPersonalLibrary(loaded.nodes);
+  let memory = createMemoryPersonalLibrary(loaded.nodes);
   let issue = loaded.issue;
   let canPersist = issue !== "unavailable";
+  // Another tab (the hub's) may have written since: what persists is the truth.
+  const resync = () => {
+    if (!canPersist) return;
+    const stored = readStorage(getStorage);
+    if (stored.issue !== undefined) return;
+    memory = createMemoryPersonalLibrary(stored.nodes);
+    issue = undefined;
+  };
   return {
-    read: () => ({ ...memory.read(), ...(issue === undefined ? {} : { issue }) }),
+    read: () => {
+      resync();
+      return { ...memory.read(), ...(issue === undefined ? {} : { issue }) };
+    },
     add: (manifest) => {
+      resync();
       const snapshot = memory.add(manifest);
       if (canPersist && !writeStorage(getStorage, snapshot)) {
         canPersist = false;
