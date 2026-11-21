@@ -2,11 +2,12 @@
 -- Every row belongs to one actor (profiles.id) and RLS limits access to that owner.
 
 create table public.agent_entities (
-  id text primary key,
+  id text not null,
   actor_id uuid not null default auth.uid() references public.profiles (id) on delete cascade,
   kind text not null,
   name text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  primary key (actor_id, id)
 );
 
 create table public.agent_edges (

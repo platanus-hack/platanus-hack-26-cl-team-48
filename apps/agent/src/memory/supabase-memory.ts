@@ -134,7 +134,7 @@ export function createSupabaseMemory(client: SupabaseClient): MemoryPort {
   return {
     recordEpisode: (episode) => write(client.from("agent_episodes").insert(episodeToRow(episode))),
     upsertEntity: (entity) =>
-      write(client.from("agent_entities").upsert(entity, { onConflict: "id" })),
+      write(client.from("agent_entities").upsert(entity, { onConflict: "actor_id,id" })),
     openEdge: (edge) => openEdge(client, edge),
     closeEdge: (id, at) => closeEdge(client, id, at),
     edgesAt: async (entityId, at) => {
