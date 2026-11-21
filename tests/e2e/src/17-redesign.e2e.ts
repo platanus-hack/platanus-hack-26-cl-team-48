@@ -85,9 +85,7 @@ test("opens the hub in another tab with its own header", async ({ page }) => {
     hub.getByRole("banner").getByRole("link", { name: "Abrir el editor" }),
   ).toBeVisible();
   await expect(hub.getByRole("heading", { name: "Para ti" })).toBeVisible();
-  await expect(
-    hub.getByText("Maqueta: recomendaciones según los flujos en los que trabajas."),
-  ).toBeVisible();
+  await expect(hub.getByText("Entra para ver con quién puedes colaborar.")).toBeVisible();
   await expect(
     hub.getByRole("banner").getByRole("searchbox", { name: "Buscar en el hub" }),
   ).toBeVisible();
