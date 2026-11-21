@@ -184,6 +184,24 @@ describe("Mis flujos section", () => {
     expect(within(panel("Mis flujos")).queryByRole("article", { name: "Ventas" })).toBeNull();
   });
 
+  it("shows a flow another tab saved once the window gets focus", async () => {
+    const stores = await seededStores();
+    await renderSection("flows", stores);
+    await stores.savedFlowStore.getState().library.saveFlow({
+      id: "two",
+      name: "Compras",
+      flow: { ...flowOf([nodeOf("s", SAMPLE.id)]), name: "Compras" },
+      files: {},
+      updatedAt: 2,
+    });
+
+    fireEvent.focus(window);
+
+    expect(
+      await within(panel("Mis flujos")).findByRole("article", { name: "Compras" }),
+    ).toBeTruthy();
+  });
+
   it("exports a saved flow as a file", async () => {
     const downloads = recordDownloads();
     await renderSection("flows");
@@ -365,4 +383,35 @@ describe("Agente section mockup", () => {
         .hasAttribute("disabled"),
     ).toBe(true);
   });
+
+  it("says the agent works on a draft", async () => {
+    await renderSection("agent");
+
+    expect(within(panel("Agente")).getByText(/Trabaja en un borrador/)).toBeTruthy();
+  });
+
+  it("offers a disabled Ver en el lienzo for each proposal", async () => {
+    await renderSection("agent");
+
+    const show = within(panel("Agente")).getAllByRole("button", { name: "Ver en el lienzo" });
+
+    expect({
+      count: show.length,
+      disabled: show.map((button) => button.hasAttribute("disabled")),
+    }).toEqual({
+      count: within(panel("Agente")).getAllByRole("button", { name: "Aceptar" }).length,
+      disabled: show.map(() => true),
+    });
+  });
+
+  it.each(["Aceptar los 3", "Descartar borrador"])(
+    "offers a disabled %s button for the whole draft",
+    async (name) => {
+      await renderSection("agent");
+
+      expect(within(panel("Agente")).getByRole("button", { name }).hasAttribute("disabled")).toBe(
+        true,
+      );
+    },
+  );
 });

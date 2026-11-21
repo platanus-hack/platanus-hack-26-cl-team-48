@@ -1,12 +1,13 @@
 import type { Hub } from "@nodomics/hub";
 import { err, ok } from "@nodomics/protocol";
 import { screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import { AppStoresContext } from "../app-context.ts";
 import { FeedContext } from "../feed/feed-context.ts";
 import { componentHit, createFakeFeed, profileHit } from "../feed/feed-fixtures.ts";
 import type { FeedService } from "../feed/feed-service.ts";
+import { HubContext } from "./hub-context.ts";
 import { createSeededHub, renderWithHub } from "./hub-pages-fixtures.tsx";
 import { HubPage } from "./HubPage.tsx";
 
@@ -20,12 +21,25 @@ async function signedInHub(handle = "ana"): Promise<Hub> {
   return hub;
 }
 
-function withFeed(feed: FeedService): ReactNode {
+function withFeed(feed: FeedService, text = ""): ReactNode {
   return (
     <FeedContext.Provider value={feed}>
-      <HubPage />
+      <HubPage text={text} />
     </FeedContext.Provider>
   );
+}
+
+/** Renders the page with the feed and hands back a way to change the text the header would send. */
+function renderWithFeed(feed: FeedService, hub: Hub) {
+  const rendered = renderWithHub(withFeed(feed), hub);
+  const showText = (next: string) => {
+    rendered.rerender(
+      <AppStoresContext value={rendered.stores}>
+        <HubContext value={hub}>{withFeed(feed, next)}</HubContext>
+      </AppStoresContext>,
+    );
+  };
+  return { ...rendered, showText };
 }
 
 const forYou = async () => {
@@ -134,13 +148,12 @@ describe("HubPage Para ti", () => {
 
 describe("HubPage people search", () => {
   it("lists the profile hits of the search as links to their profiles", async () => {
-    const user = userEvent.setup();
     const { feed, search } = createFakeFeed({
       search: () => Promise.resolve(ok([profileHit("beto", "Beto Ruiz")])),
     });
-    renderWithHub(withFeed(feed), await createSeededHub());
+    const { showText } = renderWithFeed(feed, await createSeededHub());
 
-    await user.type(screen.getByLabelText("Buscar en el hub"), "clima");
+    showText("clima");
 
     const people = await screen.findByRole("list", { name: "Personas" });
     expect({
@@ -150,13 +163,12 @@ describe("HubPage people search", () => {
   });
 
   it("keeps the publication results while showing people", async () => {
-    const user = userEvent.setup();
     const { feed } = createFakeFeed({
       search: () => Promise.resolve(ok([profileHit("beto", "Beto Ruiz")])),
     });
-    renderWithHub(withFeed(feed), await createSeededHub());
+    const { showText } = renderWithFeed(feed, await createSeededHub());
 
-    await user.type(screen.getByLabelText("Buscar en el hub"), "clima");
+    showText("clima");
 
     await screen.findByRole("list", { name: "Personas" });
     expect(await screen.findByRole("link", { name: "Clima diario" })).toBeTruthy();
