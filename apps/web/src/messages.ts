@@ -39,7 +39,6 @@ export const MESSAGES = {
   },
   hub: {
     title: "Hub",
-    open: "Hub",
     search: "Buscar en el hub",
     kind: "Tipo",
     kinds: { all: "Todo", flow: "Flujos", node: "Nodos" },
@@ -55,7 +54,17 @@ export const MESSAGES = {
     install: "Agregar a Mis nodos",
     installed: "Agregado a Mis nodos",
     preview: "Vista previa del flujo",
-    back: "Volver al editor",
+    subtitle:
+      "Flujos y nodos publicados por la comunidad. Ábrelos como copia o agrégalos a tus nodos.",
+    publications: (count: number) =>
+      count === 1 ? "1 publicación" : `${String(count)} publicaciones`,
+    by: "Publicado por",
+    license: "Licencia",
+    published: "Publicada",
+    use: "Usar",
+    flowHint: "Se abre como un flujo nuevo en tu editor; el original no cambia.",
+    nodeHint:
+      "Se agrega a «Mis nodos» y lo usas como cualquier otro nodo, también como copia editable.",
   },
   publish: {
     action: "Publicar",
@@ -160,6 +169,13 @@ export const MESSAGES = {
     undo: "Deshacer",
     redo: "Rehacer",
     share: "Compartir",
+    copyLink: "Copiar enlace",
+    publish: "Publicar en el hub…",
+    exportFile: "Exportar archivo",
+    importFile: "Importar archivo…",
+    sections: "Secciones",
+    editor: "Editor",
+    hub: "Hub",
     export: "Exportar",
     import: "Importar",
   },

@@ -7,18 +7,25 @@ const PRIMARY_BUTTON = 0;
 type RouteLinkProps = {
   readonly route: Route;
   readonly className?: string;
+  /** Marks the link of the page being shown (`aria-current="page"`). */
+  readonly isCurrent?: boolean;
   readonly children: ReactNode;
 };
 
 /** A real link to a page: a plain click stays in the app, any other opens it as the browser would. */
-export function RouteLink({ route, className, children }: RouteLinkProps) {
+export function RouteLink({ route, className, isCurrent = false, children }: RouteLinkProps) {
   const followInApp = (event: MouseEvent<HTMLAnchorElement>) => {
     if (isModifiedClick(event)) return;
     event.preventDefault();
     navigate(route);
   };
   return (
-    <a href={pathOf(route)} className={className} onClick={followInApp}>
+    <a
+      href={pathOf(route)}
+      className={className}
+      aria-current={isCurrent ? "page" : undefined}
+      onClick={followInApp}
+    >
       {children}
     </a>
   );

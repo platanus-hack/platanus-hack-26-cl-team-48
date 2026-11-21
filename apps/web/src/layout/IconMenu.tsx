@@ -1,4 +1,4 @@
-import { Icon, type IconName } from "@nodomics/ui";
+import { Icon, ICON_SIZE, type IconName } from "@nodomics/ui";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 
 type MenuItem = {
@@ -13,6 +13,8 @@ export function IconMenu(props: {
   readonly items: ReadonlyArray<MenuItem>;
   readonly disabled?: boolean;
   readonly size?: "sm" | "md";
+  /** Shows the label beside the icon, as a secondary button that opens a menu. */
+  readonly hasText?: boolean;
 }) {
   const [isOpen, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -31,9 +33,9 @@ export function IconMenu(props: {
       <button
         ref={trigger}
         type="button"
-        className={`nd-btn nd-btn-ghost nd-btn-${props.size ?? "sm"} nd-btn-icon`}
-        aria-label={props.label}
-        title={props.label}
+        className={triggerClass(props)}
+        aria-label={props.hasText === true ? undefined : props.label}
+        title={props.hasText === true ? undefined : props.label}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? id : undefined}
@@ -49,6 +51,12 @@ export function IconMenu(props: {
         }}
       >
         <Icon name={props.icon} />
+        {props.hasText === true && (
+          <>
+            {props.label}
+            <Icon name="chevron-down" size={ICON_SIZE.sm} />
+          </>
+        )}
       </button>
       {isOpen && (
         <div
@@ -106,4 +114,10 @@ function navigateMenu(event: KeyboardEvent<HTMLDivElement>, close: () => void) {
     event.preventDefault();
     items[next]?.focus();
   }
+}
+
+function triggerClass({ size = "sm", hasText = false }: { size?: "sm" | "md"; hasText?: boolean }) {
+  return hasText
+    ? `nd-btn nd-btn-secondary nd-btn-${size}`
+    : `nd-btn nd-btn-ghost nd-btn-${size} nd-btn-icon`;
 }

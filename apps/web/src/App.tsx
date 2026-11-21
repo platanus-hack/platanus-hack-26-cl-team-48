@@ -13,7 +13,6 @@ import { ParamsPanel } from "./params/ParamsPanel.tsx";
 import { PreviewPanel } from "./preview/PreviewPanel.tsx";
 import { Toolbar } from "./toolbar/Toolbar.tsx";
 import { HubLayer } from "./hub/HubLayer.tsx";
-import { HubToolbarActions } from "./hub/HubToolbarActions.tsx";
 import { useRoute } from "./routing/use-route.ts";
 import { useRunOnConnect } from "./engine/use-run-on-connect.ts";
 
@@ -53,7 +52,6 @@ export function App({ engines, defaultEngine, shouldRunOnConnect, preferenceStor
           onEngineChange={setEngine}
         />
         <AutoRun isEnabled={shouldRunOnConnect} />
-        <HubOverlay />
         <NoticeArea />
       </ReactFlowProvider>
     </EngineConnectionContext>
@@ -80,6 +78,7 @@ function Workspace(props: {
     <PreviewLocationContext value={location}>
       <div
         className="web-app"
+        data-canvas-frame
         data-library-open={preferences.isLibraryOpen}
         data-params-open={preferences.isParamsOpen}
         data-preview-location={preferences.previewLocation}
@@ -88,24 +87,13 @@ function Workspace(props: {
         style={workspaceSizes(preferences)}
       >
         <Canvas />
-        <Toolbar
-          {...engine}
-          center={
-            <PreviewLocationControl
-              location={preferences.previewLocation}
-              onChange={(previewLocation) => {
-                change({ previewLocation });
-              }}
-            />
-          }
-        >
+        <Toolbar {...engine}>
           <ThemeControl
             theme={preferences.theme}
             onChange={(theme) => {
               change({ theme });
             }}
           />
-          <HubToolbarActions />
         </Toolbar>
         <LibraryPanel
           isOpen={preferences.isLibraryOpen}
@@ -145,7 +133,18 @@ function Workspace(props: {
             }}
           />
         </CodeEditorSizeContext>
-        <CanvasZoom />
+        <div className="web-canvas-controls">
+          <CanvasZoom />
+          <div className="web-floating web-preview-location">
+            <PreviewLocationControl
+              location={preferences.previewLocation}
+              onChange={(previewLocation) => {
+                change({ previewLocation });
+              }}
+            />
+          </div>
+        </div>
+        <HubOverlay />
       </div>
     </PreviewLocationContext>
   );

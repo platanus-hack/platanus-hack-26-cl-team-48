@@ -1,39 +1,51 @@
-import { SavedFlows } from "../library/SavedFlows.tsx";
 import type { ReactNode } from "react";
+import { AccountButton } from "../hub/AccountButton.tsx";
+import { SavedFlows } from "../library/SavedFlows.tsx";
 import { MESSAGES } from "../messages.ts";
+import { useRoute } from "../routing/use-route.ts";
 import { EngineSelector, type EngineSelectorProps } from "./EngineSelector.tsx";
-import { FlowFileActions } from "./FlowFileActions.tsx";
 import { HistoryButtons } from "./HistoryButtons.tsx";
 import { RunButton } from "./RunButton.tsx";
+import { SectionNav } from "./SectionNav.tsx";
+import { ShareMenu } from "./ShareMenu.tsx";
 
 type ToolbarProps = EngineSelectorProps & {
-  /** The middle island, between the engine and the flow's actions. */
-  readonly center?: ReactNode;
-  /** Workspace controls placed after the file actions, such as the theme. */
+  /** Workspace controls placed before the account, such as the theme. */
   readonly children?: ReactNode;
 };
 
-/** Three floating islands over the canvas: the engine, the preview location and the flow actions. */
-export function Toolbar({ center, children, ...engine }: ToolbarProps) {
+/**
+ * The app bar, the same in the editor and the hub: the sections on the left, the open flow in the
+ * middle and its actions on the right; in the hub only the sections and the account remain.
+ */
+export function Toolbar({ children, ...engine }: ToolbarProps) {
+  const route = useRoute();
+  const isEditor = route.page === "workspace";
   return (
     <header className="web-toolbar" aria-label={MESSAGES.toolbar.label} data-canvas-inset="top">
-      <div className="web-island">
-        <h1 className="web-brand">{MESSAGES.app.title}</h1>
-        <span className="web-divider" aria-hidden="true" />
-        <EngineSelector {...engine} />
+      <div className="web-toolbar-start">
+        <h1 className="web-brand">
+          <span className="web-brand-mark" aria-hidden="true" />
+          {MESSAGES.app.title}
+        </h1>
+        <SectionNav route={route} />
       </div>
-      <span className="web-toolbar-spacer" />
-      {center !== undefined && <div className="web-island">{center}</div>}
-      <span className="web-toolbar-spacer" />
-      <div className="web-island">
-        <SavedFlows />
-        <HistoryButtons />
-        <span className="web-divider" aria-hidden="true" />
-        <div className="web-toolbar-group">
-          <FlowFileActions />
-          {children}
+      {isEditor && (
+        <div className="web-toolbar-middle">
+          <SavedFlows />
+          <HistoryButtons />
         </div>
-        <RunButton />
+      )}
+      <div className="web-toolbar-end">
+        {isEditor && (
+          <>
+            <EngineSelector {...engine} />
+            <ShareMenu />
+            <RunButton />
+          </>
+        )}
+        {children}
+        <AccountButton />
       </div>
     </header>
   );
