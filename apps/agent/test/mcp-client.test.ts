@@ -24,8 +24,17 @@ function fakeTransport(handler: Handler): Transport {
     close: () => Promise.resolve(),
     send: (message) => {
       if (!isRequest(message)) return Promise.resolve();
-      const result = message.method === "initialize" ? initializeResult(message.params) : handler(message.method, message.params);
-      queueMicrotask(() => transport.onmessage?.({ jsonrpc: "2.0", id: message.id, result: result as Record<string, unknown> }));
+      const result =
+        message.method === "initialize"
+          ? initializeResult(message.params)
+          : handler(message.method, message.params);
+      queueMicrotask(() =>
+        transport.onmessage?.({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: result as Record<string, unknown>,
+        }),
+      );
       return Promise.resolve();
     },
   };
@@ -76,7 +85,10 @@ it("default transport sends the bearer token and maps a network failure to UNAVA
   const result = await client.call("flows.get", {}, ALICE);
 
   expect(headers).toContain("Bearer token-alice");
-  expect(result).toEqual({ ok: false, error: { code: "UNAVAILABLE", message: expect.any(String) as string } });
+  expect(result).toEqual({
+    ok: false,
+    error: { code: "UNAVAILABLE", message: expect.any(String) as string },
+  });
 });
 
 it("maps malformed mcp response to McpError", async () => {
@@ -104,12 +116,19 @@ it("maps a tool result that is not json to MALFORMED_RESPONSE", async () => {
 it("maps an isError tool result to TOOL_FAILED with its message", async () => {
   const client = createMcpClient({
     url: URL_UNDER_TEST,
-    transport: () => fakeTransport(() => ({ isError: true, content: [{ type: "text", text: "Node does not exist" }] })),
+    transport: () =>
+      fakeTransport(() => ({
+        isError: true,
+        content: [{ type: "text", text: "Node does not exist" }],
+      })),
   });
 
   const result = await client.call("flows.connect", {}, ALICE);
 
-  expect(result).toEqual({ ok: false, error: { code: "TOOL_FAILED", message: "Node does not exist" } });
+  expect(result).toEqual({
+    ok: false,
+    error: { code: "TOOL_FAILED", message: "Node does not exist" },
+  });
 });
 
 it("prefers structured content over text", async () => {
@@ -125,7 +144,8 @@ it("prefers structured content over text", async () => {
 
 it("lists tools as descriptors and rejects a tool without inputSchema", async () => {
   const good = { name: "nodes.list", description: "List", inputSchema: { type: "object" } };
-  const listing = (tools: unknown[]) => createMcpClient({ url: URL_UNDER_TEST, transport: () => fakeTransport(() => ({ tools })) });
+  const listing = (tools: unknown[]) =>
+    createMcpClient({ url: URL_UNDER_TEST, transport: () => fakeTransport(() => ({ tools })) });
 
   const ok = await listing([good]).listTools();
   const bad = await listing([{ name: "broken" }]).listTools();
@@ -135,7 +155,10 @@ it("lists tools as descriptors and rejects a tool without inputSchema", async ()
 });
 
 it("rejects non-object args before reaching the network", async () => {
-  const client = createMcpClient({ url: URL_UNDER_TEST, transport: () => fakeTransport(() => ({})) });
+  const client = createMcpClient({
+    url: URL_UNDER_TEST,
+    transport: () => fakeTransport(() => ({})),
+  });
 
   const result = await client.call("flows.get", "oops", ALICE);
 
