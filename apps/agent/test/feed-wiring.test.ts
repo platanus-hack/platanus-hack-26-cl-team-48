@@ -59,7 +59,9 @@ it("feed routes reject an identity with an empty access token without touching S
     { ...CONFIG, supabaseAnonKey: jwt("anon") },
     {
       fetch: (input) => {
-        fetchCalls.push(String(input));
+        fetchCalls.push(
+          input instanceof URL ? input.href : typeof input === "string" ? input : input.url,
+        );
         return Promise.reject(new Error("offline"));
       },
       clientFactory: (url) => {
