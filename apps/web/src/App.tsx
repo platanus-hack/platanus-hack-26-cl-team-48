@@ -12,6 +12,9 @@ import { CodeEditorSizeContext } from "./layout/code-editor-size.ts";
 import { ParamsPanel } from "./params/ParamsPanel.tsx";
 import { PreviewPanel } from "./preview/PreviewPanel.tsx";
 import { Toolbar } from "./toolbar/Toolbar.tsx";
+import { HubLayer } from "./hub/HubLayer.tsx";
+import { HubToolbarActions } from "./hub/HubToolbarActions.tsx";
+import { useRoute } from "./routing/use-route.ts";
 import { useRunOnConnect } from "./engine/use-run-on-connect.ts";
 
 import { useAppStores } from "./app-context.ts";
@@ -50,6 +53,7 @@ export function App({ engines, defaultEngine, shouldRunOnConnect, preferenceStor
           onEngineChange={setEngine}
         />
         <AutoRun isEnabled={shouldRunOnConnect} />
+        <HubOverlay />
         <NoticeArea />
       </ReactFlowProvider>
     </EngineConnectionContext>
@@ -101,6 +105,7 @@ function Workspace(props: {
               change({ theme });
             }}
           />
+          <HubToolbarActions />
         </Toolbar>
         <LibraryPanel
           isOpen={preferences.isLibraryOpen}
@@ -175,4 +180,10 @@ function AutoRun({ isEnabled }: { readonly isEnabled: boolean }) {
   useSourceReconnection();
   useRunOnConnect(isEnabled);
   return null;
+}
+
+/** The hub's pages cover the editor, which stays mounted so its flow and engine survive. */
+function HubOverlay() {
+  const route = useRoute();
+  return route.page === "workspace" ? null : <HubLayer route={route} />;
 }

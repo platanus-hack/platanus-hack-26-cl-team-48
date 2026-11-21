@@ -1,0 +1,206 @@
+/* The hub (ADR 0018): a full-screen layer over the editor, its pages and its dialogs. */
+.web-hub-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-200);
+  color: var(--ink);
+  font: var(--text-body);
+  overflow: auto;
+}
+.web-hub-layer-bar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: var(--stroke-hairline) solid var(--line);
+  background: var(--surface-100);
+}
+.web-hub-layer-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.web-hub-page {
+  width: 100%;
+  max-width: calc(var(--node-width) * 5);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+}
+.web-hub-page h1 {
+  font: var(--text-display);
+  letter-spacing: var(--text-display-tracking);
+  margin: 0;
+}
+.web-hub-page a,
+.web-account-menu a,
+.web-hub-layer a {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.web-hub-page a:hover,
+.web-account-menu a:hover,
+.web-hub-layer a:hover {
+  text-decoration: underline;
+}
+.web-hub-page a:focus-visible,
+.web-hub-layer a:focus-visible,
+.web-account-menu a:focus-visible {
+  outline: var(--stroke-strong) solid var(--focus-ring);
+  border-radius: var(--radius-xs);
+}
+.web-hub-filters {
+  display: grid;
+  grid-template-columns: 1fr calc(var(--node-width) * 0.75);
+  gap: var(--space-4);
+  align-items: end;
+}
+.web-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--node-width-wide), 1fr));
+  gap: var(--space-4);
+}
+.web-hub-empty {
+  color: var(--ink-muted);
+  margin: 0;
+}
+.web-hub-profile,
+.web-hub-publication {
+  display: grid;
+  gap: var(--space-2);
+}
+.web-hub-profile img {
+  width: var(--space-12);
+  height: var(--space-12);
+  border-radius: var(--radius-full);
+}
+.web-hub-profile span {
+  color: var(--ink-muted);
+  font: var(--text-mono);
+}
+.web-hub-publication p {
+  margin: 0;
+  color: var(--ink-muted);
+}
+.web-hub-tags,
+.web-hub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.web-hub-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.web-hub-preview {
+  display: grid;
+  grid-template-rows: calc(var(--node-width) * 2) auto;
+  gap: var(--space-4);
+  min-height: 0;
+}
+.web-hub-preview .web-canvas {
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.web-hub-dialog {
+  width: calc(100% - var(--space-12));
+  max-width: calc(var(--node-width) * 2);
+  max-height: calc(100% - var(--space-12));
+  overflow: auto;
+  padding: var(--space-6);
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-100);
+  color: var(--ink);
+  font: var(--text-body);
+  box-shadow: var(--shadow-pop);
+}
+.web-hub-dialog::backdrop {
+  background: var(--surface-inverse);
+  opacity: 0.5;
+}
+.web-hub-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.web-hub-dialog-heading h2 {
+  font: var(--text-title);
+  margin: 0;
+}
+.web-hub-form {
+  display: grid;
+  gap: var(--space-4);
+}
+.web-hub-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.web-hub-choice {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.web-hub-choice legend {
+  font: var(--text-label);
+  margin-bottom: var(--space-1);
+}
+.web-hub-choice label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.web-hub-choice input {
+  accent-color: var(--accent);
+}
+.web-hub-warning {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--status-warn-soft);
+  color: var(--ink);
+  font: var(--text-body-sm);
+}
+.web-account {
+  position: relative;
+}
+.web-account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: var(--z-popover);
+  display: grid;
+  gap: var(--space-1);
+  min-width: calc(var(--node-width) * 0.75);
+  padding: var(--space-2);
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-100);
+  box-shadow: var(--shadow-pop);
+}
+.web-account-menu a {
+  padding: var(--space-1) var(--space-2);
+}
+.web-toolbar a.nd-btn {
+  color: var(--ink);
+  text-decoration: none;
+}

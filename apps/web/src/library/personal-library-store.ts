@@ -14,7 +14,16 @@ export function createPersonalLibraryStore(
   reportIssue(initial, show);
   return createStore<{
     readonly nodes: ReadonlyArray<NodeManifest>;
-  }>(() => ({ nodes: initial.nodes }));
+    readonly install: (manifests: ReadonlyArray<NodeManifest>) => void;
+  }>((set) => ({
+    nodes: initial.nodes,
+    install: (manifests) => {
+      manifests.forEach((manifest) => library.add(manifest));
+      const snapshot = library.read();
+      reportIssue(snapshot, show);
+      set({ nodes: snapshot.nodes });
+    },
+  }));
 }
 
 function reportIssue(snapshot: PersonalLibrarySnapshot, show: (notice: LibraryNotice) => void) {

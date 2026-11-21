@@ -17,6 +17,8 @@ import { describeFlowFileError } from "./flow/use-flow-files.ts";
 import { createStoragePersonalLibrary } from "./library/storage-personal-library.ts";
 import { createStorageWorkspacePreferences } from "./layout/storage-workspace-preferences.ts";
 import { MESSAGES } from "./messages.ts";
+import { createAppHub } from "./hub/create-app-hub.ts";
+import { HubContext } from "./hub/hub-context.ts";
 
 // Composition root: the one place that reads the URL, creates the stores and picks the engines.
 const shared = decodeSharedFlow(window.location.hash);
@@ -45,6 +47,8 @@ startFlowSaving({
   now: Date.now,
 });
 
+const hub = createAppHub(import.meta.env);
+
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 
 const [defaultEngine] = ENGINES;
@@ -55,12 +59,14 @@ if (defaultEngine === undefined || root === null)
 createRoot(root).render(
   <StrictMode>
     <AppStoresContext value={stores}>
-      <App
-        preferenceStorage={preferenceStorage}
-        engines={ENGINES}
-        defaultEngine={defaultEngine}
-        shouldRunOnConnect={shared?.ok === true}
-      />
+      <HubContext value={hub}>
+        <App
+          preferenceStorage={preferenceStorage}
+          engines={ENGINES}
+          defaultEngine={defaultEngine}
+          shouldRunOnConnect={shared?.ok === true}
+        />
+      </HubContext>
     </AppStoresContext>
   </StrictMode>,
 );
