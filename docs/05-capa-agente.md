@@ -16,7 +16,7 @@ Cuando un usuario le pide al agente una herramienta, una función o un proyecto,
 | Sitio web | Render, sitio estático (ya existe) | Sin cambios |
 | **Servicio del agente** (bucle del agente, cliente MCP, claves de Anthropic y Render) | **Render, servicio web Node/TS** | Los bucles del agente duran minutos. Las Edge Functions de Supabase tienen límites de tiempo cortos. Las claves quedan solo en el servidor |
 | **Sandbox** (fork del flujo, ejecución de flujos y de código generado) | **Render Sandboxes**, creadas por el servicio del agente | Aísla lo que hace el agente. Corre en la nube si el usuario no puede o no quiere correr en su equipo |
-| **Servidor MCP del motor** | Dentro de cada sandbox, junto a un motor sin interfaz | Las herramientas operan sobre el fork, nunca sobre el flujo original |
+| **Servidor MCP del motor** | **En el servicio del agente**. Cada sesión queda atada a un usuario y un fork, y la ejecución se manda al sandbox con `exec` de un runner de comando | Render Sandboxes no expone puertos ni red privada (beta), así que el MCP no puede vivir dentro del sandbox |
 | Usuarios, perfiles, flujos guardados, propuestas | Supabase (Postgres) | Lo define el equipo del motor |
 | Tiempo real de la sala y `@agente` | Supabase Realtime | El agente se une a la sala como un participante más |
 | Índice para el buscador (embeddings de las fichas de componente) | Supabase, pgvector | Lo comparten el buscador del Feed y la memoria del agente |
