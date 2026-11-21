@@ -71,7 +71,7 @@ Una sola escala pondría "a la mitad" a quien es experto en teoría y principian
 
 ### 5. Los vectores se calculan en `apps/agent`
 
-Se reutiliza el servicio de Gabriel (ADR 0019): ya guarda la clave de Voyage y tiene el puerto `EmbeddingsPort`. Así no hacen falta Edge Functions ni copias de las claves. Se agregan tres rutas HTTP, autenticadas con el JWT de Supabase del usuario (ADR 0021):
+Se reutiliza el servicio de Gabriel (ADR 0019): ya guarda la clave de Voyage y tiene el puerto `EmbeddingsPort`. Así no hacen falta Edge Functions ni copias de las claves. Se agregan cinco rutas HTTP, autenticadas con el JWT de Supabase del usuario (ADR 0021):
 
 - `POST /feed/profile`: recibe la ficha, la parsea, la guarda y la vectoriza.
 - `GET /feed/search?q=&k=`: búsqueda libre. Es `GET` porque no cambia nada y se puede repetir y cachear.
@@ -81,7 +81,7 @@ Se reutiliza el servicio de Gabriel (ADR 0019): ya guarda la clave de Voyage y t
 
 Las rutas y el formato de sus respuestas están en `packages/profile/src/feed-contract.ts`, que comparten la web y el servicio.
 
-Quién escribe esas rutas (Gabriel, o Cantú en un módulo `feed/` dentro de `apps/agent`) se acuerda con Gabriel.
+Las escribe Cantú en el módulo `feed/` de `apps/agent`, como se acordó con Gabriel. Se registran con el parámetro `extraRoutes` de `assembleServer`.
 
 ### 6. Agente de registro
 
