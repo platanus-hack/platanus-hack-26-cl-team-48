@@ -9,10 +9,15 @@ const TOKEN = "token-123";
 type Call = { readonly url: string; readonly init: RequestInit | undefined };
 type Reply = { readonly status: number; readonly body?: unknown } | Error;
 
-function setup(reply: Reply = { status: 200, body: {} }, token: string | undefined = TOKEN) {
+function urlOf(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+function setup(reply: Reply = { status: 200, body: {} }, hasToken = true) {
   const calls: Call[] = [];
   const fakeFetch = (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
-    calls.push({ url: String(input), init });
+    calls.push({ url: urlOf(input), init });
     if (reply instanceof Error) return Promise.reject(reply);
     return Promise.resolve(
       new Response(reply.body === undefined ? null : JSON.stringify(reply.body), {
@@ -23,8 +28,8 @@ function setup(reply: Reply = { status: 200, body: {} }, token: string | undefin
   };
   const service = createHttpFeedService({
     baseUrl: BASE_URL,
-    getAccessToken: () => Promise.resolve(token),
-    fetch: fakeFetch as typeof fetch,
+    getAccessToken: () => Promise.resolve(hasToken ? TOKEN : undefined),
+    fetch: fakeFetch,
   });
   return { service, calls };
 }
@@ -120,7 +125,7 @@ describe("createHttpFeedService without a token", () => {
     ["saveProfile", (s: Service) => s.saveProfile(ANA_CARD)],
     ["extractProfile", (s: Service) => s.extractProfile({ text: "x" })],
   ])("returns UNAUTHENTICATED from %s and never calls fetch", async (_name, call) => {
-    const { service, calls } = setup({ status: 200, body: {} }, undefined);
+    const { service, calls } = setup({ status: 200, body: {} }, false);
 
     const result = await call(service);
 

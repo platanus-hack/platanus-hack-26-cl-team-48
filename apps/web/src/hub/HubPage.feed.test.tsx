@@ -64,12 +64,12 @@ describe("HubPage Para ti", () => {
 
     const section = await forYou();
 
-    expect({
-      text: await within(section).findByText(
-        "Completa tu perfil para ver con quién puedes colaborar.",
-      ),
-      href: within(section).getByRole("link", { name: "Completar perfil" }).getAttribute("href"),
-    }).toEqual({ text: expect.anything(), href: "/u/ana" });
+    expect(
+      await within(section).findByText("Completa tu perfil para ver con quién puedes colaborar."),
+    ).toBeTruthy();
+    expect(
+      within(section).getByRole("link", { name: "Completar perfil" }).getAttribute("href"),
+    ).toBe("/u/ana");
   });
 
   it("shows one item per hit with its title", async () => {

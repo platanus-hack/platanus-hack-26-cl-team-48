@@ -150,7 +150,7 @@ describe("ProfilePage registration", () => {
 
     expect(await screen.findByText("Revisa la ficha antes de guardar.")).toBeTruthy();
     expect({
-      about: (within(form).getByLabelText("Sobre ti") as HTMLTextAreaElement).value,
+      about: within(form).getByRole<HTMLTextAreaElement>("textbox", { name: "Sobre ti" }).value,
       saved: saveProfile.mock.calls.length,
     }).toEqual({ about: ANA_CARD.about, saved: 0 });
   });

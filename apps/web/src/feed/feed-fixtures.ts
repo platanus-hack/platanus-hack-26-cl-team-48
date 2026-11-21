@@ -49,15 +49,19 @@ export function componentHit(kind: "node" | "flow", id: string, title: string): 
   return { kind, id, title, payload: {}, similarity: 0.8 };
 }
 
-/** A hand-written fake: every operation succeeds with an empty result unless overridden. */
+/** A hand-written fake: every operation succeeds with an empty result unless overridden; each override runs inside the spy the result exposes. */
 export function createFakeFeed(overrides: Partial<FeedService> = {}) {
-  const search = vi.fn<FeedService["search"]>(() => Promise.resolve(ok([])));
-  const matches = vi.fn<FeedService["matches"]>(() => Promise.resolve(ok([])));
-  const card = vi.fn<FeedService["card"]>(() => Promise.resolve(ok(undefined)));
-  const saveProfile = vi.fn<FeedService["saveProfile"]>(() => Promise.resolve(ok(MINIMAL_CARD)));
-  const extractProfile = vi.fn<FeedService["extractProfile"]>(() =>
-    Promise.resolve(ok(MINIMAL_CARD)),
+  const search = vi.fn<FeedService["search"]>(overrides.search ?? (() => Promise.resolve(ok([]))));
+  const matches = vi.fn<FeedService["matches"]>(
+    overrides.matches ?? (() => Promise.resolve(ok([]))),
   );
-  const feed: FeedService = { search, matches, card, saveProfile, extractProfile, ...overrides };
+  const card = vi.fn<FeedService["card"]>(overrides.card ?? (() => Promise.resolve(ok(undefined))));
+  const saveProfile = vi.fn<FeedService["saveProfile"]>(
+    overrides.saveProfile ?? (() => Promise.resolve(ok(MINIMAL_CARD))),
+  );
+  const extractProfile = vi.fn<FeedService["extractProfile"]>(
+    overrides.extractProfile ?? (() => Promise.resolve(ok(MINIMAL_CARD))),
+  );
+  const feed: FeedService = { search, matches, card, saveProfile, extractProfile };
   return { feed, search, matches, card, saveProfile, extractProfile };
 }
