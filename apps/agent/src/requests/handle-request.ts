@@ -6,6 +6,8 @@ import {
   type LoopOutcome,
 } from "../loop/agent-loop.ts";
 import type { McpPort, UserIdentity } from "../mcp/mcp-port.ts";
+import { buildProposal } from "../proposals/build-proposal.ts";
+import type { ProposalStorePort } from "../proposals/proposal-store-port.ts";
 import { SYSTEM_PROMPT } from "../prompts/system.ts";
 import { REQUEST_ALLOWLIST } from "./allowlists.ts";
 import { recordDrafts } from "./draft-recorder.ts";
@@ -16,6 +18,7 @@ export type RequestDeps = {
   readonly identity: IdentityPort;
   readonly llm: LlmPort;
   readonly mcp: McpPort;
+  readonly proposals?: ProposalStorePort;
   readonly limits?: LoopLimits;
 };
 
@@ -44,31 +47,68 @@ const loopFailure = (error: LoopError): HttpReply =>
     ? reply(HTTP_GATEWAY_TIMEOUT, "timeout")
     : reply(HTTP_BAD_GATEWAY, "upstream_unavailable");
 
-function success(outcome: LoopOutcome, draftId: string | undefined): HttpReply {
-  const body = { summary: outcome.text, steps: outcome.steps };
-  return { status: HTTP_OK, body: draftId === undefined ? body : { draftId, ...body } };
+type ProposalPayload = {
+  readonly proposalId: string;
+  readonly cards: readonly unknown[];
+};
+
+function success(
+  outcome: LoopOutcome,
+  draftId: string | undefined,
+  proposalData: ProposalPayload | null,
+): HttpReply {
+  const body = {
+    summary: outcome.text,
+    steps: outcome.steps,
+    ...(draftId ? { draftId } : {}),
+    ...(proposalData ? { proposalId: proposalData.proposalId, cards: proposalData.cards } : {}),
+  };
+  return { status: HTTP_OK, body };
 }
 
-/** The loop ships a generic prompt; the request flow replaces it with the product prompt. */
 const withSystemPrompt = (llm: LlmPort): LlmPort => ({
   complete: (request) => llm.complete({ ...request, system: SYSTEM_PROMPT }),
 });
 
+async function buildProposalData(
+  deps: RequestDeps,
+  identity: UserIdentity,
+  input: { readonly draftId: string; readonly flowId?: string | undefined },
+): Promise<ProposalPayload | null> {
+  if (!deps.proposals) return null;
+  const outcome = await buildProposal({
+    mcp: deps.mcp,
+    llm: deps.llm,
+    identity,
+    draftId: input.draftId,
+    flowId: input.flowId ?? input.draftId,
+  });
+  if (!outcome.ok || !outcome.value) return null;
+  const { proposal, cards } = outcome.value;
+  await deps.proposals.save({ proposal, cards, ownerId: identity.userId });
+  return { proposalId: proposal.id, cards };
+}
+
 async function runRequest(
   deps: RequestDeps,
   identity: UserIdentity,
-  goal: string,
+  request: { readonly goal: string; readonly flowId?: string | undefined },
 ): Promise<HttpReply> {
   const recorder = recordDrafts(deps.mcp);
   const outcome = await runAgentLoop({
     llm: withSystemPrompt(deps.llm),
     mcp: recorder.mcp,
     identity,
-    goal,
+    goal: request.goal,
     allowlist: REQUEST_ALLOWLIST,
     ...(deps.limits ? { limits: deps.limits } : {}),
   });
-  return outcome.ok ? success(outcome.value, recorder.lastDraftId()) : loopFailure(outcome.error);
+  if (!outcome.ok) return loopFailure(outcome.error);
+  const draftId = recorder.lastDraftId();
+  const proposal = draftId
+    ? await buildProposalData(deps, identity, { draftId, flowId: request.flowId })
+    : null;
+  return success(outcome.value, draftId, proposal);
 }
 
 export function createHandleRequest(deps: RequestDeps) {
@@ -77,6 +117,9 @@ export function createHandleRequest(deps: RequestDeps) {
     if (!identity.ok) return authFailure(identity.error);
     const body = parseRequestBody(input.rawBody);
     if (!body.ok) return reply(HTTP_BAD_REQUEST, body.error);
-    return runRequest(deps, identity.value, toGoalMessage(body.value));
+    return runRequest(deps, identity.value, {
+      goal: toGoalMessage(body.value),
+      flowId: body.value.flowId,
+    });
   };
 }
