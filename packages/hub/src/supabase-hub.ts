@@ -11,6 +11,7 @@ import type {
   SignInMethod,
 } from "./hub.ts";
 import { toProfile, toSummaries, toVersion, toVersionSummaries } from "./hub-rows.ts";
+import { profileChangeOf } from "./profile-change.ts";
 import { parseSnapshot, type Snapshot } from "./snapshot.ts";
 import type { FlowStore } from "./flow-store.ts";
 import { createHubClient, fromPostgrest, type HubClient } from "./supabase-client.ts";
@@ -47,7 +48,10 @@ export function createHubOnClient(client: HubClient, redirectTo: () => string): 
         setTimeout(() => {
           void (
             session === null ? Promise.resolve(undefined) : profileById(client, session.user.id)
-          ).then(listener);
+          ).then((profile) => {
+            const change = profileChangeOf(session !== null, profile);
+            if (change !== undefined) listener(change.profile);
+          });
         }, 0);
       });
       return () => {

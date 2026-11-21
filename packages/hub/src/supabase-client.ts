@@ -8,7 +8,7 @@ export type HubClient = ReturnType<typeof createHubClient>;
 
 // Postgres error codes the hub's rules raise (see supabase/migrations).
 const CHECK_VIOLATION = "23514";
-const INSUFFICIENT_PRIVILEGE = "42501";
+export const INSUFFICIENT_PRIVILEGE = "42501";
 
 export function fromPostgrest(error: PostgrestError): HubError {
   switch (error.code) {

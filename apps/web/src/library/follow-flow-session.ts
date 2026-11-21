@@ -19,8 +19,12 @@ export function followFlowSession({ hub, stores, saving, initialProfileId }: Flo
   });
 }
 
+/** A flow saved in the account leaves with it, so the next account to sign in cannot copy it. */
 function signOut(stores: AppStores) {
-  stores.savedFlowStore.setState({ currentId: undefined, flows: [], status: "signed-out" });
+  const saved = stores.savedFlowStore;
+  const wasSaved = saved.getState().currentId !== undefined;
+  saved.setState({ currentId: undefined, flows: [], status: "signed-out" });
+  if (wasSaved) void saved.getState().newFlow();
 }
 
 async function signIn(stores: AppStores, saving: FlowSessionDeps["saving"]) {

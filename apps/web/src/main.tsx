@@ -2,6 +2,7 @@ import { createIdbFlowLibrary } from "./library/idb-flow-library.ts";
 import { startFlowSaving } from "./library/flow-saving.ts";
 import { createCloudFlowLibrary } from "./library/cloud-flow-library.ts";
 import { followFlowSession } from "./library/follow-flow-session.ts";
+import { keepPendingFlow, takePendingFlow } from "./library/pending-flow.ts";
 import "@nodomics/ui/tokens.css";
 import "@nodomics/ui/fonts.css";
 import "@nodomics/ui/components.css";
@@ -34,9 +35,13 @@ import { followStoredTheme } from "./theme/theme-sync.ts";
 
 // Composition root: the one place that reads the URL, creates the stores and picks the engines.
 const shared = decodeSharedFlow(window.location.hash);
+// The hub has its own tab; the editor tab owns the open flow and saves it.
+const isHubTab = routeOf(window.location.pathname).page !== "workspace";
+// What was left unsaved before signing in with a provider, which navigates away (ADR 0023).
+const pending = isHubTab ? undefined : takePendingFlow(window.sessionStorage);
 const hub = createAppHub(import.meta.env);
 const stores = createAppStores(
-  shared?.ok === true ? shared.value : undefined,
+  shared?.ok === true ? shared.value : pending,
   createStoragePersonalLibrary(() => window.localStorage),
   createCloudFlowLibrary({ flows: hub, local: createIdbFlowLibrary(() => window.indexedDB) }),
 );
@@ -47,9 +52,6 @@ if (shared?.ok === false)
     detail: describeFlowFileError(shared.error),
   });
 
-// The hub has its own tab; the editor tab owns the open flow and saves it.
-const isHubTab = routeOf(window.location.pathname).page !== "workspace";
-
 // Mis nodos changes in the hub tab, and the editor tab must see it.
 window.addEventListener("storage", (event) => {
   if (event.key === PERSONAL_NODES_KEY) stores.personalLibraryStore.getState().reload();
@@ -59,7 +61,8 @@ if (!isHubTab) await startEditorFlow();
 
 async function startEditorFlow() {
   const profile = await hub.currentProfile();
-  await stores.savedFlowStore.getState().initialize(shared !== undefined);
+  const hasOpenFlow = shared !== undefined || pending !== undefined;
+  await stores.savedFlowStore.getState().initialize(hasOpenFlow);
   const saving = startFlowSaving({
     stores,
     timers: {
@@ -72,6 +75,16 @@ async function startEditorFlow() {
     now: Date.now,
   });
   followFlowSession({ hub, stores, saving, initialProfileId: profile?.id });
+  keepUnsavedFlowOnLeave();
+  if (pending !== undefined && profile !== undefined) await saving.saveCurrent();
+}
+
+function keepUnsavedFlowOnLeave() {
+  window.addEventListener("pagehide", () => {
+    const { flow } = stores.flowStore.getState().state;
+    const isUnsaved = stores.savedFlowStore.getState().status === "signed-out";
+    if (isUnsaved && flow.nodes.length > 0) keepPendingFlow(window.sessionStorage, flow);
+  });
 }
 
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);

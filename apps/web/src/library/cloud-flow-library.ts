@@ -1,4 +1,4 @@
-import type { FlowStore, HubError, StoredFlow } from "@nodomics/hub";
+import type { FlowDraft, FlowStore, HubError, StoredFlow } from "@nodomics/hub";
 import type { Result } from "@nodomics/protocol";
 import type { FlowLibrary, LibraryIssue, LibraryResult, SavedFlow } from "./flow-library.ts";
 import { parseSavedFlow } from "./parse-saved-flow.ts";
@@ -26,8 +26,9 @@ export function createCloudFlowLibrary({ flows, local }: CloudFlowLibraryDeps): 
   };
 }
 
-function draftOf({ visibility = "private", ...document }: SavedFlow) {
-  return { id: document.id, visibility, document };
+/** Without a visibility the hub keeps the flow's own, so a save never undoes "Hacer público". */
+function draftOf({ visibility, ...document }: SavedFlow): FlowDraft {
+  return { id: document.id, ...(visibility === undefined ? {} : { visibility }), document };
 }
 
 function savedFlowOf(stored: StoredFlow): SavedFlow | undefined {

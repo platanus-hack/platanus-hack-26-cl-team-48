@@ -3,11 +3,9 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import type { FlowStore, StoredFlow } from "./flow-store.ts";
 import type { HubError, HubResult } from "./hub.ts";
 import { toStoredFlow } from "./hub-rows.ts";
-import { fromPostgrest, type HubClient } from "./supabase-client.ts";
+import { fromPostgrest, INSUFFICIENT_PRIVILEGE, type HubClient } from "./supabase-client.ts";
 
 const FLOWS_TABLE = "flows";
-// Row level security refuses an upsert over someone else's flow with this code.
-const INSUFFICIENT_PRIVILEGE = "42501";
 const INVALID_ROW: HubError = { kind: "invalid", detail: "flows row" };
 
 /** Saved flows in the `flows` table (ADR 0023); row level security decides who sees what. */
@@ -32,9 +30,10 @@ export function createSupabaseFlowStore(client: HubClient): FlowStore {
       if (error !== null) return err(fromPostgrest(error));
       return data === null ? ok(undefined) : storedFlowOrInvalid(data);
     },
-    saveOwnFlow: async ({ id, visibility, document }) => {
+    saveOwnFlow: async (draft) => {
       if ((await signedInUserId(client)) === undefined) return err({ kind: "signed-out" });
-      const { error } = await client.from(FLOWS_TABLE).upsert({ id, visibility, document });
+      // Without `visibility` the upsert leaves the column alone, or uses its default when new.
+      const { error } = await client.from(FLOWS_TABLE).upsert(draft);
       return error === null ? ok(undefined) : err(fromWrite(error));
     },
     deleteOwnFlow: async (id) => {
@@ -67,7 +66,7 @@ function storedFlowOrInvalid(row: unknown): HubResult<StoredFlow | undefined> {
   return flow === undefined ? err(INVALID_ROW) : ok(flow);
 }
 
-/** Signed in already, so a refusal means the flow belongs to someone else. */
+/** Signed in already, so row level security refusing it means the flow is someone else's. */
 function fromWrite(error: PostgrestError): HubError {
   return error.code === INSUFFICIENT_PRIVILEGE
     ? { kind: "invalid", detail: error.message }

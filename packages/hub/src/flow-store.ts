@@ -13,7 +13,8 @@ export type StoredFlow = {
 
 export type FlowDraft = {
   readonly id: string;
-  readonly visibility: FlowVisibility;
+  /** Missing keeps the flow's visibility; a new flow is private. */
+  readonly visibility?: FlowVisibility;
   readonly document: unknown;
 };
 

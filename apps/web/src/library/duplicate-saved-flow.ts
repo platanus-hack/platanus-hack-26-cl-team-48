@@ -12,6 +12,7 @@ export function duplicateSavedFlow(
   return {
     ...record,
     ...identity,
+    visibility: "private",
     name: MESSAGES.savedFlows.copy(saved.name),
     flow: { ...saved.flow, name: MESSAGES.savedFlows.copy(saved.name) },
     ...(node === undefined ? {} : { node }),

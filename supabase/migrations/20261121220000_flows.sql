@@ -12,18 +12,19 @@ create index flows_owner_updated_at on public.flows (owner_id, updated_at desc);
 
 alter table public.flows enable row level security;
 
+-- `(select auth.uid())` is evaluated once per query instead of once per row.
 create policy "owners and the public read flows" on public.flows for select
-  using (owner_id = auth.uid() or visibility = 'public');
+  using (owner_id = (select auth.uid()) or visibility = 'public');
 create policy "owners create flows" on public.flows for insert
-  with check (owner_id = auth.uid());
+  with check (owner_id = (select auth.uid()));
 create policy "owners edit flows" on public.flows for update
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+  using (owner_id = (select auth.uid())) with check (owner_id = (select auth.uid()));
 create policy "owners delete flows" on public.flows for delete
-  using (owner_id = auth.uid());
+  using (owner_id = (select auth.uid()));
 
 -- Every save rewrites the row; the server's clock orders "Mis flujos".
 create function public.touch_flow() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = '' as $$
 begin
   new.updated_at := now();
   return new;

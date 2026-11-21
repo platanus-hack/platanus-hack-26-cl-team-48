@@ -36,7 +36,7 @@ export function createMemoryFlowStore({ current, now }: MemoryFlowStoreOptions):
       flows.set(id, {
         id,
         ownerId: owner.id,
-        visibility,
+        visibility: visibility ?? flows.get(id)?.visibility ?? "private",
         document: structuredClone(document),
         updatedAt: now(),
       });

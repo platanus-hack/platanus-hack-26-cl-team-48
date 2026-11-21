@@ -61,10 +61,9 @@ async function saveFlow(deps: SavingDeps, flow: Flow) {
   store.setState({ currentId: id });
   const previous = report(await library.readFlow(id));
   const node = savedNode({ id, flow, previous: previous?.node }, savingCatalog(deps.stores, flow));
-  const result = await library.saveFlow({
-    ...savedFlowRecord({ id, flow, files, node, updatedAt: deps.now() }),
-    ...(previous?.visibility === undefined ? {} : { visibility: previous.visibility }),
-  });
+  const result = await library.saveFlow(
+    savedFlowRecord({ id, flow, files, node, updatedAt: deps.now() }),
+  );
   report(result);
   if (store.getState().generation !== generation) return;
   store.setState({ status: savedStatus(result.issue) });

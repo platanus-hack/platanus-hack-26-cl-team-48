@@ -28,8 +28,10 @@ Con el ADR 0015, "Mis flujos" vive en IndexedDB: es por navegador y por direcci�
 4. **Sin sesión se puede editar y ejecutar, pero no se guarda.**
    - La barra dice "Entra para guardar" y "Mis flujos" invita a entrar.
    - Al entrar, el flujo abierto se guarda en la cuenta, o, si el lienzo está vacío, se abre el último flujo de la cuenta.
-   - Al salir, la lista se vacía y el flujo abierto deja de estar asociado a un flujo guardado.
-5. **Visibilidad:** cada flujo de "Mis flujos" muestra si es privado o público y se cambia con "Hacer público" o "Hacer privado". Todo flujo nuevo es privado.
+   - Entrar con GitHub o Google navega fuera de la página. Para no perder lo hecho sin sesión, al salir de la página sin sesión el flujo abierto queda en `sessionStorage` (solo esa pestaña, sin listarse en "Mis flujos"); al volver se abre y, con sesión, se guarda en la cuenta.
+   - Al salir de la cuenta, la lista se vacía. Si el flujo abierto estaba guardado en la cuenta, el lienzo se vacía también: así no se copia a la próxima cuenta que entre, ni se duplica al volver a entrar. Un flujo hecho sin sesión se queda en el lienzo.
+   - Solo cuenta como salir una sesión que termina, no una consulta del perfil que falla.
+5. **Visibilidad:** cada flujo de "Mis flujos" muestra si es privado o público y se cambia con "Hacer público" o "Hacer privado". Todo flujo nuevo es privado, y también toda copia hecha con "Duplicar". El guardado automático no envía la visibilidad: solo "Hacer público" y "Hacer privado" la cambian, para que un guardado no pise un cambio de visibilidad hecho al mismo tiempo.
 6. **Los flujos locales existentes se ignoran.** El almacén `flows` de IndexedDB ya no se lee ni se escribe. Quien quiera conservar uno lo exporta antes desde una versión anterior.
 7. **Sin claves de Supabase**, el hub en memoria trae una cuenta local de prueba. Así se puede entrar y guardar en desarrollo y en los e2e, aunque todo se pierde al recargar.
 
