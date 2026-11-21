@@ -1,0 +1,101 @@
+/* The Feed: collaboration card, its editor and the people list (ADR 0022). */
+
+.web-feed-section {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.web-feed-section h2 {
+  margin: 0;
+  font: var(--text-title);
+}
+
+.web-feed-card {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  font: var(--text-body);
+}
+
+.web-feed-card p {
+  margin: 0;
+}
+
+.web-feed-card ul,
+.web-feed-people {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.web-feed-domains {
+  list-style: none;
+  padding-left: 0;
+}
+
+.web-feed-list-title {
+  margin: 0;
+  color: var(--ink-muted);
+  font: var(--text-label);
+}
+
+.web-feed-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.web-feed-people {
+  list-style: none;
+  padding-left: 0;
+  font: var(--text-body);
+}
+
+.web-feed-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-2);
+  background: var(--surface-300);
+  border: var(--stroke-hairline) solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: var(--text-body-sm);
+  resize: vertical;
+}
+
+.web-feed-textarea:focus-visible {
+  border-color: var(--focus-ring);
+  outline: none;
+  box-shadow: 0 0 0 var(--stroke-hairline) var(--focus-ring);
+}
+
+.web-feed-registration {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: var(--stroke-hairline) dashed var(--ai-pending);
+  border-radius: var(--radius-md);
+}
+
+.web-feed-registration legend {
+  padding: 0 var(--space-2);
+  color: var(--ai-pending);
+  font: var(--text-label);
+}
+
+.web-feed-domain-rows {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.web-feed-domain-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-3);
+  align-items: end;
+  width: 100%;
+}

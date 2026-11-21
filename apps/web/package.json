@@ -22,6 +22,7 @@
     "@nodomics/engine-browser": "workspace:*",
     "@nodomics/engine-mock": "workspace:*",
     "@nodomics/hub": "workspace:*",
+    "@nodomics/profile": "workspace:*",
     "@nodomics/protocol": "workspace:*",
     "@nodomics/ui": "workspace:*",
     "@xyflow/react": "12.12.0",
