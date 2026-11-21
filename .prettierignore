@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+docs/
+packages/ui/src/fonts/
+packages/ui/src/tokens.css
+packages/ui/src/components.css
+*.md
+.claude/
