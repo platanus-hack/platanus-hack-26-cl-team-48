@@ -612,7 +612,22 @@ describe("HubPage Etiquetas filter", () => {
     await waitFor(() => {
       expect(cardTitles()).toEqual(["Limpiar texto"]);
     });
-    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("stops offering an unpressed tag that no listed publication has", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+    await userEvent.click(kindChip("Nodos"));
+    await waitFor(() => {
+      expect(cardTitles()).toEqual([]);
+    });
+
+    await userEvent.click(tagButton("comercial"));
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["texto"]);
+    });
   });
 
   it("keeps offering a pressed tag after the text changes", async () => {
