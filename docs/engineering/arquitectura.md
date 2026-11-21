@@ -44,6 +44,7 @@ Patrones que dan forma al sistema (catálogo completo, con criterios de verifica
 | `packages/nodes-core` | Nodos oficiales como datos (`node.json`, `main.py`) y sus casos de prueba | Código TypeScript ejecutable por nodo |
 | `packages/hub` | Puerto `Hub` (perfiles, publicar, buscar, versiones), sus adaptadores (Supabase y memoria), el formato de la instantánea y el parseo de lo que llega de la red (ADR 0018) | Conocer el motor, el NEP en vivo o la interfaz |
 | `apps/web` | Interfaz: lienzo, formularios generados por JSON Schema, vistas, estado de edición, compartir, hub | Importar algo que no sea `protocol`, `client`, `ui` o `hub` |
+| `apps/agent` | Bucle del agente, cliente MCP, propuestas y Diff de Dominio, memoria | Escribir flujos fuera de la herramienta de escritura del MCP; ejecutar código; importar `apps/web` ni paquetes de motor |
 | `engines/python-local` | Ejecutor Python local por WebSocket (`duckdb`, `pandas`, `pyarrow`) | Lógica de grafo (en la PoC la hace el coordinador TS) |
 | `tests/conformance` | Flujos de referencia que corren contra cada motor y comparan resultados | Probar detalles internos de un motor |
 
@@ -54,6 +55,7 @@ protocol, rpc  ←  client  ←  apps/web  →  ui
                              apps/web  →  hub  →  protocol
 protocol, rpc  ←  coordinator  ←  engine-browser  →  executor-duckdb-wasm, executor-pyodide
 protocol, rpc  ←  engine-mock
+protocol       ←  apps/agent
 protocol       ←  executor-*       (implementan la interfaz Executor definida en protocol)
 ```
 
