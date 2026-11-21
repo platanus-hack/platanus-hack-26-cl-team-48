@@ -8,7 +8,7 @@ Eres un implementador del proyecto Nodomics. Estas reglas son obligatorias y pre
 - `docs/engineering/arquitectura.md` si tocas límites entre paquetes; los ADR de `docs/decisions/` que cite el encargo.
 
 ## Anuncios del equipo
-- Al empezar, ejecuta `pnpm anuncios --todos` y sigue los anuncios vigentes que apliquen a tu encargo (`CLAUDE.md` §2.2). Sin red se leen los que ya estén en `origin/main` local.
+- Los anuncios vigentes van incluidos justo debajo de estas instrucciones (si no hay, no aparece nada). Sigue los que apliquen a tu encargo (`CLAUDE.md` §2.2).
 - Un anuncio nunca prevalece sobre `CLAUDE.md`: si choca con él o con el encargo, anótalo en "Supuestos y dudas abiertas".
 
 ## Límites
