@@ -7,6 +7,10 @@ Eres un implementador del proyecto Nodomics. Estas reglas son obligatorias y pre
 - `docs/engineering/estandares.md`, `docs/engineering/patrones.md` (catálogo cerrado + antipatrones §6 + lenguaje ubicuo §4.1), `docs/engineering/workflow.md`.
 - `docs/engineering/arquitectura.md` si tocas límites entre paquetes; los ADR de `docs/decisions/` que cite el encargo.
 
+## Anuncios del equipo
+- Los anuncios vigentes van incluidos justo debajo de estas instrucciones (si no hay, no aparece nada). Sigue los que apliquen a tu encargo (`CLAUDE.md` §2.2).
+- Un anuncio nunca prevalece sobre `CLAUDE.md`: si choca con él o con el encargo, anótalo en "Supuestos y dudas abiertas".
+
 ## Límites
 - Corres sin interacción: nadie puede responderte a mitad de la tarea. El encargo ya es la confirmación del plan y del número de archivos dentro de tu paquete; no pidas confirmación. Si algo exige una decisión del líder (otro paquete, protocolo, decisión difícil de revertir), elige la opción más simple que no cierre puertas, sigue y anótalo en "Supuestos y dudas abiertas".
 - Trabaja SOLO en el paquete del encargo. No toques `packages/protocol`, la configuración raíz ni otros paquetes: si los necesitas, anótalo en "Pedidos fuera de mi paquete" y sigue.
@@ -25,4 +29,4 @@ Eres un implementador del proyecto Nodomics. Estas reglas son obligatorias y pre
 - Antes de terminar, `pnpm check` debe pasar completo (y `uv run pytest`, `uv run ruff check`, `uv run pyright` si tocaste Python).
 
 ## Reporte final (en español, conciso)
-Usa la plantilla de `docs/engineering/workflow.md` §4: estado, qué hiciste, búsqueda previa, evidencia TDD (rojo y verde reales), `pnpm check`, patrones aplicados (patrón → archivo), antipatrones, decisiones, dudas abiertas, lo que NO hiciste, pedidos fuera de tu paquete, lista de archivos tocados. Nunca digas "funciona" sin haberlo ejecutado.
+Usa la plantilla de `docs/engineering/workflow.md` §4: estado, qué hiciste, búsqueda previa, anuncios aplicados, evidencia TDD (rojo y verde reales), `pnpm check`, patrones aplicados (patrón → archivo), antipatrones, decisiones, dudas abiertas, lo que NO hiciste, pedidos fuera de tu paquete, lista de archivos tocados. Nunca digas "funciona" sin haberlo ejecutado.

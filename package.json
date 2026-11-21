@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "e2e": "pnpm --filter @nodomics/e2e e2e",
     "prepare": "lefthook install",
-    "names": "node scripts/check-file-names.ts"
+    "names": "node scripts/check-file-names.ts",
+    "anuncios": "node scripts/show-announcements.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

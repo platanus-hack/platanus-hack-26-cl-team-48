@@ -5,6 +5,8 @@ HERE=${0:A:h}
 codex exec -C "$W" -s workspace-write -o "$OUT/impl-$NAME.md" < /dev/null \
   "$(cat "$HERE/preamble.md")
 
+$(cd "$W" && node scripts/show-announcements.ts --hook --todos 2>/dev/null)
+
 ---
 
 $(cat "$BRIEF")" > "$OUT/impl-$NAME.log" 2>&1

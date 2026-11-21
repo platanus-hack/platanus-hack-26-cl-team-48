@@ -186,23 +186,48 @@ body {
   outline-offset: var(--stroke-hairline);
 }
 
-/* Top bar --------------------------------------------------------------------------------- */
+/* App bar: one strip, the same in the editor and the hub ---------------------------------- */
 
 .web-toolbar {
   position: relative;
-  z-index: calc(var(--z-panel) + 1);
+  z-index: calc(var(--z-panel) + 2);
   grid-row: 1;
   grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--space-2);
-  pointer-events: none;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-12);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  box-sizing: border-box;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
 }
 
-.web-toolbar-spacer {
-  flex: 1 1 0;
+.web-toolbar-start,
+.web-toolbar-middle,
+.web-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
+}
+
+.web-toolbar-start {
+  gap: var(--space-4);
+}
+
+.web-toolbar-middle {
+  grid-column: 2;
+}
+
+.web-toolbar-end {
+  grid-column: 3;
+  justify-content: flex-end;
 }
 
 .web-toolbar-group {
@@ -212,9 +237,71 @@ body {
 }
 
 .web-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
-  padding: 0 var(--space-1);
   font: var(--text-title-sm);
+  white-space: nowrap;
+}
+
+.web-brand-mark {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  transform: rotate(45deg) scale(0.75);
+}
+
+.web-sections .web-seg-button {
+  text-decoration: none;
+}
+
+.web-sections .web-seg-button[aria-current="page"] {
+  background: var(--surface-300);
+  color: var(--ink);
+  box-shadow: var(--shadow-node);
+}
+
+.web-toolbar .web-flow-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: auto;
+}
+
+.web-toolbar .web-flow-name .nd-input {
+  width: calc(var(--node-width) - var(--space-12));
+  border-color: transparent;
+  background: transparent;
+  font: var(--text-label);
+}
+
+.web-toolbar .web-flow-name .nd-input:hover,
+.web-toolbar .web-flow-name .nd-input:focus-within {
+  border-color: var(--line);
+  background: var(--surface-sunken);
+}
+
+.web-toolbar .web-flow-name .web-caption {
+  white-space: nowrap;
+}
+
+.web-canvas-controls {
+  position: absolute;
+  z-index: var(--z-panel);
+  left: var(--edge-left);
+  bottom: var(--zoom-bottom);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.web-preview-location {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(var(--space-1) - var(--stroke-hairline)) var(--space-2);
 }
 
 .web-island-caption {
@@ -307,10 +394,6 @@ body {
 }
 
 .web-canvas-zoom {
-  position: absolute;
-  z-index: var(--z-panel);
-  left: var(--edge-left);
-  bottom: var(--zoom-bottom);
   display: flex;
   align-items: center;
   gap: var(--space-0);
@@ -1175,11 +1258,17 @@ body {
   flex-direction: column;
   align-items: stretch;
   width: max-content;
+  min-width: calc(var(--node-width) * 0.8);
+  margin-top: var(--space-1);
   padding: var(--space-1);
   background: var(--surface-300);
   border: var(--stroke-hairline) solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-pop);
+}
+
+.web-icon-menu-items .nd-btn {
+  justify-content: flex-start;
 }
 
 .web-notice {

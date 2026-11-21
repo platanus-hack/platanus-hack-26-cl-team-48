@@ -12,7 +12,8 @@ Antes de escribir código:
 4. Busca si ya existe lo que vas a crear (`grep -r` por concepto y sinónimos en `packages/`, `apps/`, `engines/` y `docs/decisions/`). Reutiliza lo que exista.
 
 Mientras trabajas:
-- TDD estricto: escribe el test, **ejecútalo y míralo fallar**, implementa lo mínimo, vuelve a ejecutar y refactoriza en verde. Guarda los extractos de la salida en rojo y en verde para el reporte.
+- TDD estricto con tests ajenos: **no escribes tus propios tests**. Recibes los que escribió el agente `test-writer`, **los ejecutas y los miras fallar**, implementas lo mínimo, vuelves a ejecutar y refactorizas en verde. Guarda los extractos de la salida en rojo y en verde para el reporte.
+- No edites ni borres tests ajenos. Si uno te parece incorrecto o falta un caso, repórtalo al líder.
 - Respeta SLAP, SOLID, variables inline, comentarios solo para el porqué y los invariantes de `CLAUDE.md` §1.
 - Aplica los patrones con la forma exacta de `patrones.md`, evita sus antipatrones (§6) y usa el lenguaje ubicuo (§4.1) en nombres de código, tests y textos.
 - No toques otros paquetes ni `packages/protocol`. Si los necesitas, anótalo como pedido en el reporte y sigue con lo que puedas hacer.

@@ -8,9 +8,10 @@ Este proceso existe para que el trabajo de varios agentes en paralelo termine si
 |---|---|---|---|
 | **Líder** | La sesión principal | Divide el trabajo, escribe los encargos, es dueño de `packages/protocol` y de los ADRs, integra, corre las puertas de calidad finales, decide en conflictos | Implementar dentro del paquete de otro agente mientras ese agente trabaja |
 | **Implementador** | Subagente, uno por paquete | Implementa su encargo con TDD dentro de su paquete y reporta | Tocar otros paquetes o el protocolo; aprobarse a sí mismo |
+| **Autor de tests** | Subagente independiente (`.claude/agents/test-writer.md`) | Escribe los tests de un encargo a partir de sus criterios y de la API pública, sin ver la implementación | Implementar; leer o adaptar los tests al código existente; escribir tests para su propio código |
 | **Revisor** | Subagente independiente (`.claude/agents/reviewer.md`) | Revisa el cambio contra los estándares y verifica con comandos; reporta hallazgos | Editar código; revisar su propio trabajo |
 
-Un agente nunca revisa su propio trabajo.
+Un agente nunca revisa su propio trabajo ni escribe los tests de lo que él mismo implementa.
 
 ### Implementadores y revisores de dos familias de modelos
 
@@ -28,17 +29,20 @@ Para repartir el consumo y obtener revisiones sin sesgo, el trabajo se reparte e
 ## 2. Ciclo de una tarea
 
 ```
-Encargo → Entender → Buscar lo existente → Plan → TDD (rojo → verde → refactor)
+Encargo → Entender → Buscar lo existente → Plan → Tests del autor de tests
+       → TDD del implementador (rojo → verde → refactor)
        → pnpm check → Autorrevisión → Reporte → Revisión independiente
        → Correcciones → Integración por el líder → Puertas finales
 ```
 
 | Paso | Qué se exige | Cómo se verifica |
 |---|---|---|
+| Anuncios | `pnpm anuncios` al empezar y antes de cada commit (`CLAUDE.md` §2.2) | El reporte lista los anuncios aplicados |
 | Entender | Criterios de aceptación listados en el plan | Aparecen en el reporte |
 | Buscar lo existente | `grep` por concepto y sinónimos en `packages/`, `apps/`, `docs/decisions/` | El reporte lista qué se buscó y qué se reutilizó |
 | Plan | Pasos y archivos a tocar | Si toca otros paquetes, se detiene y pregunta |
-| TDD | Test visto en rojo antes de implementar | El reporte incluye la salida en rojo y luego en verde |
+| Tests | Los escribe el autor de tests desde los criterios, sin ver la implementación | El reporte nombra qué agente los escribió |
+| TDD | Test visto en rojo antes de implementar; el implementador no edita tests ajenos | El reporte incluye la salida en rojo y luego en verde |
 | `pnpm check` | Todo en verde | El revisor lo vuelve a ejecutar |
 | Autorrevisión | Checklist de `CLAUDE.md` §7 | Marcada en el reporte |
 | Revisión | Hallazgos verificados | Informe del revisor |
@@ -77,7 +81,9 @@ Todo encargo usa esta forma. Un encargo que no la cumple se devuelve al líder.
 
 **Búsqueda previa:** <qué busqué, qué encontré, qué reutilicé>
 
-**Evidencia TDD:**
+**Anuncios aplicados:** <archivos de `docs/anuncios/` que aplican a la tarea; "ninguno" si no hay>
+
+**Evidencia TDD:** (tests escritos por: <agente>)
 - Rojo: <comando + extracto de la salida del test fallando>
 - Verde: <comando + extracto de la salida pasando>
 

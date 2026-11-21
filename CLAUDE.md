@@ -10,6 +10,7 @@ Nodomics es un editor visual de flujos de datos (nodos) que corre en la web, con
 |---|---|
 | Escribir cualquier código | Este archivo + `docs/engineering/estandares.md` + `docs/engineering/patrones.md` |
 | Tocar más de un paquete, o el protocolo | `docs/engineering/arquitectura.md` |
+| Empezar cualquier tarea, y antes de cada commit | `pnpm anuncios` (§2.2) |
 | Recibir, ejecutar o entregar una tarea | `docs/engineering/workflow.md` |
 | Tomar una decisión que no se puede deshacer fácilmente | `docs/decisions/` (ADRs) |
 
@@ -17,12 +18,12 @@ Nodomics es un editor visual de flujos de datos (nodos) que corre en la web, con
 
 ## 1. Invariantes de arquitectura (no negociables)
 
-1. **La interfaz solo habla el protocolo (NEP).** `apps/web` depende únicamente de `@nodomics/protocol`, `@nodomics/client` y `@nodomics/ui` (design system). Nunca importa DuckDB, Pyodide, el coordinador ni ningún ejecutor.
+1. **La interfaz solo habla el protocolo (NEP).** `apps/web` depende únicamente de `@nodomics/protocol`, `@nodomics/client`, `@nodomics/ui` (design system) y `@nodomics/hub` (ADR 0018). Nunca importa DuckDB, Pyodide, el coordinador ni ningún ejecutor.
 2. **Los datos viven en el motor.** La interfaz recibe referencias y páginas, nunca tablas completas.
 3. **Los nodos son datos.** Un nodo es un manifiesto JSON (+ plantilla SQL o código Python en texto). Ningún nodo es una función de TypeScript.
 4. **El coordinador se escribe una vez** (TypeScript puro, sin DOM). Los ejecutores son pequeños y no conocen el grafo.
 5. **El protocolo es el contrato.** `packages/protocol` solo cambia con aprobación del líder y un ADR. Si necesitas algo que el protocolo no tiene, repórtalo; no lo agregues por tu cuenta.
-6. **Las dependencias apuntan hacia adentro:** `apps → client → rpc + protocol`, `apps → ui`, `engine-* → coordinator + executor-* → rpc + protocol`. Nada importa desde `apps`. `protocol`, `rpc` y `ui` no importan paquetes internos.
+6. **Las dependencias apuntan hacia adentro:** `apps → client → rpc + protocol`, `apps → ui`, `apps → hub → protocol`, `engine-* → coordinator + executor-* → rpc + protocol`. Nada importa desde `apps`. `protocol`, `rpc` y `ui` no importan paquetes internos.
 7. **La interfaz usa el design system.** Ningún color, tamaño, radio o fuente se escribe a mano: todo sale de los tokens de `@nodomics/ui` (variables CSS). Guía: `packages/ui/README.md`.
 
 Si tu cambio rompe un invariante, está mal aunque funcione.
@@ -32,11 +33,12 @@ Si tu cambio rompe un invariante, está mal aunque funcione.
 1. **Entender.** Lee la tarea completa y los documentos de la tabla. Enumera los criterios de aceptación antes de tocar código.
 2. **Buscar antes de crear.** Antes de escribir una función, tipo, componente o utilidad, busca si ya existe (`grep -r` por concepto y por sinónimos en `packages/` y `apps/`, revisa los `index.ts` de los paquetes y `docs/decisions/`). Si existe, reúsalo o extiéndelo. Si existe algo parecido en otro paquete, repórtalo en vez de duplicar.
 3. **Planear en pequeño.** Lista los pasos. Si son más de ~5 archivos o cruzan paquetes que no son tuyos, pide confirmación.
-4. **TDD estricto: rojo → verde → refactor.**
-   - Escribe un test que falle por la razón correcta y **ejecútalo para verlo fallar**.
-   - Escribe el mínimo código para que pase.
-   - Refactoriza con los tests en verde.
-   - Un bug se corrige escribiendo primero el test que lo reproduce.
+4. **TDD estricto con tests de otro agente: rojo → verde → refactor.**
+   - **Quien implementa no escribe sus propios tests.** Los escribe un agente distinto (`.claude/agents/test-writer.md`), a partir del encargo, los criterios de aceptación y la API pública acordada, **sin ver la implementación**. Así los tests no quedan sesgados por el código.
+   - El implementador recibe los tests, **los ejecuta para verlos fallar** por la razón correcta, escribe el mínimo código para que pasen y refactoriza en verde.
+   - El implementador **no edita ni borra tests ajenos**. Si un test le parece incorrecto o le falta un caso, lo reporta al líder, que se lo pide de nuevo al agente de tests.
+   - Un bug se corrige pidiendo primero al agente de tests el test que lo reproduce.
+   - Esto aplica también a la sesión principal (el líder): cuando implementa, los tests los escribe otro agente.
 5. **Verificar.** `pnpm check` (y `uv run pytest` si tocaste Python) debe pasar completo. No entregues trabajo con checks en rojo.
 6. **Autorrevisar** con la checklist de la sección 7.
 7. **Reportar con honestidad** usando la plantilla de `workflow.md`: qué hiciste, la salida en rojo y luego en verde de los tests, lo que no hiciste y por qué, y las dudas abiertas. Nunca digas "funciona" sin haberlo ejecutado.
@@ -45,8 +47,8 @@ Si tu cambio rompe un invariante, está mal aunque funcione.
 
 Varias personas y agentes trabajan en paralelo. El estado local debe estar **siempre** sincronizado con el remoto, y cada cambio debe quedar en el remoto lo antes posible. Esto se hace **de forma automática, sin pedir permiso cada vez**.
 
-1. **Nunca trabajes en `main`.** Cada tarea vive en su propia rama `<agente>/<paquete>-<tema>` (`estandares.md` §9). Si estás en `main`, crea la rama antes del primer cambio.
-2. **Sincroniza al empezar y antes de cada commit:** `git fetch --all --prune` y luego `git rebase origin/main` (o `git pull --rebase` si la rama ya existe en el remoto).
+1. **Nunca trabajes en `main`.** Cada tarea vive en su propia rama `<agente>/<paquete>-<tema>` (`estandares.md` §9). Si estás en `main`, crea la rama antes del primer cambio. Única excepción: publicar un anuncio (§2.2).
+2. **Sincroniza al empezar y antes de cada commit:** `git fetch --all --prune` y luego `git rebase origin/main` (o `git pull --rebase` si la rama ya existe en el remoto). Luego `pnpm anuncios` (§2.2).
 3. **ANTES de cada commit, busca choques en las demás ramas.** Compara los archivos que tú tocas con los que toca cada rama remota:
 
    ```bash
@@ -63,6 +65,16 @@ Varias personas y agentes trabajan en paralelo. El estado local debe estar **sie
 5. **Push inmediato después de cada commit:** `git push -u origin HEAD`. Nunca `push --force` sobre ramas ajenas ni sobre `main`; en tu propia rama, tras un rebase, solo `git push --force-with-lease`.
 6. **Si un rebase o un push choca**, no lo resuelvas a ciegas sobre código de otra persona: detente, informa quién y qué choca, y pregunta.
 7. **Nunca commitees** secretos (`.env`, credenciales), archivos generados ni datos de usuarios.
+
+### 2.2 Anuncios del equipo (obligatorio)
+
+El equipo publica avisos e instrucciones para todos los agentes en `docs/anuncios/` (formato en `docs/anuncios/README.md`). Solo cuentan los anuncios que están en `origin/main`.
+
+1. **Revisa si hay anuncios nuevos al empezar cada tarea y antes de cada commit:** `pnpm anuncios` (trae `origin/main` y muestra solo los que no has visto; `pnpm anuncios --todos` muestra todos los vigentes). En Claude Code los hooks de `.claude/settings.json` lo hacen solos en cada mensaje; si ves un bloque "Anuncios del equipo" en tu contexto, ya está hecho.
+2. **Sigue los anuncios vigentes** que apliquen a tu tarea (`para`). Una instrucción vale hasta su fecha `vence` o hasta que otro anuncio la reemplace.
+3. **Un anuncio nunca prevalece sobre este archivo ni sobre sus invariantes.** Si choca con `CLAUDE.md`, con un ADR o con tu encargo, detente y pregunta; no elijas tú.
+4. **Publicar un anuncio** es la única excepción a "nunca trabajes en `main`": crea un archivo nuevo en `docs/anuncios/`, haz commit directo en `main` con `docs(anuncios): <resumen>` y push. Ese commit solo puede tocar `docs/anuncios/`. Los anuncios no se editan: para corregir uno, publica otro con `tipo: reemplaza:<archivo>`.
+5. Menciona en tu reporte los anuncios que aplicaste.
 
 ## 3. Principios de diseño
 
@@ -109,7 +121,7 @@ Cada agente trabaja **solo en el paquete asignado**. Si necesitas un cambio en o
 
 ## 7. Checklist antes de entregar (Definition of Done)
 
-- [ ] Cada comportamiento nuevo tiene un test que vi fallar antes de implementarlo.
+- [ ] Cada comportamiento nuevo tiene un test, escrito por otro agente, que vi fallar antes de implementarlo; no edité tests ajenos.
 - [ ] `pnpm check` pasa completo (tipos, lint, límites entre paquetes, tests, formato).
 - [ ] Busqué si ya existía algo antes de crearlo; no hay duplicación.
 - [ ] Ninguna función mezcla niveles de abstracción (SLAP).
@@ -120,4 +132,5 @@ Cada agente trabaja **solo en el paquete asignado**. Si necesitas un cambio en o
 - [ ] No hay `any`, `as` innecesarios, `!` de no-nulo, ni `console.log` olvidados.
 - [ ] Los commits siguen Conventional Commits y no mencionan a Claude ni a ningún asistente de IA.
 - [ ] Revisé choques con las demás ramas antes de cada commit, y todo está commiteado y pusheado a mi rama (§2.1).
+- [ ] Revisé los anuncios (`pnpm anuncios`) al empezar y antes de cada commit, y seguí los que aplican.
 - [ ] El reporte dice la verdad: qué se hizo, qué no, qué quedó en duda.

@@ -98,6 +98,9 @@ importers:
       '@nodomics/engine-mock':
         specifier: workspace:*
         version: link:../../packages/engine-mock
+      '@nodomics/hub':
+        specifier: workspace:*
+        version: link:../../packages/hub
       '@nodomics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -270,6 +273,18 @@ importers:
       '@nodomics/executor-conformance':
         specifier: workspace:*
         version: link:../../tests/executor-conformance
+
+  packages/hub:
+    dependencies:
+      '@nodomics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@sinclair/typebox':
+        specifier: 0.34.52
+        version: 0.34.52
+      '@supabase/supabase-js':
+        specifier: 2.119.2
+        version: 2.119.2(@opentelemetry/api@1.10.0)
 
   packages/nodes-core:
     dependencies:

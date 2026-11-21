@@ -9,6 +9,17 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "24"
+      # The hub (ADR 0018). Both are public by design: the key is Supabase's publishable key and
+      # every table is protected by Row Level Security. Set them in the Render dashboard.
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+    # The app routes /hub, /u/<handle> and /hub/<handle>/<slug> in the browser.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     headers:
       # Vite fingerprints every file in assets/, so they never change under the same name.
       - path: /assets/*
