@@ -1,6 +1,6 @@
 # 0022. Perfiles vectoriales y buscador del Feed
 
-- **Estado:** propuesta (pendiente de acuerdo con Gabriel, responsable de la capa de agente, y aprobación del líder)
+- **Estado:** aceptada
 - **Fecha:** 2026-11-21
 
 ## Contexto
@@ -90,11 +90,11 @@ Quién escribe esas rutas (Gabriel, o Cantú en un módulo `feed/` dentro de `ap
 
 ### 7. Mapa del Feed
 
-- **Proyección.** Los vectores se proyectan a 2D con UMAP y se dibujan como un mapa:
+- **Proyección.** Los vectores se proyectan a 2D con PCA (análisis de componentes principales) y se dibujan como un mapa:
   - **Forma:** según el tipo (perfil, nodo, flujo o app).
   - **Color:** según `technical`.
   - **Líneas:** los emparejamientos `seeks ↔ offers`.
-- **Dónde se calcula:** en el navegador, con `umap-js`. Es viable con el volumen del hackathon (cientos de puntos). Es una dependencia nueva de runtime de `apps/web` y hay que verificar su licencia antes de instalarla.
+- **Dónde se calcula:** en el navegador, con un PCA propio: una función pura, sin dependencias nuevas. Es viable con el volumen del hackathon (cientos de puntos).
 - **Si el volumen crece:** la proyección pasa a `apps/agent` y la web recibe solo coordenadas.
 
 ### 8. Apps
@@ -127,7 +127,9 @@ Para que comparta las reglas de §1:
 - **El Feed depende de que `apps/agent` esté desplegado.** Sin el servicio, el buscador y el agente de registro no funcionan. El resto del hub sigue igual.
 - **Cambiar de modelo de embeddings obliga a revectorizar todo** (perfiles y fichas). El campo `embedding_model` permite detectar los vectores viejos.
 - **Los datos personales del CV no se almacenan.** Solo persiste la ficha confirmada, que es pública.
-- **Dependencias nuevas:** `umap-js` en `apps/web` (§7). `@anthropic-ai/sdk` ya entra con el ADR 0019.
+- **Paquete nuevo `packages/profile`.** Es puro y contiene el esquema de la ficha, el parseo con migraciones y `profileToEmbeddingTexts`. Lo importan `apps/web` y `apps/agent`, lo que amplía el ADR 0019: `apps/agent` puede importar `protocol` y `profile`. `profile` solo importa `protocol`.
+- **Mapa con PCA en lugar de UMAP.** `umap-js` no se actualiza desde 2024, así que la proyección de §7 se hace con un PCA propio, una función pura sin dependencias nuevas. UMAP se reevalúa si los grupos no se distinguen.
+- **Sin dependencias nuevas de runtime.** `@anthropic-ai/sdk` ya entra con el ADR 0019.
 
 ## Preguntas abiertas
 

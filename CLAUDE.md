@@ -18,12 +18,12 @@ Nodomics es un editor visual de flujos de datos (nodos) que corre en la web, con
 
 ## 1. Invariantes de arquitectura (no negociables)
 
-1. **La interfaz solo habla el protocolo (NEP).** `apps/web` depende únicamente de `@nodomics/protocol`, `@nodomics/client`, `@nodomics/ui` (design system) y `@nodomics/hub` (ADR 0018). Nunca importa DuckDB, Pyodide, el coordinador ni ningún ejecutor.
+1. **La interfaz solo habla el protocolo (NEP).** `apps/web` depende únicamente de `@nodomics/protocol`, `@nodomics/client`, `@nodomics/ui` (design system), `@nodomics/hub` (ADR 0018) y `@nodomics/profile` (ADR 0022). Nunca importa DuckDB, Pyodide, el coordinador ni ningún ejecutor.
 2. **Los datos viven en el motor.** La interfaz recibe referencias y páginas, nunca tablas completas.
 3. **Los nodos son datos.** Un nodo es un manifiesto JSON (+ plantilla SQL o código Python en texto). Ningún nodo es una función de TypeScript.
 4. **El coordinador se escribe una vez** (TypeScript puro, sin DOM). Los ejecutores son pequeños y no conocen el grafo.
 5. **El protocolo es el contrato.** `packages/protocol` solo cambia con aprobación del líder y un ADR. Si necesitas algo que el protocolo no tiene, repórtalo; no lo agregues por tu cuenta.
-6. **Las dependencias apuntan hacia adentro:** `apps → client → rpc + protocol`, `apps → ui`, `apps → hub → protocol`, `engine-* → coordinator + executor-* → rpc + protocol`. Nada importa desde `apps`. `protocol`, `rpc` y `ui` no importan paquetes internos.
+6. **Las dependencias apuntan hacia adentro:** `apps → client → rpc + protocol`, `apps → ui`, `apps → hub → protocol`, `apps → profile → protocol`, `engine-* → coordinator + executor-* → rpc + protocol`. Nada importa desde `apps`. `protocol`, `rpc` y `ui` no importan paquetes internos.
 7. **La interfaz usa el design system.** Ningún color, tamaño, radio o fuente se escribe a mano: todo sale de los tokens de `@nodomics/ui` (variables CSS). Guía: `packages/ui/README.md`.
 
 Si tu cambio rompe un invariante, está mal aunque funcione.

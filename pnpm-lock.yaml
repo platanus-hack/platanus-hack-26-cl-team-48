@@ -292,6 +292,15 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
+  packages/profile:
+    dependencies:
+      '@nodomics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@sinclair/typebox':
+        specifier: 0.34.52
+        version: 0.34.52
+
   packages/protocol:
     dependencies:
       '@sinclair/typebox':
