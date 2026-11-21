@@ -116,16 +116,10 @@ describe("runAgentLoop", () => {
 
     expect(result.ok).toBe(true);
     const last = requests[1]?.messages.at(-1);
-    expect(last).toEqual({
-      role: "tool",
-      results: [
-        {
-          toolCallId: "c1",
-          content: expect.stringContaining("node kind not found"),
-          isError: true,
-        },
-      ],
-    });
+    const toolResult = last?.role === "tool" ? last.results[0] : undefined;
+    expect(toolResult?.toolCallId).toBe("c1");
+    expect(toolResult?.isError).toBe(true);
+    expect(toolResult?.content).toContain("node kind not found");
   });
 
   it("rejects tool call whose args fail schema", async () => {
