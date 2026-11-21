@@ -12,7 +12,9 @@ export type RegistrationRouteDeps = {
 
 export const MAX_TEXT_LENGTH = 20000;
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
-const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+// A flat pattern: a grouped one overflows the regex stack on multi-megabyte payloads.
+const BASE64_SHAPE_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
+const BASE64_QUARTET = 4;
 const BASE64_BYTES_PER_CHAR = 3 / 4;
 const PADDING_CHAR = "=";
 
@@ -37,17 +39,20 @@ function decodedBytes(base64: string): number {
     : base64.endsWith(PADDING_CHAR)
       ? 1
       : 0;
-  return Math.floor(base64.length * BASE64_BYTES_PER_CHAR) - padding;
+  return base64.length * BASE64_BYTES_PER_CHAR - padding;
 }
+
+const isStrictBase64 = (value: string): boolean =>
+  value.length % BASE64_QUARTET === 0 && BASE64_SHAPE_PATTERN.test(value);
+
+const isValidPdf = (base64: string): boolean =>
+  isStrictBase64(base64) && decodedBytes(base64) > 0 && decodedBytes(base64) <= MAX_PDF_BYTES;
 
 function isWithinLimits(input: Input): boolean {
   const { pdfBase64, text, githubLogin } = input;
   if (pdfBase64 === undefined && text === undefined && githubLogin === undefined) return false;
   if (text !== undefined && text.length > MAX_TEXT_LENGTH) return false;
-  return (
-    pdfBase64 === undefined ||
-    (BASE64_PATTERN.test(pdfBase64) && decodedBytes(pdfBase64) <= MAX_PDF_BYTES)
-  );
+  return pdfBase64 === undefined || isValidPdf(pdfBase64);
 }
 
 async function handleRegistration(
