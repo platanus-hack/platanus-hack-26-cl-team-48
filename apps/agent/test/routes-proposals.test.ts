@@ -168,4 +168,43 @@ describe("proposal routes", () => {
     expect(names).toEqual(["flows.diff", "flows.apply"]);
     expect(llmCalls).toEqual([]);
   });
+
+  it("POST decision records the decision in memory when recordDecision is provided", async () => {
+    const decisions: unknown[] = [];
+    const deps = {
+      store: memoryStore(),
+      mcp: recordingMcp().mcp,
+      recordDecision: (record: unknown) => {
+        decisions.push(record);
+        return Promise.resolve(ok(undefined));
+      },
+    };
+    const post = route(createProposalRoutes(deps), "POST");
+    const reply = await post.handle(request(DECISION));
+
+    expect(reply.status).toBe(200);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]).toMatchObject({
+      actorId: "owner",
+      acceptedIds: ["a"],
+      proposal: { id: "p1", status: "accepted" },
+    });
+  });
+
+  it("POST decision invokes onAccepted when acceptedIds are non-empty", async () => {
+    const acceptedCalls: unknown[] = [];
+    const deps = {
+      store: memoryStore(),
+      mcp: recordingMcp().mcp,
+      onAccepted: (proposal: Proposal, acceptedIds: readonly string[]) => {
+        acceptedCalls.push({ proposal, acceptedIds });
+        return Promise.resolve();
+      },
+    };
+    const post = route(createProposalRoutes(deps), "POST");
+    const reply = await post.handle(request(DECISION));
+
+    expect(reply.status).toBe(200);
+    expect(acceptedCalls).toHaveLength(1);
+  });
 });

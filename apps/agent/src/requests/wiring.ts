@@ -7,14 +7,19 @@ import type { Route } from "../http/route.ts";
 import { createRouter } from "../http/router.ts";
 import { createWhyRoute } from "../http/routes/why.ts";
 import { createSearchRoute } from "../http/routes/search.ts";
+import { createProposalRoutes } from "../http/routes/proposals.ts";
 import { createServer } from "../server.ts";
 import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
 import type { MemoryPort } from "../memory/memory-port.ts";
 import { createFakeMemory } from "../memory/fake-memory.ts";
-import { createUserScopedMemory } from "../memory/supabase-memory.ts";
+import { createSupabaseMemory, createUserScopedMemory } from "../memory/supabase-memory.ts";
 import type { EmbeddingsPort } from "../memory/embeddings.ts";
 import { createVoyageEmbeddings } from "../memory/embeddings.ts";
 import { createFakeSearchIndex, type SearchIndexPort } from "../memory/search.ts";
+import { createSupabaseSearchIndex } from "../memory/supabase-search.ts";
+import { indexComponent } from "../memory/indexer.ts";
+import type { FlowLike } from "../memory/component-card.ts";
+import type { Proposal } from "../contracts/proposal.ts";
 import { createFakeProposalStore } from "../proposals/fake-proposal-store.ts";
 import { createSupabaseProposalStore } from "../proposals/supabase-proposal-store.ts";
 import type { ProposalStorePort } from "../proposals/proposal-store-port.ts";
@@ -52,7 +57,12 @@ const selectEmbeddings = (voyageApiKey: string): EmbeddingsPort =>
 
 const selectSearch = (config: AgentConfig) => ({
   embeddings: selectEmbeddings(config.voyageApiKey),
-  index: createFakeSearchIndex(),
+  index:
+    config.memory === "supabase"
+      ? createSupabaseSearchIndex(
+          createClient<Record<string, never>>(config.supabaseUrl, config.supabaseAnonKey),
+        )
+      : createFakeSearchIndex(),
 });
 
 const selectMemoryForUser = (
@@ -86,23 +96,63 @@ const defaultSearch = (): { embeddings: EmbeddingsPort; index: SearchIndexPort }
   index: createFakeSearchIndex(),
 });
 
+const resolveMemory = (
+  deps: RequestDeps,
+  fallback: MemoryPort,
+  identity: UserIdentity,
+): MemoryPort => deps.memoryForUser?.(identity) ?? fallback;
+
+const DEFAULT_CONTEXT = { domain: "nodomics", crop: "general", region: "local" };
+
+async function maybeIndexFlow(
+  deps: RequestDeps,
+  proposal: Proposal,
+  identity: UserIdentity,
+): Promise<void> {
+  if (!deps.search) return;
+  const read = await deps.mcp.call("flows.get", { flowId: proposal.flowId }, identity);
+  if (read.ok && typeof read.value === "object" && read.value !== null) {
+    const flow = read.value as FlowLike;
+    await indexComponent(deps.search, {
+      flow,
+      manifests: {},
+      history: [],
+      context: DEFAULT_CONTEXT,
+    });
+  }
+}
+
+function resolveProposalRoutes(deps: RequestDeps, memory: MemoryPort): readonly Route[] {
+  if (!deps.proposals) return [];
+  return createProposalRoutes({
+    store: deps.proposals,
+    mcp: deps.mcp,
+    recordDecision: (decision, identity) =>
+      buildMemoryDeps(resolveMemory(deps, memory, identity)).recordDecision(decision),
+    onAccepted: (proposal, _acceptedIds, identity) => maybeIndexFlow(deps, proposal, identity),
+  });
+}
+
 /** The one place to add routes from other lanes (search, proposals). */
 export function buildRoutes(deps: RequestDeps, memory: MemoryPort): readonly Route[] {
   const search = deps.search ?? defaultSearch();
   return [
     createWhyRoute({ memory, llm: deps.llm }),
     createSearchRoute(search),
-    // createProposalRoutes({ store: deps.proposals, mcp: deps.mcp })
+    ...resolveProposalRoutes(deps, memory),
   ];
 }
 
-/** The supabase entry becomes the user-scoped Supabase memory once the memory lane exports it. */
-const MEMORY_FACTORIES: Readonly<Record<MemoryMode, () => MemoryPort>> = {
-  fake: createFakeMemory,
-  supabase: createFakeMemory,
+const MEMORY_FACTORIES: Readonly<Record<MemoryMode, (config: AgentConfig) => MemoryPort>> = {
+  fake: () => createFakeMemory(),
+  supabase: (config) =>
+    createSupabaseMemory(
+      createClient<Record<string, never>>(config.supabaseUrl, config.supabaseAnonKey),
+    ),
 };
 
-export const selectMemory = (config: AgentConfig): MemoryPort => MEMORY_FACTORIES[config.memory]();
+export const selectMemory = (config: AgentConfig): MemoryPort =>
+  MEMORY_FACTORIES[config.memory](config);
 
 /** One memory serves both the recording MCP of /agent/requests and the router. */
 export function assembleServer(deps: RequestDeps, memory: MemoryPort): Server {

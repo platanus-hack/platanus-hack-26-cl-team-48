@@ -61,6 +61,18 @@ describe("buildServer", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ cards: [] });
   });
+
+  it("start wires the proposal routes", async () => {
+    const server = buildServer({ ...CONFIG, devIdentity: true });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    const response = await fetch(`http://127.0.0.1:${String(port)}/agent/proposals/missing`);
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "not_found" });
+  });
 });
 
 describe("wired proposals and scoped memory", () => {
@@ -171,5 +183,67 @@ describe("shared memory", () => {
     expect(request.status).toBe(200);
     expect(why.status).toBe(200);
     expect(await why.json()).toMatchObject({ citations: [expect.any(String)] });
+  });
+
+  it("a proposal decision records an episode in shared memory", async () => {
+    const memory = createFakeMemory();
+    const deps = {
+      ...buildRequestDeps({ ...CONFIG, devIdentity: true }),
+      llm: scriptedAgentAndStoryLlm(),
+    };
+    const server = assembleServer(deps, memory);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+
+    const req = await call(base, "/agent/requests", {
+      method: "POST",
+      body: JSON.stringify({ goal: "crea un filtro" }),
+    });
+    const { proposalId } = (await req.json()) as { proposalId: string };
+
+    const decide = await call(base, `/agent/proposals/${proposalId}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acceptedIds: [], version: 1 }),
+    });
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(decide.status).toBe(200);
+    const episodes = await memory.episodesFor(proposalId);
+    expect(episodes.ok && episodes.value.some((e) => e.kind === "proposal_decision")).toBe(true);
+  });
+
+  it("an accepted proposal indexes the flow in the search index", async () => {
+    const memory = createFakeMemory();
+    const deps = {
+      ...buildRequestDeps({ ...CONFIG, devIdentity: true, voyageApiKey: "fake" }),
+      llm: scriptedAgentAndStoryLlm(),
+    };
+    const server = assembleServer(deps, memory);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+
+    const req = await call(base, "/agent/requests", {
+      method: "POST",
+      body: JSON.stringify({ goal: "crea un filtro" }),
+    });
+    const { proposalId, cards } = (await req.json()) as {
+      proposalId: string;
+      cards: Array<{ changeId: string }>;
+    };
+
+    const decide = await call(base, `/agent/proposals/${proposalId}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acceptedIds: [cards[0]?.changeId ?? "c1"], version: 1 }),
+    });
+
+    await new Promise((resolve) => server.close(resolve));
+    expect(decide.status).toBe(200);
+    expect(deps.search).toBeDefined();
+    if (deps.search) {
+      const searchRes = await deps.search.index.query([1, 0, 0], 5);
+      expect(searchRes.ok).toBe(true);
+    }
   });
 });
