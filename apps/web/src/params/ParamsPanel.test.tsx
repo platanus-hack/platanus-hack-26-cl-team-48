@@ -51,6 +51,12 @@ it("heads the selected node's parameters with its name and description", () => {
   expect(screen.getByText("Conserva las filas que cumplen una condición.")).toBeDefined();
 });
 
+it("lets the keyboard reach the tab panel", () => {
+  renderParams();
+
+  expect(screen.getByRole("tabpanel").getAttribute("tabindex")).toBe("0");
+});
+
 it("hides the parameters and keeps a control to show them again", async () => {
   renderParams();
 

@@ -150,6 +150,37 @@ describe("HubApp header", () => {
   });
 });
 
+describe("HubApp profile link", () => {
+  async function openProfileLink() {
+    window.history.replaceState(null, "", pathOf({ page: "hub" }));
+    const hub = await seededHub();
+    await hub.signIn({ kind: "email", email: ANA.handle });
+    renderWithHub(<HubApp />, hub);
+    await userEvent.click(
+      await within(hubHeader()).findByRole("button", { name: "Cuenta de Ana Pérez" }),
+    );
+    return screen.getByRole("link", { name: "Mi perfil" });
+  }
+
+  it("keeps the profile link in this tab", async () => {
+    const link = await openProfileLink();
+
+    expect({ href: link.getAttribute("href"), target: link.getAttribute("target") }).toEqual({
+      href: "/u/ana",
+      target: null,
+    });
+  });
+
+  it("shows the profile in this tab when the profile link is clicked", async () => {
+    const link = await openProfileLink();
+
+    await userEvent.click(link);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Ana Pérez" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/u/ana");
+  });
+});
+
 describe("HubApp pages", () => {
   it("shows the hub search page for the hub route", async () => {
     await renderHubApp({ page: "hub" });

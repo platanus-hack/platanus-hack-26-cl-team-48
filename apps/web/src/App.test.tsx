@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createSeededHub } from "./hub/hub-pages-fixtures.tsx";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { ANA, createSeededHub, createTestHub } from "./hub/hub-pages-fixtures.tsx";
 import { renderApp } from "./testing/render-app.tsx";
 import { stubResizeObserver } from "./testing/stub-resize-observer.ts";
 
@@ -39,6 +39,40 @@ async function waitForEngine() {
 }
 
 const sidePanel = (name: string) => screen.getByRole("complementary", { name });
+
+const opensInNewTab = (link: HTMLElement) => ({
+  href: link.getAttribute("href"),
+  target: link.getAttribute("target"),
+  isNoopener: link.getAttribute("rel")?.split(" ").includes("noopener"),
+});
+
+async function signedInHub() {
+  const hub = createTestHub();
+  await hub.signIn({ kind: "email", email: ANA.handle });
+  return hub;
+}
+
+async function openProfileLink() {
+  renderApp({ hub: await signedInHub() });
+  await userEvent.click(await screen.findByRole("button", { name: "Cuenta de Ana Pérez" }));
+  return screen.getByRole("link", { name: "Mi perfil" });
+}
+
+async function publishFromShareMenu() {
+  renderApp({ hub: await signedInHub() });
+  await userEvent.click(await screen.findByRole("button", { name: "Compartir" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Publicar en el hub…" }));
+  const dialog = await screen.findByRole("dialog", { name: "Publicar en el hub" });
+  await userEvent.clear(within(dialog).getByRole("textbox", { name: "Título" }));
+  await userEvent.type(within(dialog).getByRole("textbox", { name: "Título" }), "Ventas");
+  await waitFor(() => {
+    expect(within(dialog).getByRole<HTMLInputElement>("textbox", { name: "Versión" }).value).toBe(
+      "0.1.0",
+    );
+  });
+  await userEvent.click(within(dialog).getByRole("button", { name: "Publicar" }));
+  return within(dialog).findByRole("link", { name: "Ver en el hub" });
+}
 
 beforeAll(stubResizeObserver);
 
@@ -207,6 +241,28 @@ describe("App side panel", () => {
   });
 });
 
+describe("App side panel focus", () => {
+  it("moves focus to the shown section's rail button when the panel is hidden", async () => {
+    renderApp();
+
+    await userEvent.click(
+      within(sidePanel("Biblioteca de nodos")).getByRole("button", { name: "Ocultar panel" }),
+    );
+
+    expect(document.activeElement).toBe(railButton("Nodos"));
+  });
+
+  it("returns focus to the rail button of a section other than the default", async () => {
+    renderApp({ preferences: { sideSection: "data" } });
+
+    await userEvent.click(
+      within(sidePanel("Datos")).getByRole("button", { name: "Ocultar panel" }),
+    );
+
+    expect(document.activeElement).toBe(railButton("Datos"));
+  });
+});
+
 describe("App side panel preferences", () => {
   it("starts on the stored section", () => {
     renderApp({ preferences: { sideSection: "secrets" } });
@@ -275,5 +331,43 @@ describe("App workspace", () => {
       hubPage: screen.queryByRole("heading", { level: 1, name: page }) !== null,
       hubSearch: screen.queryByLabelText("Buscar en el hub") !== null,
     }).toEqual({ canvas: true, hubPage: false, hubSearch: false });
+  });
+});
+
+describe("App hub links", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("opens the profile from the account menu in another tab", async () => {
+    const link = await openProfileLink();
+
+    expect(opensInNewTab(link)).toEqual({ href: "/u/ana", target: "_blank", isNoopener: true });
+  });
+
+  it("stays on the editor when the profile link is clicked", async () => {
+    const link = await openProfileLink();
+
+    await userEvent.click(link);
+
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("opens the new publication in another tab", async () => {
+    const link = await publishFromShareMenu();
+
+    expect(opensInNewTab(link)).toEqual({
+      href: "/hub/ana/ventas",
+      target: "_blank",
+      isNoopener: true,
+    });
+  });
+
+  it("stays on the editor when the publication link is clicked", async () => {
+    const link = await publishFromShareMenu();
+
+    await userEvent.click(link);
+
+    expect(window.location.pathname).toBe("/");
   });
 });
