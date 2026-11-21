@@ -28,7 +28,7 @@ async function openAsAna() {
   await hub.signIn({ kind: "email", email: "ana" });
   renderWithHub(
     <FeedContext.Provider value={feed}>
-      <HubPage />
+      <HubPage text="" />
     </FeedContext.Provider>,
     hub,
   );
