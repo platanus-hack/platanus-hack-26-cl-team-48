@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { signInLocally } from "../support/account.ts";
 import {
   addNodeFromLibrary,
   connectNodes,
@@ -75,6 +76,8 @@ async function createDefinition(page: Page) {
 
 test("creates, reuses and explicitly updates a saved flow as a node", async ({ page }) => {
   await openEmptyApp(page);
+  // Flows are saved only in the account (ADR 0023); without signing in nothing is saved.
+  await signInLocally(page);
   await createDefinition(page);
   await runButton(page).click();
   await waitForAllNodesReady(page, 4);

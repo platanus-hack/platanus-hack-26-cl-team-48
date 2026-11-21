@@ -28,6 +28,9 @@ export default defineConfig({
     url: APP_ORIGIN,
     reuseExistingServer: !process.env["CI"],
     timeout: SERVER_TIMEOUT,
+    // Empty keys override a developer's .env.local: the app uses the in-memory hub and its local
+    // account (ADR 0023), never a real Supabase project.
+    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "" },
     stdout: "ignore",
     // Vite forwards the page's console warnings to stderr, which would bury the test report.
     stderr: "ignore",
