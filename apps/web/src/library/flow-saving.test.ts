@@ -1,11 +1,11 @@
-import type { FlowStore } from "@nodomics/hub";
+import type { FlowDraft, FlowStore, StoredFlow } from "@nodomics/hub";
 import { expect, it, vi } from "vitest";
-import { FLOW_FORMAT, type Flow } from "@nodomics/protocol";
+import { FLOW_FORMAT, ok, type Flow } from "@nodomics/protocol";
 import { createAppStores } from "../app-stores.ts";
 import { createMemoryPersonalLibrary } from "./memory-personal-library.ts";
 import { createMemoryFlowLibrary } from "./memory-flow-library.ts";
 import { startFlowSaving, AUTO_SAVE_DELAY_MS } from "./flow-saving.ts";
-import { cloudStores, createFlowsHub, signedInHub } from "./cloud-flow-fixtures.ts";
+import { cloudStores, createFlowsHub, recordingFlows, signedInHub } from "./cloud-flow-fixtures.ts";
 
 const flow: Flow = {
   format: FLOW_FORMAT,
@@ -266,3 +266,95 @@ it("keeps a public flow public when an edit is autosaved", async () => {
   });
   saving.close();
 });
+
+it("sends no visibility when an edit is autosaved", async () => {
+  const { flows, drafts } = recordingFlows();
+  const { stores, saving } = cloudSetup(flows);
+  stores.flowStore.getState().dispatch({ type: "flow.load", flow });
+
+  await saving.flush();
+
+  expect(drafts.map((draft) => ({ id: draft.id, hasVisibility: "visibility" in draft }))).toEqual([
+    { id: "flow_test", hasVisibility: false },
+  ]);
+  saving.close();
+});
+
+it("sends no visibility when an open public flow is autosaved", async () => {
+  const hub = await signedInHub();
+  const drafts: Array<FlowDraft> = [];
+  const { stores, library, saving } = cloudSetup({
+    ...delegateTo(hub),
+    saveOwnFlow: (draft) => {
+      drafts.push(draft);
+      return hub.saveOwnFlow(draft);
+    },
+  });
+  await library.saveFlow({
+    id: "old",
+    name: "Ventas",
+    flow,
+    files: {},
+    updatedAt: 1,
+    visibility: "public",
+  });
+  await stores.savedFlowStore.getState().openFlow("old");
+  drafts.length = 0;
+  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
+
+  await saving.flush();
+
+  expect(drafts.map((draft) => "visibility" in draft)).toEqual([false]);
+  saving.close();
+});
+
+it("does not undo a visibility change made after the open flow was read", async () => {
+  const hub = await signedInHub();
+  const { library: writer } = cloudStores(hub);
+  await writer.saveFlow({ id: "old", name: "Ventas", flow, files: {}, updatedAt: 1 });
+  const { stores, saving } = cloudSetup(seenAsPrivate(hub));
+  await stores.savedFlowStore.getState().openFlow("old");
+  await writer.saveFlow({
+    id: "old",
+    name: "Ventas",
+    flow,
+    files: {},
+    updatedAt: 1,
+    visibility: "public",
+  });
+  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
+
+  await saving.flush();
+
+  expect((await writer.readFlow("old")).value).toMatchObject({
+    name: "Editado",
+    visibility: "public",
+  });
+  saving.close();
+});
+
+/** A flow store that forwards every call to `store`, so a test can override one method. */
+function delegateTo(store: FlowStore): FlowStore {
+  return {
+    listOwnFlows: () => store.listOwnFlows(),
+    readFlow: (id) => store.readFlow(id),
+    saveOwnFlow: (draft) => store.saveOwnFlow(draft),
+    deleteOwnFlow: (id) => store.deleteOwnFlow(id),
+  };
+}
+
+/** Reads `store`'s flows as they were before another writer made them public. */
+function seenAsPrivate(store: FlowStore): FlowStore {
+  const asPrivate = (flow: StoredFlow): StoredFlow => ({ ...flow, visibility: "private" });
+  return {
+    ...delegateTo(store),
+    listOwnFlows: async () => {
+      const listed = await store.listOwnFlows();
+      return listed.ok ? ok(listed.value.map(asPrivate)) : listed;
+    },
+    readFlow: async (id) => {
+      const read = await store.readFlow(id);
+      return read.ok && read.value ? ok(asPrivate(read.value)) : read;
+    },
+  };
+}

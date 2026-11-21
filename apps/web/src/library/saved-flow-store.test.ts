@@ -134,3 +134,22 @@ describe("savedFlowStore setVisibility", () => {
     ]);
   });
 });
+
+describe("savedFlowStore duplicate", () => {
+  it("creates a private copy of a public flow", async () => {
+    const { stores, library } = await storesWithSavedFlow("public");
+
+    await stores.savedFlowStore.getState().duplicate("one");
+
+    const copies = (await library.listFlows()).value.filter(({ id }) => id !== "one");
+    expect(copies.map(({ visibility }) => visibility)).toEqual(["private"]);
+  });
+
+  it("keeps the original flow public when duplicating it", async () => {
+    const { stores, library } = await storesWithSavedFlow("public");
+
+    await stores.savedFlowStore.getState().duplicate("one");
+
+    expect((await library.readFlow("one")).value?.visibility).toBe("public");
+  });
+});

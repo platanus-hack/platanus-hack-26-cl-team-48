@@ -83,15 +83,35 @@ describe("followFlowSession signing out", () => {
     });
   });
 
-  it("keeps the open flow on the canvas", async () => {
+  it("empties the canvas when the open flow was saved in the account", async () => {
     const { hub, stores } = await anaWithOpenFlow();
+    const { emit } = follow(stores, ANA.id);
+    await hub.signOut();
+
+    emit(undefined);
+
+    await vi.waitFor(() => {
+      expect({
+        nodes: stores.flowStore.getState().state.flow.nodes.length,
+        currentId: stores.savedFlowStore.getState().currentId,
+      }).toEqual({ nodes: 0, currentId: undefined });
+    });
+  });
+
+  it("keeps on the canvas an open flow that was never saved in the account", async () => {
+    const hub = await signedInHub(ANA);
+    const { stores } = cloudStores(hub);
+    stores.flowStore.getState().dispatch({ type: "flow.load", flow: FLOW });
     const { emit } = follow(stores, ANA.id);
     await hub.signOut();
 
     emit(undefined);
     await settle();
 
-    expect(stores.flowStore.getState().state.flow.name).toBe("one");
+    expect({
+      name: stores.flowStore.getState().state.flow.name,
+      nodes: stores.flowStore.getState().state.flow.nodes.length,
+    }).toEqual({ name: "Sin cuenta", nodes: 1 });
   });
 });
 
@@ -266,6 +286,37 @@ describe("followFlowSession with real saving", () => {
         status: "saved",
         currentId: "flow_new",
       });
+    });
+    saving.close();
+  });
+});
+
+describe("followFlowSession signing out and in again", () => {
+  it("opens the account's saved flow instead of saving a duplicate", async () => {
+    const { hub, stores, library } = await anaWithOpenFlow();
+    const saving = startFlowSaving({
+      stores,
+      timers: { set: () => 0, clear: () => undefined },
+      createId: () => "flow_duplicate",
+      now: () => 7,
+    });
+    const events = profileEvents();
+    followFlowSession({ hub: events.hub, stores, saving, initialProfileId: ANA.id });
+    await hub.signOut();
+    events.emit(undefined);
+    await vi.waitFor(() => {
+      expect(stores.savedFlowStore.getState().status).toBe("signed-out");
+    });
+    await settle();
+    await hub.signIn({ kind: "email", email: ANA.handle });
+
+    events.emit(ANA);
+
+    await vi.waitFor(async () => {
+      expect({
+        saved: (await library.listFlows()).value.map(({ id }) => id),
+        currentId: stores.savedFlowStore.getState().currentId,
+      }).toEqual({ saved: ["one"], currentId: "one" });
     });
     saving.close();
   });

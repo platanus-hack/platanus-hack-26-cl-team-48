@@ -174,6 +174,48 @@ describe("createMemoryHub: saving own flows", () => {
   });
 });
 
+describe("createMemoryHub: saving own flows without visibility", () => {
+  const withoutVisibility = (document: unknown = { name: "Ventas" }): FlowDraft => ({
+    id: "flujo-1",
+    document,
+  });
+
+  it("creates a private flow when the draft has no visibility", async () => {
+    const hub = await signIn(newHub(), ana);
+
+    await valueOf(hub.saveOwnFlow(withoutVisibility()));
+
+    expect((await valueOf(hub.readFlow("flujo-1")))?.visibility).toBe("private");
+  });
+
+  it("keeps a public flow public when saved again without visibility", async () => {
+    const hub = await signIn(newHub(), ana);
+    await valueOf(hub.saveOwnFlow(draft({ visibility: "public" })));
+
+    await valueOf(hub.saveOwnFlow(withoutVisibility()));
+
+    expect((await valueOf(hub.readFlow("flujo-1")))?.visibility).toBe("public");
+  });
+
+  it("keeps a private flow private when saved again without visibility", async () => {
+    const hub = await signIn(newHub(), ana);
+    await valueOf(hub.saveOwnFlow(draft({ visibility: "private" })));
+
+    await valueOf(hub.saveOwnFlow(withoutVisibility()));
+
+    expect((await valueOf(hub.readFlow("flujo-1")))?.visibility).toBe("private");
+  });
+
+  it("replaces the document when saved again without visibility", async () => {
+    const hub = await signIn(newHub(), ana);
+    await valueOf(hub.saveOwnFlow(draft({ visibility: "public" })));
+
+    await valueOf(hub.saveOwnFlow(withoutVisibility({ name: "Ventas 2" })));
+
+    expect((await valueOf(hub.readFlow("flujo-1")))?.document).toEqual({ name: "Ventas 2" });
+  });
+});
+
 describe("createMemoryHub: listing own flows", () => {
   it("lists nothing for a profile without flows", async () => {
     const hub = await signIn(newHub(), ana);

@@ -128,6 +128,16 @@ describe("createCloudFlowLibrary readFlow", () => {
     expect(read).toEqual({ value: saved });
   });
 
+  it("reads a row whose document has no visibility with the row's visibility", async () => {
+    const library = cloudLibrary(
+      flowsWithRows([rowOf(savedFlowOf("one"), { id: "one", visibility: "public" })]),
+    );
+
+    const read = await library.readFlow("one");
+
+    expect(read.value?.visibility).toBe("public");
+  });
+
   it("reads a flow saved without visibility as private", async () => {
     const library = cloudLibrary(await signedInHub());
     await library.saveFlow(savedFlowOf("one"));
@@ -180,13 +190,27 @@ describe("createCloudFlowLibrary saveFlow", () => {
     expect(drafts).toEqual([{ id: "one", visibility: "public", document: savedFlowOf("one") }]);
   });
 
-  it("saves a flow without visibility as private", async () => {
+  it("sends no visibility for a flow without one", async () => {
     const { flows, drafts } = recordingFlows();
     const library = cloudLibrary(flows);
 
     await library.saveFlow(savedFlowOf("one"));
 
-    expect(drafts.map(({ visibility }) => visibility)).toEqual(["private"]);
+    expect(drafts.map((draft) => ({ id: draft.id, hasVisibility: "visibility" in draft }))).toEqual(
+      [{ id: "one", hasVisibility: false }],
+    );
+  });
+
+  it("keeps a public flow public when a flow without visibility is saved over it", async () => {
+    const library = cloudLibrary(await signedInHub());
+    await library.saveFlow(savedFlowOf("one", { visibility: "public" }));
+
+    await library.saveFlow(savedFlowOf("one", { name: "Editado" }));
+
+    expect((await library.readFlow("one")).value).toMatchObject({
+      name: "Editado",
+      visibility: "public",
+    });
   });
 
   it("reports signed-out when there is no session", async () => {
