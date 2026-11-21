@@ -21,7 +21,8 @@ export function recordDrafts(mcp: McpPort): DraftRecorder {
       listTools: () => mcp.listTools(),
       call: async (name, args, identity) => {
         const reply = await mcp.call(name, args, identity);
-        if (reply.ok && name === CREATE_DRAFT) seen.draftId = readDraftId(reply.value) ?? seen.draftId;
+        if (reply.ok && name === CREATE_DRAFT)
+          seen.draftId = readDraftId(reply.value) ?? seen.draftId;
         return reply;
       },
     },

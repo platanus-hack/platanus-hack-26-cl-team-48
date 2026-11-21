@@ -1,4 +1,9 @@
-import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import type { HttpReply, RequestInput } from "./requests/handle-request.ts";
 
 export type ServerDeps = {
@@ -41,21 +46,34 @@ async function serveRequests(
   response: ServerResponse,
 ): Promise<void> {
   const rawBody = await readBody(request);
-  if (rawBody === undefined) return sendJson(response, HTTP_BAD_REQUEST, { error: "invalid_body" });
+  if (rawBody === undefined) {
+    sendJson(response, HTTP_BAD_REQUEST, { error: "invalid_body" });
+    return;
+  }
   const reply = await deps.handleRequest({ authorization: request.headers.authorization, rawBody });
   sendJson(response, reply.status, reply.body);
 }
 
-function route(deps: ServerDeps, request: IncomingMessage, response: ServerResponse): Promise<void> {
-  if (isRoute(request, "GET", "/health")) return Promise.resolve(sendJson(response, HTTP_OK, { status: "ok" }));
-  if (isRoute(request, "POST", REQUESTS_PATH)) return serveRequests(deps, request, response);
-  return Promise.resolve(sendJson(response, HTTP_NOT_FOUND, { error: "not_found" }));
+async function route(
+  deps: ServerDeps,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (isRoute(request, "GET", "/health")) {
+    sendJson(response, HTTP_OK, { status: "ok" });
+  } else if (isRoute(request, "POST", REQUESTS_PATH)) {
+    await serveRequests(deps, request, response);
+  } else {
+    sendJson(response, HTTP_NOT_FOUND, { error: "not_found" });
+  }
 }
 
 export function createServer(deps: ServerDeps): Server {
   return createHttpServer((request, response) => {
     route(deps, request, response).catch(() => {
-      if (!response.headersSent) sendJson(response, HTTP_INTERNAL_ERROR, { error: "internal_error" });
+      if (!response.headersSent) {
+        sendJson(response, HTTP_INTERNAL_ERROR, { error: "internal_error" });
+      }
     });
   });
 }

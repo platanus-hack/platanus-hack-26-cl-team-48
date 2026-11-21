@@ -1,5 +1,10 @@
 import type { LlmPort } from "../llm/llm-port.ts";
-import { runAgentLoop, type LoopError, type LoopLimits, type LoopOutcome } from "../loop/agent-loop.ts";
+import {
+  runAgentLoop,
+  type LoopError,
+  type LoopLimits,
+  type LoopOutcome,
+} from "../loop/agent-loop.ts";
 import type { McpPort, UserIdentity } from "../mcp/mcp-port.ts";
 import { SYSTEM_PROMPT } from "../prompts/system.ts";
 import { REQUEST_ALLOWLIST } from "./allowlists.ts";
