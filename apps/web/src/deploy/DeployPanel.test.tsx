@@ -1150,6 +1150,34 @@ describe("DeployPanel out-of-order list replies", () => {
     });
   });
 
+  it("shows each reply that arrives in order when every list takes longer than the poll interval", async () => {
+    const SLOW_REPLY_MS = 6000;
+    const deploy = createFakeDeploy();
+    const opening: ListReply = deferred();
+    const firstPoll: ListReply = deferred();
+    const secondPoll: ListReply = deferred();
+    [opening, firstPoll, secondPoll].forEach((reply) => {
+      deploy.nextListWith(reply.promise);
+    });
+    await renderWithFakeClock(deploy);
+    await advance(SLOW_REPLY_MS);
+    await answer(opening, "deploying");
+    const afterFirstReply = shownStatus();
+    await advance(REFRESH_INTERVAL_MS);
+
+    await answer(firstPoll, "live");
+
+    expect({
+      lists: deploy.calls.list.length,
+      afterFirstReply,
+      afterSecondReply: shownStatus(),
+    }).toEqual({
+      lists: 3,
+      afterFirstReply: { live: false, deploying: true },
+      afterSecondReply: { live: true, deploying: false },
+    });
+  });
+
   it("keeps the newer status when the periodic list answers after the later refresh one", async () => {
     const deploy = createFakeDeploy([deploymentOf({ status: "deploying" })]);
     await renderWithFakeClock(deploy);
