@@ -11,7 +11,10 @@ type ChipInputProps = {
 
 const ADD_KEYS: ReadonlySet<string> = new Set(["Enter", ","]);
 
-/** A list of short entries typed one at a time: Enter or a comma turns the text into a chip. */
+/**
+ * A list of short entries typed one at a time: Enter or a comma turns the text into a chip.
+ * Chips are removed by position, because a card from the registration agent may repeat one.
+ */
 export function ChipInput({ label, help, values, onChange }: ChipInputProps) {
   const add = (text: string) => {
     const entry = text.trim();
@@ -32,15 +35,15 @@ function ChipList({ label, values, onChange }: Omit<ChipInputProps, "help">) {
   if (values.length === 0) return null;
   return (
     <ul className="web-feed-chip-list" aria-label={label}>
-      {values.map((value) => (
-        <li key={value} className="web-feed-chip">
+      {values.map((value, position) => (
+        <li key={position} className="web-feed-chip">
           {value}
           <button
             type="button"
             className="web-feed-chip-remove"
             aria-label={MESSAGES.feed.chips.remove(value)}
             onClick={() => {
-              onChange(values.filter((current) => current !== value));
+              onChange(values.filter((_, index) => index !== position));
             }}
           >
             <Icon name="x" size={ICON_SIZE.xs} />
