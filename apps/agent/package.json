@@ -12,6 +12,7 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "@nodomics/profile": "workspace:*",
     "@nodomics/protocol": "workspace:*",
+    "@renderinc/sdk": "^1.10.0",
     "@sinclair/typebox": "0.34.52",
     "@supabase/supabase-js": "2.119.2"
   }
