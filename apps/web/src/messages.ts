@@ -389,6 +389,7 @@ export const MESSAGES = {
     title: "Vista previa",
     empty: "Selecciona un nodo para ver sus datos.",
     noResult: "Ejecuta el flujo para ver los datos de este nodo.",
+    resource: "Este nodo describe algo que se despliega: no produce datos.",
     tabs: { data: "Datos", profile: "Perfil", chart: "Gráfico" },
     previous: "Página anterior",
     next: "Página siguiente",

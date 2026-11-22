@@ -152,7 +152,9 @@ function routeOf(method: string, pathname: string): RouteHandler | undefined {
     return ({ useCases, identity }) => {
       const decoded = decodedPathSegment(deploymentId);
       return decoded === undefined
-        ? Promise.resolve(failed({ code: "BAD_REQUEST", message: "The deployment id is not valid" }))
+        ? Promise.resolve(
+            failed({ code: "BAD_REQUEST", message: "The deployment id is not valid" }),
+          )
         : removeDeployment(useCases, identity, decoded);
     };
   return ROUTES[`${method} ${pathname}`];

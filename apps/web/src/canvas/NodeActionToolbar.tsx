@@ -3,6 +3,7 @@ import { useId } from "react";
 import { IconMenu } from "../layout/IconMenu.tsx";
 import { usePreviewLocation } from "../layout/preview-location.ts";
 import { useRunFlow } from "../engine/use-engine-actions.ts";
+import { useIsResourceNode } from "./resource-nodes.ts";
 import { useNodeMenuActions } from "./use-node-menu-actions.ts";
 import { NODE_ACTION_MESSAGES as text } from "./node-action-messages.ts";
 import "./canvas.css";
@@ -11,6 +12,7 @@ export function NodeActionToolbar({ nodeId }: { readonly nodeId: string }) {
   const { openInPanel } = usePreviewLocation();
   const description = useId();
   const run = useRunFlow();
+  const isResource = useIsResourceNode(nodeId);
   return (
     <div
       className="web-node-actions nodrag nopan"
@@ -20,16 +22,18 @@ export function NodeActionToolbar({ nodeId }: { readonly nodeId: string }) {
         event.stopPropagation();
       }}
     >
-      <Button
-        variant="ghost"
-        size="sm"
-        icon="play"
-        label={text.run}
-        disabled={run === undefined}
-        onClick={() => {
-          void run?.([nodeId]);
-        }}
-      />
+      {!isResource && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="play"
+          label={text.run}
+          disabled={run === undefined}
+          onClick={() => {
+            void run?.([nodeId]);
+          }}
+        />
+      )}
       <Button
         variant="ghost"
         size="sm"
