@@ -1,7 +1,7 @@
 import type { HubProfile } from "@nodomics/hub";
 import type { ProfileCard } from "@nodomics/profile";
 import { Button, Notice } from "@nodomics/ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../messages.ts";
 import type { FeedService } from "./feed-service.ts";
 import { RegistrationFields } from "./RegistrationFields.tsx";
@@ -10,6 +10,7 @@ import { useCardEditor, type EditorNotice } from "./use-card-editor.ts";
 
 type NumberedStep = 1 | 2 | 3 | 4;
 type Step = "start" | "cv" | NumberedStep;
+type Busy = ReturnType<typeof useCardEditor>["busy"];
 
 const TEXT = MESSAGES.feed.wizard;
 const NUMBERED_STEPS = [1, 2, 3, 4] as const satisfies ReadonlyArray<NumberedStep>;
@@ -34,14 +35,11 @@ type ProfileWizardProps = {
 /** Builds or edits the own collaboration card one short question at a time. */
 export function ProfileWizard({ feed, profile, initial, onSaved, onCancel }: ProfileWizardProps) {
   const editor = useCardEditor({ feed, initial, onSaved });
-  const [step, setStep] = useState<Step>(initial === undefined ? "start" : 1);
+  const entry: Step = initial === undefined ? "start" : 1;
+  const [step, setStep] = useState<Step>(entry);
   const goTo = (next: Step) => {
     editor.clearNotice();
     setStep(next);
-  };
-  const startManually = () => {
-    editor.startEmpty();
-    setStep(1);
   };
   return (
     <form
@@ -52,33 +50,21 @@ export function ProfileWizard({ feed, profile, initial, onSaved, onCancel }: Pro
       }}
     >
       <WizardHeader step={step} />
-      <WizardNotice notice={editor.notice} onManual={step === "cv" ? startManually : undefined} />
-      {step === "start" && (
-        <StartStep
-          onCv={() => {
-            goTo("cv");
-          }}
-          onManual={startManually}
-        />
-      )}
-      {step === "cv" && (
-        <RegistrationFields
-          isGenerating={editor.busy === "generating"}
-          onGenerate={(sources) => {
-            void editor.generate(sources).then((isFilled) => {
-              if (isFilled) setStep(1);
-            });
-          }}
-        />
-      )}
-      {step === 1 && <AboutStep draft={editor.draft} change={editor.change} />}
-      {step === 2 && <HelpStep draft={editor.draft} change={editor.change} />}
-      {step === 3 && <SeekStep draft={editor.draft} change={editor.change} />}
-      {step === 4 && <PreviewStep draft={editor.draft} profile={profile} />}
+      <WizardNotice
+        notice={editor.notice}
+        {...(step === "cv"
+          ? {
+              onManual: () => {
+                goTo(1);
+              },
+            }
+          : {})}
+      />
+      <StepContent step={step} editor={editor} profile={profile} onGo={goTo} onFilled={setStep} />
       <WizardFooter
         step={step}
-        isNew={initial === undefined}
-        isSaving={editor.busy === "saving"}
+        entry={entry}
+        busy={editor.busy}
         onGo={goTo}
         onSave={() => void editor.save()}
         onCancel={onCancel}
@@ -87,27 +73,77 @@ export function ProfileWizard({ feed, profile, initial, onSaved, onCancel }: Pro
   );
 }
 
+type StepContentProps = {
+  readonly step: Step;
+  readonly editor: ReturnType<typeof useCardEditor>;
+  readonly profile: HubProfile | undefined;
+  readonly onGo: (step: Step) => void;
+  readonly onFilled: (step: Step) => void;
+};
+
+function StepContent({ step, editor, profile, onGo, onFilled }: StepContentProps) {
+  switch (step) {
+    case "start":
+      return (
+        <StartStep
+          onCv={() => {
+            onGo("cv");
+          }}
+          onManual={() => {
+            onGo(1);
+          }}
+        />
+      );
+    case "cv":
+      return (
+        <RegistrationFields
+          isGenerating={editor.busy === "generating"}
+          onGenerate={(sources) => {
+            void editor.generate(sources).then((isFilled) => {
+              if (isFilled) onFilled(1);
+            });
+          }}
+        />
+      );
+    case 1:
+      return <AboutStep draft={editor.draft} change={editor.change} />;
+    case 2:
+      return <HelpStep draft={editor.draft} change={editor.change} />;
+    case 3:
+      return <SeekStep draft={editor.draft} change={editor.change} />;
+    case 4:
+      return <PreviewStep draft={editor.draft} profile={profile} />;
+  }
+}
+
+/** The step title takes the focus on every step, so keyboard users land on the new question. */
 function WizardHeader({ step }: { readonly step: Step }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, [step]);
   return (
-    <header className="web-feed-wizard-header">
+    <div className="web-feed-wizard-header">
       {typeof step === "number" && (
         <>
           <p className="web-feed-wizard-step">{TEXT.step(step, STEP_COUNT)}</p>
           <div className="web-feed-progress" aria-hidden="true">
-            {Array.from({ length: STEP_COUNT }, (_, index) => (
-              <span key={index} className={index < step ? "is-done" : undefined} />
+            {NUMBERED_STEPS.map((done) => (
+              <span key={done} className={done <= step ? "is-done" : undefined} />
             ))}
           </div>
         </>
       )}
-      <h2>{STEP_TITLES[step]}</h2>
-    </header>
+      <h2 ref={heading} tabIndex={-1}>
+        {STEP_TITLES[step]}
+      </h2>
+    </div>
   );
 }
 
 type WizardNoticeProps = {
   readonly notice: EditorNotice | undefined;
-  readonly onManual: (() => void) | undefined;
+  readonly onManual?: () => void;
 };
 
 /** What the wizard has to tell; a failed CV reading also offers to continue by hand. */
@@ -126,47 +162,55 @@ function WizardNotice({ notice, onManual }: WizardNoticeProps) {
 
 type WizardFooterProps = {
   readonly step: Step;
-  readonly isNew: boolean;
-  readonly isSaving: boolean;
+  readonly entry: Step;
+  readonly busy: Busy;
   readonly onGo: (step: Step) => void;
   readonly onSave: () => void;
   readonly onCancel: () => void;
 };
 
-function WizardFooter({ step, isNew, isSaving, onGo, onSave, onCancel }: WizardFooterProps) {
+/** While a request is pending nothing can leave the step, so a late answer never lands elsewhere. */
+function WizardFooter({ onCancel, ...buttons }: WizardFooterProps) {
   return (
     <footer className="web-feed-wizard-footer">
-      <Button variant="ghost" onClick={onCancel}>
+      <Button variant="ghost" disabled={buttons.busy !== "idle"} onClick={onCancel}>
         {TEXT.cancel}
       </Button>
       <span className="web-feed-wizard-spacer" />
-      <StepButtons step={step} isNew={isNew} isSaving={isSaving} onGo={onGo} onSave={onSave} />
+      {buttons.step === 4 ? <PreviewButtons {...buttons} /> : <StepButtons {...buttons} />}
     </footer>
   );
 }
 
-function StepButtons({ step, isNew, isSaving, onGo, onSave }: Omit<WizardFooterProps, "onCancel">) {
-  const back = previousStep(step, isNew);
-  if (step === 4)
-    return (
-      <>
-        <Button
-          onClick={() => {
-            onGo(3);
-          }}
-        >
-          {TEXT.preview.edit}
-        </Button>
-        <Button variant="primary" icon="check" loading={isSaving} onClick={onSave}>
-          {TEXT.preview.save}
-        </Button>
-      </>
-    );
+type StepButtonsProps = Omit<WizardFooterProps, "onCancel">;
+
+function PreviewButtons({ busy, onGo, onSave }: StepButtonsProps) {
+  return (
+    <>
+      <Button
+        disabled={busy !== "idle"}
+        onClick={() => {
+          onGo(3);
+        }}
+      >
+        {TEXT.preview.edit}
+      </Button>
+      <Button variant="primary" icon="check" loading={busy === "saving"} onClick={onSave}>
+        {TEXT.preview.save}
+      </Button>
+    </>
+  );
+}
+
+function StepButtons({ step, entry, busy, onGo }: StepButtonsProps) {
+  const back = previousStep(step, entry);
+  const next = nextStep(step);
   return (
     <>
       {back !== undefined && (
         <Button
           icon="chevron-left"
+          disabled={busy !== "idle"}
           onClick={() => {
             onGo(back);
           }}
@@ -174,11 +218,11 @@ function StepButtons({ step, isNew, isSaving, onGo, onSave }: Omit<WizardFooterP
           {TEXT.back}
         </Button>
       )}
-      {typeof step === "number" && (
+      {next !== undefined && (
         <Button
           variant="primary"
           onClick={() => {
-            onGo(nextStep(step));
+            onGo(next);
           }}
         >
           {TEXT.next}
@@ -188,12 +232,13 @@ function StepButtons({ step, isNew, isSaving, onGo, onSave }: Omit<WizardFooterP
   );
 }
 
-function previousStep(step: Step, isNew: boolean): Step | undefined {
+/** Step 1 goes back to where the wizard opened: the start for a new card, nowhere when editing. */
+function previousStep(step: Step, entry: Step): Step | undefined {
   if (step === "cv") return "start";
-  if (step === "start") return undefined;
-  if (step === 1) return isNew ? "start" : undefined;
+  if (step === "start" || step === entry) return undefined;
+  if (step === 1) return "start";
   return NUMBERED_STEPS[NUMBERED_STEPS.indexOf(step) - 1];
 }
 
-const nextStep = (step: NumberedStep): NumberedStep =>
-  NUMBERED_STEPS[NUMBERED_STEPS.indexOf(step) + 1] ?? step;
+const nextStep = (step: Step): Step | undefined =>
+  typeof step === "number" ? NUMBERED_STEPS[NUMBERED_STEPS.indexOf(step) + 1] : undefined;

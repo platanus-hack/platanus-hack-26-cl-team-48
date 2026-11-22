@@ -95,7 +95,7 @@ export const MESSAGES = {
       offers: "Puede ayudarte con",
       seeks: "Está buscando",
       domains: "Sabe de",
-      publications: "Flujos publicados",
+      publications: "Publicaciones",
       links: { linkedin: "LinkedIn", github: "GitHub", website: "Sitio web" },
       technical: { uses: "Usa flujos", builds: "Arma flujos", codes: "Programa nodos" },
       depth: { curious: "Le interesa", practitioner: "Lo practica", expert: "Experto/a" },
@@ -171,6 +171,8 @@ export const MESSAGES = {
         edit: "Volver a editar",
       },
       invalid: "Revisa los campos marcados.",
+      checkFields: (labels: ReadonlyArray<string>) =>
+        labels.length === 0 ? "Revisa tus datos." : `Revisa: ${labels.join(", ")}.`,
       saveFailed: "No pudimos guardar tu perfil. Intenta de nuevo.",
     },
     chips: {

@@ -15,7 +15,7 @@ type ProfileHeroProps = {
 /** The head of a person's page: who they are and, with a card, how they work with others. */
 export function ProfileHero({ profile, publicationCount, card, action }: ProfileHeroProps) {
   return (
-    <header className="web-feed-hero">
+    <div className="web-feed-hero">
       <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
       <div className="web-feed-hero-body">
         <div className="web-feed-hero-top">
@@ -31,6 +31,6 @@ export function ProfileHero({ profile, publicationCount, card, action }: Profile
         </div>
         {card !== undefined && <CardSummary card={card} />}
       </div>
-    </header>
+    </div>
   );
 }
