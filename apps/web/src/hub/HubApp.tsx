@@ -1,13 +1,16 @@
 import type { Flow } from "@nodomics/protocol";
 import { useState } from "react";
-import { Button, Input } from "@nodomics/ui";
+import { KnotMark } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
 import type { EditorOpening, Route } from "../routing/routes.ts";
 import { navigate, useRoute } from "../routing/use-route.ts";
+import { StoredThemeControl } from "../theme/StoredThemeControl.tsx";
 import { AccountButton } from "./AccountButton.tsx";
+import { useHubProfile } from "./hub-context.ts";
 import { HubPage } from "./HubPage.tsx";
+import { HubTabs, type HubTab } from "./HubTabs.tsx";
 import { ProfilePage } from "./ProfilePage.tsx";
 import { PublicationPage } from "./PublicationPage.tsx";
 import "../feed/feed.css";
@@ -24,22 +27,22 @@ export type HubNavigation = {
 export function HubApp(navigation: HubNavigation) {
   const route = useRoute();
   const [text, setText] = useState("");
-  const search = (next: string) => {
-    setText(next);
-    if (route.page !== "hub") navigate({ page: "hub" });
-  };
+  const [tab, setTab] = useState<HubTab>("for-you");
   return (
     <div className="web-hub-app">
       <HubBar
-        text={text}
-        onSearch={search}
-        onNewFlow={() => {
-          navigation.onOpenEditor({ kind: "new" });
+        tab={tab}
+        onTab={(next) => {
+          setTab(next);
+          if (route.page !== "hub") navigate({ page: "hub" });
+        }}
+        onOpenEditor={() => {
+          navigation.onOpenEditor({ kind: "latest" });
         }}
       />
       <div className="web-hub-scroll">
         {route.page === "workspace" || route.page === "hub" ? (
-          <HubPage text={text} onSearch={search} {...navigation} />
+          <HubPage text={text} tab={tab} onSearch={setText} {...navigation} />
         ) : (
           <HubRoutePage route={route} {...navigation} />
         )}
@@ -48,36 +51,23 @@ export function HubApp(navigation: HubNavigation) {
   );
 }
 
-function HubBar({
-  text,
-  onSearch,
-  onNewFlow,
-}: {
-  readonly text: string;
-  readonly onSearch: (text: string) => void;
-  readonly onNewFlow: () => void;
-}) {
+type HubBarProps = {
+  readonly tab: HubTab;
+  readonly onTab: (tab: HubTab) => void;
+  readonly onOpenEditor: () => void;
+};
+
+function HubBar({ tab, onTab, onOpenEditor }: HubBarProps) {
+  const isSignedIn = useHubProfile()?.handle !== undefined;
   return (
     <header className="web-hub-bar">
       <RouteLink className="web-brand" route={{ page: "hub" }}>
-        <span className="web-brand-mark" aria-hidden="true" />
+        <KnotMark />
         {MESSAGES.app.title}
-        <span className="web-hub-bar-section">{MESSAGES.hub.title}</span>
       </RouteLink>
-      <search className="web-hub-bar-search">
-        <Input
-          type="search"
-          icon="search"
-          label={MESSAGES.hub.search}
-          placeholder={MESSAGES.hub.searchPlaceholder}
-          value={text}
-          onChange={onSearch}
-        />
-      </search>
+      {isSignedIn && <HubTabs tab={tab} onTab={onTab} onOpenEditor={onOpenEditor} />}
       <div className="web-hub-bar-end">
-        <Button variant="primary" icon="plus" onClick={onNewFlow}>
-          {MESSAGES.savedFlows.newFlow}
-        </Button>
+        <StoredThemeControl />
         <AccountButton />
       </div>
     </header>

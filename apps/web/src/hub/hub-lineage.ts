@@ -4,10 +4,11 @@ export type PublicationSummaryLike = {
   readonly latestVersion?: string | undefined;
 };
 
-export function lineageFromSummary(summary: PublicationSummaryLike): LineageEvent[] {
-  const version = summary.latestVersion;
-  if (version === undefined || version === "1.0.0" || version === "1.0") {
-    return ["origin"];
-  }
-  return ["origin", "adapt"];
+/**
+ * The hub does not store who adapted a publication yet, and a new version is the owner's own
+ * change, so every publication shows only its origin until adaptations are recorded.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept so callers need no change once adaptations exist
+export function lineageFromSummary(_summary: PublicationSummaryLike): LineageEvent[] {
+  return ["origin"];
 }

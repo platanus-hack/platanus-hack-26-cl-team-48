@@ -202,6 +202,7 @@ body {
   min-height: var(--space-12);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
   box-sizing: border-box;
+  --nd-glyph-halo: var(--surface-200);
   background: var(--surface-200);
   border-bottom: var(--stroke-hairline) solid var(--line);
 }
@@ -239,12 +240,8 @@ body {
   margin: 0;
 }
 
-.web-brand-mark {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  transform: rotate(45deg) scale(0.75);
+.web-brand svg {
+  flex: none;
 }
 
 .web-toolbar-divider {

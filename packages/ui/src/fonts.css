@@ -38,3 +38,20 @@
   font-display: swap;
   src: url("./fonts/IBMPlexMono-500.woff2") format("woff2");
 }
+
+/* Newsreader (SIL Open Font License 1.1) */
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("./fonts/Newsreader-300.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/Newsreader-400.woff2") format("woff2");
+}

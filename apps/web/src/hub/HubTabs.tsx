@@ -1,55 +1,35 @@
-import type { KeyboardEvent } from "react";
+import { Button } from "@nodomics/ui";
 import { MESSAGES } from "../messages.ts";
-import { HUB_TABS, type HubTab } from "./hub-filters.ts";
+
+export type HubTab = "for-you" | "flows" | "people";
+const TABS: readonly HubTab[] = ["for-you", "flows", "people"];
 
 type HubTabsProps = {
   readonly tab: HubTab;
-  readonly ids: { readonly panel: string } & Readonly<Record<HubTab, string>>;
-  /** "Mi espacio" needs an account. */
-  readonly isSignedIn: boolean;
   readonly onTab: (tab: HubTab) => void;
+  readonly onOpenEditor: () => void;
 };
 
-/** Discover or the account's own space; arrow keys move between tabs (WAI-ARIA tabs pattern). */
-export function HubTabs({ tab, ids, isSignedIn, onTab }: HubTabsProps) {
-  const tabs = isSignedIn ? HUB_TABS : HUB_TABS.filter((each) => each === "discover");
-  const moveWithArrows = (event: KeyboardEvent) => {
-    const step = arrowStep(event.key);
-    if (step === 0) return;
-    const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length] ?? tab;
-    onTab(next);
-    document.getElementById(ids[next])?.focus();
-  };
+/** The signed-in hub's top navigation, with the way into the editor. */
+export function HubTabs({ tab, onTab, onOpenEditor }: HubTabsProps) {
   return (
-    <div
-      className="web-hub-tabs"
-      role="tablist"
-      aria-label={MESSAGES.hub.sections}
-      onKeyDown={moveWithArrows}
-    >
-      {tabs.map((each) => (
+    <nav className="web-hub-tabs" aria-label={MESSAGES.hub.sections}>
+      {TABS.map((value) => (
         <button
-          key={each}
-          id={ids[each]}
+          key={value}
           type="button"
-          role="tab"
           className="web-hub-tab"
-          aria-selected={each === tab}
-          aria-controls={ids.panel}
-          tabIndex={each === tab ? 0 : -1}
+          aria-current={tab === value ? "page" : undefined}
           onClick={() => {
-            onTab(each);
+            onTab(value);
           }}
         >
-          {MESSAGES.hub.tabs[each]}
+          {MESSAGES.hub.tabs[value]}
         </button>
       ))}
-    </div>
+      <Button variant="ghost" icon="app-window" onClick={onOpenEditor}>
+        {MESSAGES.hub.openEditor}
+      </Button>
+    </nav>
   );
 }
-
-const arrowStep = (key: string) => {
-  if (key === "ArrowRight") return 1;
-  if (key === "ArrowLeft") return -1;
-  return 0;
-};

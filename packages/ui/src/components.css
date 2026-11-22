@@ -14,13 +14,6 @@
     var(--font-sans);
   --nd-text-mono-caption: var(--text-mono-sm-weight) var(--text-mono-label-size) /
     var(--text-mono-label-line) var(--font-mono);
-  --lineage-origin: var(--ink-faint);
-  --lineage-adapt: var(--accent);
-  --lineage-knot: var(--ink);
-  --lineage-attention: var(--status-warn);
-  --brand-paper: var(--surface-100);
-  --brand-surface: var(--surface-200);
-  --brand-rule: var(--line);
   --nd-glyph-halo: var(--brand-paper);
 }
 

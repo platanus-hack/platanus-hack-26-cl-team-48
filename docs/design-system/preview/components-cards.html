@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tarjetas</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="preview.css" />
+    <script src="theme-toggle.js" defer></script>
+  </head>
+  <body>
+    <header class="bar">
+      <a href="index.html">Sistema de diseño</a>
+      <button type="button" class="toggle" data-theme-toggle>Claro / Oscuro</button>
+    </header>
+    <main>
+      <h1>Tarjetas</h1>
+      <p class="lead">
+        Una tarjeta de publicación con su línea de linaje. Hoy el hilo solo muestra el origen,
+        porque el hub todavía no guarda adaptaciones.
+      </p>
+      <div class="cards">
+        <article class="card">
+          <p class="kind"><b>Tema</b>, flujo</p>
+          <h3>Título de la solución</h3>
+          <p class="desc">Una descripción corta de lo que resuelve, escrita por quien la creó.</p>
+          <div class="trail">
+            <svg
+              class="strip"
+              viewBox="0 0 300 28"
+              preserveAspectRatio="none"
+              fill="none"
+              aria-hidden="true"
+            >
+              <line
+                x1="0"
+                y1="14"
+                x2="300"
+                y2="14"
+                stroke="var(--lineage-origin)"
+                stroke-width="2.2"
+              />
+            </svg>
+          </div>
+          <p class="who">@persona <time>nov 2026</time></p>
+        </article>
+      </div>
+      <p class="note">
+        Ejemplo de estructura con texto de muestra. En la app, estos datos vienen siempre del hub.
+      </p>
+    </main>
+  </body>
+</html>
