@@ -78,7 +78,7 @@ async function handleSave(deps: FeedServiceDeps, request: RouteRequest): Promise
 async function handleCard(store: FeedStorePort, request: RouteRequest): Promise<RouteReply> {
   const found = await store.getCardByHandle(request.params["handle"] ?? "");
   if (!found.ok) return STORE_UNAVAILABLE;
-  return found.value ? { status: 200, body: { card: found.value } } : reply(404, "not_found");
+  return found.value ? { status: 200, body: { card: found.value } } : reply(404, "no_profile");
 }
 
 async function handleSearch(deps: FeedServiceDeps, request: RouteRequest): Promise<RouteReply> {
