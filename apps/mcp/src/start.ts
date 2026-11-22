@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { coreNodes, sampleDatasets } from "@nodomics/nodes-core";
+import { coreNodes } from "@nodomics/nodes-core";
 import { loadConfig } from "./config.ts";
-import { createEngineRunner } from "./engine-runner.ts";
 import { createSupabaseIdentity } from "./identity.ts";
-import { createNodeExecutors } from "./node-executors.ts";
 import { createMcpServer } from "./server.ts";
 import { createSupabaseStores } from "./supabase-stores.ts";
 import { createTools } from "./tools.ts";
+import { createWorkerRunner } from "./worker-runner.ts";
+
+/** A run past this is stopped by terminating its worker (ADR 0026 §6). */
+const RUN_TIMEOUT_MS = 60_000;
 
 const config = loadConfig(process.env);
 if (!config.ok) {
@@ -16,16 +18,9 @@ if (!config.ok) {
   process.exitCode = 1;
 } else {
   const options = { supabaseUrl: config.value.supabaseUrl, anonKey: config.value.supabaseAnonKey };
-  const runner = createEngineRunner({
-    createExecutors: createNodeExecutors({ withPython: true }),
-    catalog: coreNodes,
-    presetSources: Object.fromEntries(
-      Object.entries(sampleDatasets).map(([id, source]) => [
-        id,
-        { format: source.format, location: { kind: "url", url: source.url } },
-      ]),
-    ),
-    fetch,
+  const runner = createWorkerRunner({
+    workerUrl: new URL("./runner-worker.js", import.meta.url),
+    timeoutMs: RUN_TIMEOUT_MS,
   });
   const server = createMcpServer({
     identity: createSupabaseIdentity({ ...options, fetch }),

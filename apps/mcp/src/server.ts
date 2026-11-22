@@ -111,13 +111,17 @@ function formatToolResult(result: Awaited<ReturnType<Tools["call"]>>): CallToolR
   };
 }
 async function readBody(request: IncomingMessage): Promise<Result<unknown, string>> {
-  let body = "";
+  const chunks: Buffer[] = [];
+  let size = 0;
   for await (const chunk of request) {
-    body += String(chunk);
-    if (Buffer.byteLength(body) > MAX_REQUEST_BYTES) return err("Request body is too large");
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+    size += bytes.length;
+    if (size > MAX_REQUEST_BYTES) return err("Request body is too large");
+    chunks.push(bytes);
   }
   try {
-    return ok(JSON.parse(body));
+    // Decoded once: a character split across chunks would otherwise be corrupted.
+    return ok(JSON.parse(Buffer.concat(chunks).toString("utf8")));
   } catch {
     return err("Invalid JSON");
   }
