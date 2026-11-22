@@ -1,0 +1,14 @@
+{
+  "status": "incompatible",
+  "provenance": {
+    "repo": "psf/requests",
+    "commit": "147c8511ddbfa5e8f71bbf5c18ede0c4ceb3bba4",
+    "paths": ["requests/api.py"],
+    "license": "Apache-2.0"
+  },
+  "mapping": [],
+  "cases": [],
+  "outOfScope": [],
+  "missing": ["external_http_api", "network_access"],
+  "explanation": "Llamadas HTTP a servicios web externos en tiempo de ejecución no soportadas por el motor SQL."
+}
