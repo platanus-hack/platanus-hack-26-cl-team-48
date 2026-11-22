@@ -16,6 +16,10 @@ const OPERATIONS = [
     (service: Service) =>
       service.apply({ flowId: FLOW_ID, nodeId: NODE_ID, planHash: "h", secrets: {} }),
   ],
+  [
+    "redeploy",
+    (service: Service) => service.redeploy({ flowId: FLOW_ID, nodeId: NODE_ID, secrets: {} }),
+  ],
   ["list", (service: Service) => service.list(FLOW_ID)],
   ["remove", (service: Service) => service.remove("dep-1")],
 ] as const;

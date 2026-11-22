@@ -11,6 +11,7 @@ import {
 import type { EngineState, NodeRun } from "../engine/engine-state.ts";
 import { toUiEngine, toUiExecState } from "../engine/ui-types.ts";
 import { outputType } from "./connect-ports.ts";
+import { isResourceManifest, resourceState } from "./resource-nodes.ts";
 
 type NodeVariant = NonNullable<NodeProps["variant"]>;
 
@@ -104,7 +105,7 @@ function describeNode(
     variant: manifest === undefined ? "transform" : variantOf(manifest, node.params),
     inputs: describePorts(sources.flow, node, ports.inputs),
     outputs: describePorts(sources.flow, node, ports.outputs),
-    ...describeRun(sources.engine.nodes[node.id]),
+    ...describeRun(runShownFor(manifest, sources.engine.nodes[node.id])),
     ...describeIssues(sources.engine, node, manifest),
     ...describeResult(sources.engine, node),
     ...describeEngine(sources.engine, node.id),
@@ -153,6 +154,13 @@ function describePorts(flow: Flow, node: FlowNode, ports: ReadonlyArray<PortSpec
     ...(port.multi === undefined ? {} : { multi: port.multi }),
   }));
 }
+
+/** A resource node has no results to go stale: a stale one shows as not run (ADR 0027). */
+const runShownFor = (
+  manifest: NodeManifest | undefined,
+  run: NodeRun | undefined,
+): NodeRun | undefined =>
+  isResourceManifest(manifest) && resourceState(run?.state) === undefined ? undefined : run;
 
 function describeRun(run: NodeRun | undefined): Partial<NodeProps> {
   return {

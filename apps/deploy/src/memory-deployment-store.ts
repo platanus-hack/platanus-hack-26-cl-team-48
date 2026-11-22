@@ -19,6 +19,11 @@ export function createMemoryDeploymentStore(): DeploymentStore {
       records.set(record.id, record);
       return Promise.resolve(ok(undefined));
     },
+    updateStatus: (id, status, updatedAt) => {
+      const record = records.get(id);
+      if (record !== undefined) records.set(id, { ...record, status, updatedAt });
+      return Promise.resolve(ok(undefined));
+    },
     remove: (id) => {
       records.delete(id);
       return Promise.resolve(ok(undefined));

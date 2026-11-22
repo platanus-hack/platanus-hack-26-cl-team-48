@@ -113,6 +113,20 @@ const coordinatorWithoutExecutors = () => {
   return { events, setAndRun };
 };
 
+const repoWithoutUrlFlow = () => flowOf([flowNode("r", "core.deploy.repo", {})], []);
+
+const unconnectedServiceFlow = () =>
+  flowOf(
+    [flowNode("svc", "core.deploy.service", { build: "native", startCommand: "npm start" })],
+    [],
+  );
+
+const lastStatusOf = (harness: ReturnType<typeof createHarness>, runId: string, nodeId: string) =>
+  harness
+    .events("node.status")
+    .filter((status) => status.runId === runId && status.nodeId === nodeId)
+    .at(-1);
+
 const resultsOf = (harness: ReturnType<typeof createHarness>) =>
   harness
     .events("node.result")
@@ -202,5 +216,82 @@ describe("createCoordinator: resource nodes", () => {
         .filter((status) => status.nodeId === "svc")
         .map((status) => status.state),
     ).toContain("done");
+  });
+});
+
+describe("createCoordinator: misconfigured resource nodes", () => {
+  it("ends a repo without its required url in error", async () => {
+    const harness = harnessWithResources();
+
+    const runId = await harness.setAndRun(repoWithoutUrlFlow(), 1);
+
+    expect(harness.statesOf(runId, "r").at(-1)).toBe("error");
+  });
+
+  it("reports the missing url config issue as the repo error", async () => {
+    const harness = harnessWithResources();
+    const { errors } = await harness.coordinator["flow.set"]({
+      rev: 1,
+      flow: repoWithoutUrlFlow(),
+    });
+    const issue = errors.find((candidate) => candidate.nodeId === "r");
+
+    const runId = await harness.run(1);
+
+    expect(issue).toMatchObject({ code: "PARAM_REQUIRED", param: "url" });
+    expect(lastStatusOf(harness, runId, "r")?.error).toMatchObject({
+      code: issue?.code,
+      message: issue?.message,
+    });
+  });
+
+  it("finishes the run as error when a repo is misconfigured", async () => {
+    const harness = harnessWithResources();
+
+    const runId = await harness.setAndRun(repoWithoutUrlFlow(), 1);
+
+    expect(harness.events("run.finished")).toMatchObject([{ runId, status: "error" }]);
+  });
+
+  it("ends a service without its repo input connected in error with INPUT_MISSING", async () => {
+    const harness = harnessWithResources();
+
+    const runId = await harness.setAndRun(unconnectedServiceFlow(), 1);
+
+    expect(lastStatusOf(harness, runId, "svc")).toMatchObject({
+      state: "error",
+      error: { code: "INPUT_MISSING" },
+    });
+  });
+
+  it("finishes the run as error when a service has no repo connected", async () => {
+    const harness = harnessWithResources();
+
+    const runId = await harness.setAndRun(unconnectedServiceFlow(), 1);
+
+    expect(harness.events("run.finished")).toMatchObject([{ runId, status: "error" }]);
+  });
+
+  it("still never sends a misconfigured resource node to an executor", async () => {
+    const harness = harnessWithResources();
+
+    await harness.setAndRun(repoWithoutUrlFlow(), 1);
+
+    expect(harness.sql.tasks).toEqual([]);
+    expect(harness.python.tasks).toEqual([]);
+  });
+
+  it("reports a misconfigured resource node as error even without executors", async () => {
+    const engine = coordinatorWithoutExecutors();
+
+    await engine.setAndRun(repoWithoutUrlFlow());
+
+    expect(
+      engine
+        .events("node.status")
+        .filter((status) => status.nodeId === "r")
+        .at(-1),
+    ).toMatchObject({ state: "error", error: { code: "PARAM_REQUIRED" } });
+    expect(engine.events("run.finished")).toMatchObject([{ status: "error" }]);
   });
 });

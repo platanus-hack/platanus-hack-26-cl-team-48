@@ -40,6 +40,10 @@ export function createHttpDeployService(deps: HttpDeployDeps): DeployService {
       const reply = await send({ method: "POST", path: "/apply", body: request });
       return reply.ok ? parsedOr(parseDeployment(reply.value["deployment"])) : reply;
     },
+    redeploy: async (request) => {
+      const reply = await send({ method: "POST", path: "/redeploy", body: request });
+      return reply.ok ? parsedOr(parseDeployment(reply.value["deployment"])) : reply;
+    },
     list: async (flowId) => {
       const reply = await send({ method: "GET", path: deploymentsPath(flowId) });
       return reply.ok ? parsedOr(parseDeployments(reply.value["deployments"])) : reply;

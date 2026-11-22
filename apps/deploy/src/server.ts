@@ -2,6 +2,7 @@ import { parse } from "@nodomics/protocol";
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import type { DeployUseCases } from "./deploy-use-cases.ts";
 import type { IdentityPort } from "./identity.ts";
+import { createRateLimiter, type RateLimit } from "./rate-limiter.ts";
 import type { DeployErrorCode, UserIdentity } from "./types.ts";
 
 export const MAX_BODY_BYTES = 64 * 1024;
@@ -18,6 +19,12 @@ export type DeployHandlerDeps = {
   readonly identity: IdentityPort;
   readonly useCases: DeployUseCases;
   readonly allowedOrigins: readonly string[];
+  readonly rateLimit?: RateLimit;
+  readonly now?: () => number;
+};
+type Responder = {
+  readonly deps: DeployHandlerDeps;
+  readonly isAllowed: (userId: string) => boolean;
 };
 
 const HTTP_OK = 200;
@@ -40,6 +47,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   DEPLOYMENT_NOT_FOUND: 404,
   PROVIDER_ERROR: 502,
   UNAVAILABLE: 503,
+  SERVICE_KIND_CHANGED: 409,
+  RATE_LIMITED: 429,
 };
 const CORS_METHODS = "GET, POST, DELETE, OPTIONS";
 const CORS_HEADERS = "authorization, content-type";
@@ -51,6 +60,11 @@ const ApplyBody = Type.Object({
   flowId: Id,
   nodeId: Id,
   planHash: Id,
+  secrets: Type.Optional(Type.Record(Type.String(), Type.String())),
+});
+const RedeployBody = Type.Object({
+  flowId: Id,
+  nodeId: Id,
   secrets: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
@@ -74,6 +88,18 @@ const ROUTES: Readonly<Record<string, RouteHandler>> = {
       ? json(HTTP_OK, { ok: true, deployment: deployment.value })
       : failed(deployment.error);
   },
+  "POST /redeploy": async ({ useCases, identity, request }) => {
+    const body = await bodyOf(request, RedeployBody);
+    if (body instanceof Response) return body;
+    const deployment = await useCases.redeploy(identity, {
+      flowId: body.flowId,
+      nodeId: body.nodeId,
+      secrets: body.secrets ?? {},
+    });
+    return deployment.ok
+      ? json(HTTP_OK, { ok: true, deployment: deployment.value })
+      : failed(deployment.error);
+  },
   "GET /deployments": async ({ useCases, identity, url }) => {
     const flowId = url.searchParams.get("flowId") ?? "";
     if (flowId === "") return failed({ code: "BAD_REQUEST", message: "flowId is required" });
@@ -88,10 +114,13 @@ const ROUTES: Readonly<Record<string, RouteHandler>> = {
 export function createDeployHandler(
   deps: DeployHandlerDeps,
 ): (request: Request) => Promise<Response> {
+  const responder = { deps, isAllowed: rateLimiterOf(deps) };
   return async (request) => {
     const origin = allowedOriginOf(request, deps.allowedOrigins);
     const response =
-      request.method === "OPTIONS" ? preflight(origin !== undefined) : await respond(deps, request);
+      request.method === "OPTIONS"
+        ? preflight(origin !== undefined)
+        : await respond(responder, request);
     return origin === undefined ? response : withCors(response, origin);
   };
 }
@@ -101,21 +130,33 @@ function allowedOriginOf(request: Request, allowedOrigins: readonly string[]): s
   return origin !== null && allowedOrigins.includes(origin) ? origin : undefined;
 }
 
-async function respond(deps: DeployHandlerDeps, request: Request): Promise<Response> {
+function rateLimiterOf({ rateLimit, now = Date.now }: DeployHandlerDeps) {
+  return rateLimit === undefined ? () => true : createRateLimiter(rateLimit, now);
+}
+
+async function respond({ deps, isAllowed }: Responder, request: Request): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/health") return json(HTTP_OK, { ok: true });
   const route = routeOf(request.method, url.pathname);
   if (route === undefined) return failed({ code: "NOT_FOUND", message: "There is no such route" });
   const identity = await deps.identity.resolve(request.headers.get("authorization") ?? undefined);
   if (!identity.ok) return failed(identity.error);
+  if (!isAllowed(identity.value.userId))
+    return failed({ code: "RATE_LIMITED", message: "Too many requests; try again in a moment" });
   return route({ useCases: deps.useCases, identity: identity.value, request, url });
 }
 
 function routeOf(method: string, pathname: string): RouteHandler | undefined {
   const deploymentId = DEPLOYMENT_PATH.exec(pathname)?.[1];
   if (method === "DELETE" && deploymentId !== undefined)
-    return ({ useCases, identity }) =>
-      removeDeployment(useCases, identity, decodeURIComponent(deploymentId));
+    return ({ useCases, identity }) => {
+      const decoded = decodedPathSegment(deploymentId);
+      return decoded === undefined
+        ? Promise.resolve(
+            failed({ code: "BAD_REQUEST", message: "The deployment id is not valid" }),
+          )
+        : removeDeployment(useCases, identity, decoded);
+    };
   return ROUTES[`${method} ${pathname}`];
 }
 
@@ -141,6 +182,14 @@ async function bodyOf<S extends TSchema>(
     );
   const body = parse(schema, parseJson(text));
   return body.ok ? body.value : failed({ code: "BAD_REQUEST", message: "The body is not valid" });
+}
+
+function decodedPathSegment(segment: string): string | undefined {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return undefined;
+  }
 }
 
 function parseJson(text: string): unknown {

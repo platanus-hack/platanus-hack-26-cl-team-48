@@ -37,3 +37,8 @@ export const isNotConfigured = (
   ...results: ReadonlyArray<DeployResult<unknown> | undefined>
 ): boolean =>
   results.some((result) => result?.ok === false && result.error.code === "NOT_CONFIGURED");
+
+export const canRedeploy = (
+  plan: DeployResult<DeployPlan> | undefined,
+  deployment: Deployment | undefined,
+): boolean => deployment !== undefined && plan?.ok === true && plan.value.action === "unchanged";

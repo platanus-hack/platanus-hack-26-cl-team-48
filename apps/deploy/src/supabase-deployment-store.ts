@@ -46,6 +46,8 @@ export function createSupabaseDeploymentStore(options: {
     countAll: () => count(client, undefined),
     save: (record) => write(client.from(TABLE).upsert(rowOf(record), { onConflict: "id" })),
     remove: (id) => write(client.from(TABLE).delete().eq("id", id)),
+    updateStatus: (id, status, updatedAt) =>
+      write(client.from(TABLE).update({ status, updated_at: updatedAt }).eq("id", id)),
   };
 }
 

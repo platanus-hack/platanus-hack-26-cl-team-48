@@ -298,9 +298,19 @@ export const MESSAGES = {
       unchanged: "Sin cambios para desplegar",
     },
     changes: "Campos que cambian",
+    planFields: {
+      repo: "Repo",
+      build: "Construcción",
+      env: "Variables de entorno",
+      healthCheckPath: "Comprobación de salud",
+    },
     deploy: "Desplegar",
     confirmDeployQuestion: "El servicio quedará publicado en internet. ¿Desplegar ahora?",
     confirmDeploy: "Confirmar despliegue",
+    redeploy: "Redesplegar",
+    confirmRedeployQuestion:
+      "Se volverá a construir el servicio con el último commit de la rama y las credenciales actuales.",
+    confirmRedeploy: "Confirmar redespliegue",
     remove: "Eliminar servicio",
     confirmRemoveQuestion: "El servicio se borrará y su dirección dejará de funcionar.",
     confirmRemove: "Confirmar eliminación",
@@ -311,7 +321,7 @@ export const MESSAGES = {
     orphansHint: "Siguen publicados aunque su nodo ya no está en el flujo.",
     noUrl: "Todavía sin dirección",
     errors: {
-      MISSING_REPO: "Conecta un nodo Repositorio a la entrada del servicio.",
+      MISSING_REPO: "Conecta un nodo Repo a la entrada del servicio.",
       INVALID_REPO: "El repositorio debe ser una URL https://github.com/dueño/repositorio.",
       INVALID_SPEC:
         "Revisa los parámetros: falta uno obligatorio o una variable de entorno no es válida.",
@@ -321,6 +331,9 @@ export const MESSAGES = {
       MISSING_SECRET: "Falta una credencial que usan las variables de entorno.",
       UNAUTHORIZED: "Tu sesión expiró. Vuelve a entrar para desplegar.",
       UNAVAILABLE: "El servicio de hosteo no responde. Vuelve a intentar en un momento.",
+      SERVICE_KIND_CHANGED:
+        "No se puede cambiar entre Estático y Docker/Nativo en un servicio desplegado. Elimínalo y vuelve a desplegar.",
+      RATE_LIMITED: "Demasiadas solicitudes seguidas. Espera un momento y vuelve a intentar.",
       generic: "No pudimos completar el despliegue. Vuelve a intentar en un momento.",
     },
   },
@@ -376,6 +389,7 @@ export const MESSAGES = {
     title: "Vista previa",
     empty: "Selecciona un nodo para ver sus datos.",
     noResult: "Ejecuta el flujo para ver los datos de este nodo.",
+    resource: "Este nodo describe algo que se despliega: no produce datos.",
     tabs: { data: "Datos", profile: "Perfil", chart: "Gráfico" },
     previous: "Página anterior",
     next: "Página siguiente",

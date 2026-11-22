@@ -1,5 +1,5 @@
 import { ok } from "@nodomics/protocol";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useDeploy } from "./deploy-context.ts";
 import type { DeployErrorCode, Deployment, DeployPlan, DeployResult } from "./deploy-service.ts";
 import { withDeployment, withoutDeployment } from "./deploy-view.ts";
@@ -7,6 +7,7 @@ import { withDeployment, withoutDeployment } from "./deploy-view.ts";
 /** The provider refreshes a service's status on its own; the tab follows it while open. */
 const REFRESH_INTERVAL_MS = 5000;
 
+type Secrets = Readonly<Record<string, string>>;
 type Target = { readonly flowId: string; readonly nodeId: string };
 
 export type DeploymentsState = {
@@ -15,7 +16,8 @@ export type DeploymentsState = {
   readonly isBusy: boolean;
   readonly failure: DeployErrorCode | undefined;
   readonly refresh: () => void;
-  readonly deploy: (secrets: Readonly<Record<string, string>>) => void;
+  readonly deploy: (secrets: Secrets) => void;
+  readonly redeploy: (secrets: Secrets) => void;
   readonly remove: (deploymentId: string) => void;
 };
 
@@ -27,32 +29,52 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const [plan, setPlan] = useState<DeploymentsState["plan"]>();
   const [isBusy, setBusy] = useState(false);
   const [failure, setFailure] = useState<DeployErrorCode>();
+  // Every request takes a turn; a reply is shown only if no later turn was shown already. An action
+  // claims a turn when it ends, so a list sent before it ended cannot undo it.
+  const listTurns = useTurns();
+  const planTurns = useTurns();
 
-  const refresh = useCallback(() => {
-    void service.list(flowId).then(whileMounted(isMounted, setDeployments));
-  }, [service, flowId, isMounted]);
+  const refreshStatus = useCallback(() => {
+    void service.list(flowId).then(whileLatest(isMounted, listTurns.take(), setDeployments));
+  }, [service, flowId, isMounted, listTurns]);
   const requestPlan = useCallback(() => {
     setPlan(undefined);
-    void service.plan({ flowId, nodeId }).then(whileMounted(isMounted, setPlan));
-  }, [service, flowId, nodeId, isMounted]);
+    void service.plan({ flowId, nodeId }).then(whileLatest(isMounted, planTurns.take(), setPlan));
+  }, [service, flowId, nodeId, isMounted, planTurns]);
+
+  const refresh = useCallback(() => {
+    refreshStatus();
+    requestPlan();
+  }, [refreshStatus, requestPlan]);
 
   useEffect(() => {
     refresh();
-    requestPlan();
-    const timer = setInterval(refresh, REFRESH_INTERVAL_MS);
+    const timer = setInterval(refreshStatus, REFRESH_INTERVAL_MS);
     return () => {
       clearInterval(timer);
     };
-  }, [refresh, requestPlan]);
+  }, [refresh, refreshStatus]);
 
   const runAction = async <T>(action: Promise<DeployResult<T>>, onDone: (value: T) => void) => {
     setBusy(true);
     setFailure(undefined);
     const result = await action;
     if (!isMounted.current) return;
+    listTurns.take().claim();
     setBusy(false);
     if (result.ok) onDone(result.value);
-    else setFailure(result.error.code);
+    else failWith(result.error.code);
+  };
+
+  const failWith = (code: DeployErrorCode) => {
+    setFailure(code);
+    if (code === "PLAN_CHANGED") requestPlan();
+  };
+
+  const showDeployment = (deployment: Deployment) => {
+    setDeployments((current) =>
+      ok(withDeployment(current?.ok === true ? current.value : [], deployment)),
+    );
   };
 
   return {
@@ -66,12 +88,13 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
       void runAction(
         service.apply({ flowId, nodeId, planHash: plan.value.hash, secrets }),
         (created) => {
-          setDeployments((current) =>
-            ok(withDeployment(current?.ok === true ? current.value : [], created)),
-          );
+          showDeployment(created);
           requestPlan();
         },
       );
+    },
+    redeploy: (secrets) => {
+      void runAction(service.redeploy({ flowId, nodeId, secrets }), showDeployment);
     },
     remove: (deploymentId) => {
       void runAction(service.remove(deploymentId), () => {
@@ -83,11 +106,37 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   };
 }
 
-/** Drops replies that arrive after the tab closed. */
-const whileMounted =
-  <T>(isMounted: RefObject<boolean>, apply: (value: T) => void) =>
+type Turns = { readonly take: () => Turn };
+/** `claim` is true, once, when no later turn has been claimed before. */
+type Turn = { readonly claim: () => boolean };
+
+/** Numbers requests so a slow reply cannot overwrite the reply to a later request. */
+function useTurns(): Turns {
+  const taken = useRef(0);
+  const claimed = useRef(0);
+  return useMemo(
+    () => ({
+      take: () => {
+        taken.current += 1;
+        const turn = taken.current;
+        return {
+          claim: () => {
+            if (turn <= claimed.current) return false;
+            claimed.current = turn;
+            return true;
+          },
+        };
+      },
+    }),
+    [],
+  );
+}
+
+/** Drops replies that arrive after the tab closed or after the reply to a later request. */
+const whileLatest =
+  <T>(isMounted: RefObject<boolean>, turn: Turn, apply: (value: T) => void) =>
   (value: T) => {
-    if (isMounted.current) apply(value);
+    if (isMounted.current && turn.claim()) apply(value);
   };
 
 function useIsMounted(): RefObject<boolean> {

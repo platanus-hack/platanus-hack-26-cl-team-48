@@ -1,4 +1,5 @@
 import type { ResultRef } from "@nodomics/protocol";
+import { statusLabel } from "@nodomics/ui";
 import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -8,7 +9,7 @@ import {
   type PreviewLocationControls,
 } from "../layout/preview-location.ts";
 import { renderWithEngine } from "../testing/render-with-engine.tsx";
-import { BAR, CATALOG, SAMPLE, flowOf, nodeOf } from "./canvas-fixtures.ts";
+import { BAR, CATALOG, FILTER, SAMPLE, flowOf, manifestOf, nodeOf } from "./canvas-fixtures.ts";
 import { NodeCard } from "./NodeCard.tsx";
 import { toNodeViews } from "./node-views.ts";
 
@@ -152,5 +153,131 @@ describe("NodeCard with the preview in the nodes", () => {
     });
 
     expect(screen.getByText("Ejecuta el flujo para ver los datos de este nodo.")).toBeDefined();
+  });
+});
+
+const REPO = manifestOf("core.deploy.repo", {
+  name: "Repo",
+  category: "Hosteo",
+  icon: "git-branch",
+  inputs: [],
+  outputs: [{ id: "repo", type: "repo" }],
+  params: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
+  impl: { kind: "resource", resource: "repo" },
+});
+
+const SERVICE = manifestOf("core.deploy.service", {
+  name: "Servicio",
+  category: "Hosteo",
+  icon: "server",
+  inputs: [{ id: "repo", type: "repo" }],
+  outputs: [{ id: "service", type: "service" }],
+  impl: { kind: "resource", resource: "service" },
+});
+
+const CATALOG_WITH_RESOURCES = [...CATALOG, REPO, SERVICE];
+
+type ReportedState =
+  { readonly state: "stale" | "done" } | { readonly state: "error"; readonly message: string };
+
+function storesWithState(type: string, reported?: ReportedState): AppStores {
+  const stores = createAppStores(flowOf([nodeOf("n", type)]));
+  const { dispatch } = stores.engineStore.getState();
+  dispatch({ type: "catalog.loaded", nodes: CATALOG_WITH_RESOURCES });
+  if (reported === undefined) return stores;
+  dispatch({ type: "run.requested", rev: 0 });
+  dispatch({ type: "run.started", rev: 0, runId: "run" });
+  dispatch({
+    type: "node.status",
+    payload:
+      reported.state === "error"
+        ? {
+            rev: 0,
+            runId: "run",
+            nodeId: "n",
+            state: "error",
+            error: { code: "PARAM_REQUIRED", message: reported.message, param: "url" },
+          }
+        : { rev: 0, runId: "run", nodeId: "n", state: reported.state },
+  });
+  return stores;
+}
+
+async function renderNodeOfType(
+  type: string,
+  location: PreviewLocationControls["location"],
+  reported?: ReportedState,
+) {
+  const stores = storesWithState(type, reported);
+  const [view] = toNodeViews({
+    flow: stores.flowStore.getState().state.flow,
+    catalog: CATALOG_WITH_RESOURCES,
+    engine: stores.engineStore.getState().state,
+  });
+  if (view === undefined) throw new Error("Missing node view");
+  const rendered = renderWithEngine(
+    <PreviewLocationContext value={{ location, openInPanel: () => undefined }}>
+      <NodeCard view={view} isSelected={false} isDragging={false} />
+    </PreviewLocationContext>,
+    { stores },
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return rendered;
+}
+
+const RUN_HINT = "Ejecuta el flujo para ver los datos de este nodo.";
+
+describe("NodeCard of a resource node", () => {
+  it.each([REPO.id, SERVICE.id])(
+    "does not ask %s to run the flow to see its data",
+    async (type) => {
+      await renderNodeOfType(type, "nodes");
+
+      expect(screen.queryByText(RUN_HINT)).toBeNull();
+    },
+  );
+
+  it("never shows a stale repo as Desactualizado", async () => {
+    await renderNodeOfType(REPO.id, "panel", { state: "stale" });
+
+    expect(screen.queryByText(statusLabel("stale"))).toBeNull();
+  });
+
+  it("shows a stale repo as not run", async () => {
+    await renderNodeOfType(REPO.id, "panel", { state: "stale" });
+
+    expect(screen.getByRole("group", { name: /Repo, Sin ejecutar/ })).toBeDefined();
+  });
+
+  it("shows a repo without news from the engine as not run", async () => {
+    await renderNodeOfType(REPO.id, "panel");
+
+    expect(screen.getByRole("group", { name: /Repo, Sin ejecutar/ })).toBeDefined();
+  });
+
+  it("shows a failed repo as error with its message", async () => {
+    await renderNodeOfType(REPO.id, "panel", {
+      state: "error",
+      message: 'Falta el parámetro "url"',
+    });
+
+    expect(screen.getByRole("group", { name: /Repo, Error/ })).toBeDefined();
+    expect(screen.getByText('Falta el parámetro "url"')).toBeDefined();
+  });
+});
+
+describe("NodeCard of a data node next to resource nodes", () => {
+  it("still asks to run the flow to see its data", async () => {
+    await renderNodeOfType(FILTER.id, "nodes");
+
+    expect(screen.getByText(RUN_HINT)).toBeDefined();
+  });
+
+  it("still shows a stale node as Desactualizado", async () => {
+    await renderNodeOfType(FILTER.id, "panel", { state: "stale" });
+
+    expect(screen.getByText(statusLabel("stale"))).toBeDefined();
   });
 });

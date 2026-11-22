@@ -1,4 +1,5 @@
 import type { FlowNode, NodeManifest } from "@nodomics/protocol";
+import { isResourceManifest, resourceState } from "../canvas/resource-nodes.ts";
 import { useId, useRef } from "react";
 import { Button, ICON_SIZE, Icon, StatusIndicator } from "@nodomics/ui";
 import { NODE_ACTION_MESSAGES } from "../canvas/node-action-messages.ts";
@@ -114,7 +115,11 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
           </span>
           <h3>{node.label ?? manifest.name}</h3>
         </div>
-        <NodeRunHeader nodeId={node.id} />
+        {isResourceManifest(manifest) ? (
+          <ResourceStatusHeader nodeId={node.id} />
+        ) : (
+          <NodeRunHeader nodeId={node.id} />
+        )}
         {manifest.description !== undefined && (
           <p className="web-params-description">{manifest.description}</p>
         )}
@@ -157,6 +162,16 @@ const isService = ({ impl }: NodeManifest) =>
   impl.kind === "resource" && impl.resource === "service";
 
 /** The node's last run and a way to run just it, as on its card in the canvas. */
+/** A resource node is never run: only whether it is well configured shows. */
+function ResourceStatusHeader({ nodeId }: { readonly nodeId: string }) {
+  const state = useEngineState((engine) => engine.nodes[nodeId]?.state);
+  return (
+    <div className="web-params-node-run">
+      <StatusIndicator state={toUiExecState(resourceState(state))} />
+    </div>
+  );
+}
+
 function NodeRunHeader({ nodeId }: { readonly nodeId: string }) {
   const state = useEngineState((engine) => engine.nodes[nodeId]?.state);
   const run = useRunFlow();

@@ -9,7 +9,7 @@ import { createMemoryHostingProvider } from "./memory-hosting-provider.ts";
 import { hashSpec } from "./spec/plan.ts";
 import { serviceSpecOf } from "./spec/service-spec.ts";
 import { deployFlow } from "./testing/deploy-flows.ts";
-import type { ServiceSpec, UserIdentity } from "./types.ts";
+import type { DeploymentStatus, ServiceSpec, UserIdentity } from "./types.ts";
 
 const ALICE: UserIdentity = {
   userId: "3F2A9C1E-77aa-4b4b-9e0d-123456789abc",
@@ -33,6 +33,8 @@ type Overrides = {
   readonly provider?: Partial<HostingProvider>;
   readonly store?: Partial<DeploymentStore>;
   readonly reader?: FlowReader;
+  readonly now?: () => Date;
+  readonly reportOrphan?: (serviceId: string) => void;
 };
 
 function fakeFlows() {
@@ -47,7 +49,9 @@ function fakeFlows() {
   };
   const set = (identity: UserIdentity, flowId: string, flow: Flow) =>
     flows.set(keyOf(identity.userId, flowId), flow);
-  return { reader, set, reads };
+  const remove = (identity: UserIdentity, flowId: string) =>
+    flows.delete(keyOf(identity.userId, flowId));
+  return { reader, set, remove, reads };
 }
 
 function recordingProvider() {
@@ -85,6 +89,7 @@ function delegatingStore(store: DeploymentStore, overrides: Partial<DeploymentSt
     countAll: () => store.countAll(),
     save: (record) => store.save(record),
     remove: (id) => store.remove(id),
+    updateStatus: (id, status, updatedAt) => store.updateStatus(id, status, updatedAt),
     ...overrides,
   };
   return deployments;
@@ -100,8 +105,9 @@ function setup(overrides: Overrides = {}) {
     flows: overrides.reader ?? flows.reader,
     deployments: delegatingStore(store, overrides.store),
     provider: { ...recording.provider, ...overrides.provider },
-    now: () => NOW,
+    now: overrides.now ?? (() => NOW),
     createId: () => `dep-${String((nextId += 1))}`,
+    ...(overrides.reportOrphan === undefined ? {} : { reportOrphan: overrides.reportOrphan }),
   });
   return { useCases, flows, store, ...recording };
 }
@@ -712,5 +718,695 @@ describe("remove", () => {
     const result = await useCases.remove(ALICE, deployment.id);
 
     expect(codeOf(result)).toBe("PROVIDER_ERROR");
+  });
+});
+
+/** Lets the event loop run once, so that calls started together overlap inside the provider. */
+const nextTick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/** A provider whose create resolves only after a tick, counting how many times it was called. */
+function slowCreateProvider() {
+  const memory = createMemoryHostingProvider();
+  const created: string[] = [];
+  const provider: Partial<HostingProvider> = {
+    create: async (input) => {
+      created.push(input.name);
+      await nextTick();
+      return memory.create(input);
+    },
+  };
+  return { provider, created };
+}
+
+async function applyCreate(useCases: DeployUseCases, flowId: string) {
+  return useCases.apply(ALICE, {
+    flowId,
+    nodeId: "web",
+    planHash: hashSpec(specOfFlow(FLOW)),
+    secrets: SECRETS,
+  });
+}
+
+describe("apply — quotas under concurrency", () => {
+  it("lets only one of two parallel creates through when the user has one slot left", async () => {
+    const slow = slowCreateProvider();
+    const { useCases, flows, store } = setup({ provider: slow.provider });
+    flows.set(ALICE, "flow-2", FLOW);
+    flows.set(ALICE, "flow-3", FLOW);
+    await store.save(recordOf({ id: "a1", flowId: "other-1" }));
+
+    const results = await Promise.all([
+      applyCreate(useCases, "flow-2"),
+      applyCreate(useCases, "flow-3"),
+    ]);
+
+    expect(results.map(codeOf).sort()).toEqual(["QUOTA_USER", undefined]);
+    expect(slow.created).toHaveLength(1);
+    expect(await store.countByOwner(ALICE.userId)).toEqual({ ok: true, value: 2 });
+  });
+
+  it("lets only one of two parallel creates through when there is one slot left in total", async () => {
+    const slow = slowCreateProvider();
+    const { useCases, flows, store } = setup({ provider: slow.provider });
+    flows.set(ALICE, "flow-2", FLOW);
+    flows.set(ALICE, "flow-3", FLOW);
+    for (let index = 0; index < 19; index += 1)
+      await store.save(
+        recordOf({ id: `other-${String(index)}`, ownerId: `user-${String(index)}` }),
+      );
+
+    const results = await Promise.all([
+      applyCreate(useCases, "flow-2"),
+      applyCreate(useCases, "flow-3"),
+    ]);
+
+    expect(results.map(codeOf).sort()).toEqual(["QUOTA_TOTAL", undefined]);
+    expect(slow.created).toHaveLength(1);
+    expect(await store.countAll()).toEqual({ ok: true, value: 20 });
+  });
+
+  it("still creates both services when two parallel creates fit in the quota", async () => {
+    const slow = slowCreateProvider();
+    const { useCases, flows } = setup({ provider: slow.provider });
+    flows.set(ALICE, "flow-2", FLOW);
+    flows.set(ALICE, "flow-3", FLOW);
+
+    const results = await Promise.all([
+      applyCreate(useCases, "flow-2"),
+      applyCreate(useCases, "flow-3"),
+    ]);
+
+    expect(results.map(codeOf)).toEqual([undefined, undefined]);
+    expect(slow.created).toHaveLength(2);
+  });
+});
+
+describe("apply — orphan compensation", () => {
+  it("fails with UNAVAILABLE and removes the created service when the record cannot be saved", async () => {
+    const { useCases, calls, services } = setup({
+      store: { save: () => Promise.resolve(err({ message: "Supabase down" })) },
+    });
+    const planHash = await planHashOf(useCases);
+
+    const result = await useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash,
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(calls).toEqual(["create", "remove srv-1"]);
+    expect(services.size).toBe(0);
+  });
+
+  it("removes the service id that create returned", async () => {
+    const removed: string[] = [];
+    const { useCases } = setup({
+      provider: {
+        create: () => Promise.resolve(ok({ serviceId: "srv-orphan-42" })),
+        remove: (serviceId) => {
+          removed.push(serviceId);
+          return Promise.resolve(ok(undefined));
+        },
+      },
+      store: { save: () => Promise.resolve(err({ message: "Supabase down" })) },
+    });
+    const planHash = await planHashOf(useCases);
+
+    const result = await useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash,
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(removed).toEqual(["srv-orphan-42"]);
+  });
+});
+
+describe("redeploy", () => {
+  const EDITED_FLOW = deployFlow({ repo: { branch: "release" }, service: { env: ENV } });
+  const LATER = new Date("2026-11-22T12:30:00.000Z");
+
+  function movableClock() {
+    let current = NOW;
+    return { now: () => current, advanceTo: (date: Date) => (current = date) };
+  }
+
+  function updateRecorder() {
+    const memory = createMemoryHostingProvider();
+    const updates: { serviceId: string; input: { spec: ServiceSpec; secrets: unknown } }[] = [];
+    const provider: Partial<HostingProvider> = {
+      create: (input) => memory.create(input),
+      update: (serviceId, input) => {
+        updates.push({ serviceId, input });
+        return memory.update(serviceId, input);
+      },
+      status: (serviceId) => memory.status(serviceId),
+    };
+    return { provider, updates };
+  }
+
+  it("fails with DEPLOYMENT_NOT_FOUND when the node was never deployed", async () => {
+    const { useCases, calls } = setup();
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("DEPLOYMENT_NOT_FOUND");
+    expect(calls).toEqual([]);
+  });
+
+  it("fails with PLAN_CHANGED without updating when the flow changed since the deploy", async () => {
+    const { useCases, flows, calls } = setup();
+    await deployOnce(useCases);
+    flows.set(ALICE, "flow-1", EDITED_FLOW);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("PLAN_CHANGED");
+    expect(calls).toEqual(["create"]);
+  });
+
+  it("fails with MISSING_SECRET without updating when a secret has no value", async () => {
+    const { useCases, calls } = setup();
+    await deployOnce(useCases);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: {},
+    });
+
+    expect(codeOf(result)).toBe("MISSING_SECRET");
+    expect(calls).toEqual(["create"]);
+  });
+
+  it("updates the provider service with the deployed spec and the given secrets", async () => {
+    const recorder = updateRecorder();
+    const { useCases } = setup({ provider: recorder.provider });
+    await deployOnce(useCases);
+
+    await useCases.redeploy(ALICE, { flowId: "flow-1", nodeId: "web", secrets: SECRETS });
+
+    expect(recorder.updates).toEqual([
+      { serviceId: "srv-1", input: { spec: specOfFlow(FLOW), secrets: SECRETS } },
+    ]);
+  });
+
+  it("returns the deployment as deploying with the current time", async () => {
+    const clock = movableClock();
+    const { useCases } = setup({ now: clock.now });
+    const deployed = await deployOnce(useCases);
+    await useCases.list(ALICE, "flow-1");
+    clock.advanceTo(LATER);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { ...deployed, status: "deploying", updatedAt: LATER.toISOString() },
+    });
+  });
+
+  it("saves the record as deploying with the current time and the same spec", async () => {
+    const clock = movableClock();
+    const { useCases, store } = setup({ now: clock.now });
+    await deployOnce(useCases);
+    await useCases.list(ALICE, "flow-1");
+    clock.advanceTo(LATER);
+
+    await useCases.redeploy(ALICE, { flowId: "flow-1", nodeId: "web", secrets: SECRETS });
+
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: {
+        id: "dep-1",
+        providerServiceId: "srv-1",
+        specHash: hashSpec(specOfFlow(FLOW)),
+        status: "deploying",
+        updatedAt: LATER.toISOString(),
+      },
+    });
+  });
+
+  it("never saves the secret values in the record when redeploying", async () => {
+    const { useCases, store } = setup();
+    await deployOnce(useCases);
+
+    await useCases.redeploy(ALICE, { flowId: "flow-1", nodeId: "web", secrets: SECRETS });
+
+    expect(JSON.stringify(await store.listByFlow(ALICE.userId, "flow-1"))).not.toContain(
+      SECRET_VALUE,
+    );
+  });
+
+  it("fails with PROVIDER_ERROR when the provider cannot update", async () => {
+    const { useCases } = setup({
+      provider: { update: () => Promise.resolve(err({ message: "Render is down" })) },
+    });
+    await deployOnce(useCases);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("PROVIDER_ERROR");
+  });
+
+  it("fails with FLOW_NOT_FOUND when the flow no longer exists", async () => {
+    const { useCases, flows, calls } = setup();
+    await deployOnce(useCases);
+    flows.remove(ALICE, "flow-1");
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("FLOW_NOT_FOUND");
+    expect(calls).toEqual(["create"]);
+  });
+
+  it("fails with FLOW_NOT_FOUND when redeploying another user's flow", async () => {
+    const { useCases, calls } = setup();
+    await deployOnce(useCases);
+
+    const result = await useCases.redeploy(BOB, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("FLOW_NOT_FOUND");
+    expect(calls).toEqual(["create"]);
+  });
+});
+
+describe("plan and apply — changing the kind of service", () => {
+  const flowWithBuild = (build: Record<string, unknown>) =>
+    deployFlow({ service: { env: ENV, ...build } });
+  const STATIC_FLOW = flowWithBuild({ build: "static", publishPath: "dist" });
+  const NATIVE_FLOW = flowWithBuild({ build: "native" });
+  const DOCKER_FLOW = flowWithBuild({ build: "docker" });
+
+  async function deployedAs(flow: Flow) {
+    const context = setup();
+    context.flows.set(ALICE, "flow-1", flow);
+    await deployOnce(context.useCases);
+    return context;
+  }
+
+  it.each<[string, Flow, Flow]>([
+    ["static to native", STATIC_FLOW, NATIVE_FLOW],
+    ["static to docker", STATIC_FLOW, DOCKER_FLOW],
+    ["native to static", NATIVE_FLOW, STATIC_FLOW],
+    ["docker to static", DOCKER_FLOW, STATIC_FLOW],
+  ])("fails the plan with SERVICE_KIND_CHANGED from %s", async (_case, before, after) => {
+    const { useCases, flows } = await deployedAs(before);
+    flows.set(ALICE, "flow-1", after);
+
+    const result = await useCases.plan(ALICE, { flowId: "flow-1", nodeId: "web" });
+
+    expect(codeOf(result)).toBe("SERVICE_KIND_CHANGED");
+  });
+
+  it.each<[string, Flow, Flow]>([
+    ["static to native", STATIC_FLOW, NATIVE_FLOW],
+    ["native to static", NATIVE_FLOW, STATIC_FLOW],
+  ])(
+    "fails the apply with SERVICE_KIND_CHANGED from %s without calling the provider",
+    async (_case, before, after) => {
+      const { useCases, flows, calls } = await deployedAs(before);
+      flows.set(ALICE, "flow-1", after);
+
+      const result = await useCases.apply(ALICE, {
+        flowId: "flow-1",
+        nodeId: "web",
+        planHash: hashSpec(specOfFlow(after)),
+        secrets: SECRETS,
+      });
+
+      expect(codeOf(result)).toBe("SERVICE_KIND_CHANGED");
+      expect(calls).toEqual(["create"]);
+    },
+  );
+
+  it.each<[string, Flow, Flow]>([
+    ["native to docker", NATIVE_FLOW, DOCKER_FLOW],
+    ["docker to native", DOCKER_FLOW, NATIVE_FLOW],
+  ])("plans a normal update from %s", async (_case, before, after) => {
+    const { useCases, flows } = await deployedAs(before);
+    flows.set(ALICE, "flow-1", after);
+
+    const result = await useCases.plan(ALICE, { flowId: "flow-1", nodeId: "web" });
+
+    expect(result).toMatchObject({ ok: true, value: { action: "update" } });
+  });
+
+  it("applies an update from native to docker on the same service", async () => {
+    const { useCases, flows, calls } = await deployedAs(NATIVE_FLOW);
+    flows.set(ALICE, "flow-1", DOCKER_FLOW);
+
+    const result = await useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash: hashSpec(specOfFlow(DOCKER_FLOW)),
+      secrets: SECRETS,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual(["create", "update srv-1"]);
+  });
+});
+
+/** A provider status that stays pending until the test releases it with a status. */
+function deferredStatus() {
+  let release: (status: DeploymentStatus) => void = () => undefined;
+  let markCalled: () => void = () => undefined;
+  const called = new Promise<void>((resolve) => {
+    markCalled = resolve;
+  });
+  const status: HostingProvider["status"] = () =>
+    new Promise((resolve) => {
+      release = (value) => {
+        resolve(ok(value));
+      };
+      markCalled();
+    });
+  return {
+    status,
+    called,
+    release: (value: DeploymentStatus) => {
+      release(value);
+    },
+  };
+}
+
+/** A provider status where every call stays pending until the test releases it by call index. */
+function queuedStatuses() {
+  const releases: ((status: DeploymentStatus) => void)[] = [];
+  const waiters: { count: number; resolve: () => void }[] = [];
+  const notifyWaiters = () => {
+    for (const waiter of waiters) if (releases.length >= waiter.count) waiter.resolve();
+  };
+  const status: HostingProvider["status"] = () =>
+    new Promise((resolve) => {
+      releases.push((value) => {
+        resolve(ok(value));
+      });
+      notifyWaiters();
+    });
+  const calledTimes = (count: number) =>
+    new Promise<void>((resolve) => {
+      waiters.push({ count, resolve });
+      notifyWaiters();
+    });
+  const release = (index: number, value: DeploymentStatus) => {
+    releases[index]?.(value);
+  };
+  return { status, calledTimes, release };
+}
+
+const settle = async () => {
+  for (let tick = 0; tick < 5; tick += 1) await nextTick();
+};
+
+describe("list — refreshing the status never overwrites concurrent changes", () => {
+  const EDITED_FLOW = deployFlow({ repo: { branch: "release" }, service: { env: ENV } });
+
+  it("does not bring back a deployment removed while its status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, store } = setup({ provider: { status: deferred.status } });
+    const deployment = await deployOnce(useCases);
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    const removing = useCases.remove(ALICE, deployment.id);
+    await settle();
+
+    deferred.release("live");
+    await Promise.all([listing, removing]);
+
+    expect(await store.countByOwner(ALICE.userId)).toEqual({ ok: true, value: 0 });
+    expect(await store.listByFlow(ALICE.userId, "flow-1")).toEqual({ ok: true, value: [] });
+  });
+
+  it("keeps the spec saved by an update applied while the status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, flows, store } = setup({ provider: { status: deferred.status } });
+    await deployOnce(useCases);
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    flows.set(ALICE, "flow-1", EDITED_FLOW);
+    const applying = useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash: hashSpec(specOfFlow(EDITED_FLOW)),
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("live");
+    const [, applied] = await Promise.all([listing, applying]);
+
+    expect(applied.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { spec: specOfFlow(EDITED_FLOW), specHash: hashSpec(specOfFlow(EDITED_FLOW)) },
+    });
+  });
+
+  const liveRecord = () =>
+    recordOf({
+      flowId: "flow-1",
+      nodeId: "web",
+      spec: specOfFlow(FLOW),
+      specHash: hashSpec(specOfFlow(FLOW)),
+      status: "live",
+    });
+  const updateOk = () => Promise.resolve(ok(undefined));
+
+  it("keeps the deploying status saved by a redeploy run while the status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, store } = setup({
+      provider: { status: deferred.status, update: updateOk },
+    });
+    await store.save(liveRecord());
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    const redeploying = useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("failed");
+    const [, redeployed] = await Promise.all([listing, redeploying]);
+
+    expect(redeployed.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "deploying" },
+    });
+  });
+
+  it("keeps the deploying status saved by an update applied while the status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, flows, store } = setup({
+      provider: { status: deferred.status, update: updateOk },
+    });
+    await store.save(liveRecord());
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    flows.set(ALICE, "flow-1", EDITED_FLOW);
+    const applying = useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash: hashSpec(specOfFlow(EDITED_FLOW)),
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("failed");
+    const [, applied] = await Promise.all([listing, applying]);
+
+    expect(applied.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "deploying", specHash: hashSpec(specOfFlow(EDITED_FLOW)) },
+    });
+  });
+
+  it("keeps the deploying status saved by a redeploy in the same millisecond as the stored record", async () => {
+    const deferred = deferredStatus();
+    const record = liveRecord();
+    const { useCases, store } = setup({
+      provider: { status: deferred.status, update: updateOk },
+      now: () => new Date(record.updatedAt),
+    });
+    await store.save(record);
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    const redeploying = useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("failed");
+    const [, redeployed] = await Promise.all([listing, redeploying]);
+
+    expect(redeployed.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "deploying" },
+    });
+  });
+
+  it("returns the current status when its refresh loses to a newer change", async () => {
+    const statuses = queuedStatuses();
+    const { useCases, store } = setup({ provider: { status: statuses.status } });
+    await store.save({ ...liveRecord(), status: "deploying" });
+    const firstListing = useCases.list(ALICE, "flow-1");
+    await statuses.calledTimes(1);
+    const secondListing = useCases.list(ALICE, "flow-1");
+    await statuses.calledTimes(2);
+    statuses.release(0, "live");
+    await firstListing;
+
+    statuses.release(1, "suspended");
+    const second = await secondListing;
+
+    expect(second).toMatchObject({ ok: true, value: [{ id: "seed", status: "live" }] });
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "live" },
+    });
+  });
+});
+
+describe("apply — reporting orphan services", () => {
+  const saveDown = () => Promise.resolve(err({ message: "Supabase down" }));
+
+  it("reports the created service as an orphan when it cannot be removed after the save failed", async () => {
+    const orphans: string[] = [];
+    const { useCases } = setup({
+      provider: {
+        create: () => Promise.resolve(ok({ serviceId: "srv-orphan-42" })),
+        remove: () => Promise.resolve(err({ message: "Render is down" })),
+      },
+      store: { save: saveDown },
+      reportOrphan: (serviceId) => orphans.push(serviceId),
+    });
+
+    const result = await applyCreate(useCases, "flow-1");
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(orphans).toEqual(["srv-orphan-42"]);
+  });
+
+  it("reports no orphan when the created service is removed after the save failed", async () => {
+    const orphans: string[] = [];
+    const { useCases } = setup({
+      store: { save: saveDown },
+      reportOrphan: (serviceId) => orphans.push(serviceId),
+    });
+
+    const result = await applyCreate(useCases, "flow-1");
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(orphans).toEqual([]);
+  });
+});
+
+describe("stored urls", () => {
+  const seededSpec = () => specOfFlow(FLOW);
+  const seededRecord = (url: string) =>
+    recordOf({
+      flowId: "flow-1",
+      nodeId: "web",
+      url,
+      spec: seededSpec(),
+      specHash: hashSpec(seededSpec()),
+    });
+  const SEEDED_DEPLOYMENT = {
+    id: "seed",
+    flowId: "flow-1",
+    nodeId: "web",
+    status: "live",
+    updatedAt: "2026-11-01T00:00:00.000Z",
+  };
+  const updateOk = () => Promise.resolve(ok(undefined));
+
+  it.each(["http://old.onrender.com", "javascript:alert(1)"])(
+    "lists a deployment stored with the url %s without its url",
+    async (url) => {
+      const { useCases, store } = setup();
+      await store.save(seededRecord(url));
+
+      const result = await useCases.list(ALICE, "flow-1");
+
+      expect(result).toEqual({ ok: true, value: [SEEDED_DEPLOYMENT] });
+    },
+  );
+
+  it("lists a deployment stored with an https url with that url", async () => {
+    const { useCases, store } = setup();
+    await store.save(seededRecord("https://seed.onrender.com"));
+
+    const result = await useCases.list(ALICE, "flow-1");
+
+    expect(result).toEqual({
+      ok: true,
+      value: [{ ...SEEDED_DEPLOYMENT, url: "https://seed.onrender.com" }],
+    });
+  });
+
+  it.each(["http://old.onrender.com", "javascript:alert(1)"])(
+    "redeploys a deployment stored with the url %s returning it without its url",
+    async (url) => {
+      const { useCases, store } = setup({ provider: { update: updateOk } });
+      await store.save(seededRecord(url));
+
+      const result = await useCases.redeploy(ALICE, {
+        flowId: "flow-1",
+        nodeId: "web",
+        secrets: SECRETS,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.ok ? result.value : undefined).not.toHaveProperty("url");
+    },
+  );
+
+  it("redeploys a deployment stored with an https url returning that url", async () => {
+    const { useCases, store } = setup({ provider: { update: updateOk } });
+    await store.save(seededRecord("https://seed.onrender.com"));
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(result).toMatchObject({ ok: true, value: { url: "https://seed.onrender.com" } });
   });
 });

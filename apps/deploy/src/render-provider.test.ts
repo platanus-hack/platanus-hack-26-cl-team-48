@@ -472,3 +472,97 @@ describe("createRenderProvider — failures", () => {
     expect(JSON.stringify(result)).not.toContain(SECRETS["github-token"]);
   });
 });
+
+describe("createRenderProvider — removing a service that is already gone", () => {
+  it("treats a 404 from Render as removed", async () => {
+    const { provider } = providerWith(() => json({ message: "not found" }, 404));
+
+    const result = await provider.remove("srv-gone");
+
+    expect(result).toEqual({ ok: true, value: undefined });
+  });
+
+  it("still fails on a 403 from Render", async () => {
+    const { provider } = providerWith(() => json({ message: "forbidden" }, 403));
+
+    const result = await provider.remove("srv-abc");
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("createRenderProvider — timeouts", () => {
+  const TIMEOUT_MS = 20;
+  const TEST_TIMEOUT_MS = 2_000;
+
+  const signalOf = (input: string | URL | Request, init?: RequestInit) =>
+    init?.signal ?? (input instanceof Request ? input.signal : undefined);
+
+  /** A fetch that never answers; it only rejects when the request is aborted. */
+  const hangingFetch = (input: string | URL | Request, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      const signal = signalOf(input, init);
+      if (signal === undefined) return;
+      if (signal.aborted) reject(new DOMException("Aborted", "AbortError"));
+      signal.addEventListener("abort", () => {
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    });
+
+  const hangingProvider = () =>
+    createRenderProvider({
+      apiKey: API_KEY,
+      ownerId: OWNER_ID,
+      fetch: hangingFetch,
+      timeoutMs: TIMEOUT_MS,
+    });
+
+  it.each([
+    [
+      "create",
+      (provider: ReturnType<typeof createRenderProvider>) =>
+        provider.create({ name: NAME, spec: NATIVE_SPEC, secrets: SECRETS }),
+    ],
+    [
+      "update",
+      (provider: ReturnType<typeof createRenderProvider>) =>
+        provider.update("srv-abc", { spec: NATIVE_SPEC, secrets: SECRETS }),
+    ],
+    ["status", (provider: ReturnType<typeof createRenderProvider>) => provider.status("srv-abc")],
+    ["remove", (provider: ReturnType<typeof createRenderProvider>) => provider.remove("srv-abc")],
+  ] as const)(
+    "returns an error from %s when Render does not answer in time",
+    async (_name, run) => {
+      const provider = hangingProvider();
+
+      const result = await run(provider);
+
+      expect(result.ok).toBe(false);
+    },
+    TEST_TIMEOUT_MS,
+  );
+});
+
+describe("createRenderProvider — service URL", () => {
+  it.each([["http://x.onrender.com"], ["javascript:alert(1)"], ["not a url"]])(
+    "drops a service URL that is not https: %s",
+    async (url) => {
+      const { provider } = providerWith(() => createdService("srv-xyz", url));
+
+      const result = await provider.create({ name: NAME, spec: NATIVE_SPEC, secrets: SECRETS });
+
+      expect(result).toEqual({ ok: true, value: { serviceId: "srv-xyz" } });
+    },
+  );
+
+  it("keeps an https service URL", async () => {
+    const { provider } = providerWith(() => createdService("srv-xyz", "https://x.onrender.com"));
+
+    const result = await provider.create({ name: NAME, spec: NATIVE_SPEC, secrets: SECRETS });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { serviceId: "srv-xyz", url: "https://x.onrender.com" },
+    });
+  });
+});

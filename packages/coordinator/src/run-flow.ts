@@ -5,6 +5,7 @@ import { diffAgainstCache } from "./diff-against-cache.ts";
 import { executorAt, type EngineState, type RunContext } from "./engine-state.ts";
 import { executeTask } from "./execute-task.ts";
 import { findNode, incomingEdges, isResourceNode, type FlatGraph } from "./flat-graph.ts";
+import { issueToError } from "./node-issues.ts";
 import { checkOutputContract } from "./output-contract.ts";
 import { planExecution, type PlannedStep } from "./plan-execution.ts";
 import type { Evictions, NodeRun } from "./result-store.ts";
@@ -40,7 +41,7 @@ export async function runFlow(
   const { resources, stale } = splitResources(run.analysis.graph, outdated);
   const unplannable = reportUnplannable(state, run);
   reportCached(state, run, { nodeIds: cached, keys });
-  reportResources(state, run, resources);
+  const misconfigured = reportResources(state, run, resources);
   stale.forEach((nodeId) => {
     emitStatus(state, run, { nodeId, state: "queued" });
   });
@@ -53,7 +54,10 @@ export async function runFlow(
   state.emit("run.finished", {
     rev: run.rev,
     runId: run.runId,
-    status: finalStatus(run, unplannable > 0 || ends.some(([, end]) => end === "error")),
+    status: finalStatus(
+      run,
+      unplannable + misconfigured > 0 || ends.some(([, end]) => end === "error"),
+    ),
     durationMs: state.now() - startedAt,
     executed: ends.filter(([, end]) => end === "done").map(([nodeId]) => nodeId),
     cached,
@@ -142,14 +146,24 @@ const splitResources = (graph: FlatGraph, nodeIds: ReadonlyArray<string>) => ({
   stale: nodeIds.filter((nodeId) => !isResourceNode(graph, nodeId)),
 });
 
+/** A resource is done when it is well configured; otherwise it fails with its first issue. */
 function reportResources(
   state: EngineState,
   run: RunContext,
   nodeIds: ReadonlyArray<string>,
-): void {
-  nodeIds.forEach((nodeId) => {
-    emitStatus(state, run, { nodeId, state: "done" });
+): number {
+  const ends = nodeIds.map((nodeId) => {
+    const issue = run.analysis.issues.find((candidate) => candidate.nodeId === nodeId);
+    emitStatus(
+      state,
+      run,
+      issue === undefined
+        ? { nodeId, state: "done" }
+        : { nodeId, state: "error", error: issueToError(issue) },
+    );
+    return issue === undefined ? "done" : "error";
   });
+  return ends.filter((end) => end === "error").length;
 }
 
 /** Nodes that could not even be planned (unknown type, cycle) fail with their issue. */
