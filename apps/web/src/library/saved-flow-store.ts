@@ -36,6 +36,8 @@ export type SavedFlowState = {
   readonly openFlow: (id: string) => Promise<void>;
   readonly newFlow: () => Promise<void>;
   readonly flushPending: () => Promise<void>;
+  /** Saves the open flow now, even with no nodes, and returns its id (undefined if it cannot). */
+  readonly saveNow: () => Promise<string | undefined>;
   readonly loadFlow: (flow: Flow) => Promise<void>;
   readonly resetForLoad: () => void;
   readonly trackSource: (id: string, key: string) => void;
@@ -116,6 +118,7 @@ function savedFlowActions(context: Context) {
     loadFlow: createLoadFlow(context),
     resetForLoad: createResetForLoad(context),
     flushPending: createFlushPending(),
+    saveNow: () => Promise.resolve(context.get().currentId),
     newFlow: createNewFlow(context),
     trackSource: createTrackSource(context),
     resetSources: createResetSources(context),

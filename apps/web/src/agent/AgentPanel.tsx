@@ -1,7 +1,5 @@
 import { Button, Input } from "@nodomics/ui";
 import { useState, type SyntheticEvent } from "react";
-import { useStore } from "zustand";
-import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
 import { agentErrorMessage } from "./agent-error-message.ts";
 import { AgentMarkdown } from "./AgentMarkdown.tsx";
@@ -11,19 +9,17 @@ import { useAgentConversation, type Exchange } from "./use-agent-conversation.ts
 const text = MESSAGES.agent;
 
 /**
- * The agent (docs/05-capa-agente.md): the user asks for a change to the saved flow, the agent
+ * The agent (docs/05-capa-agente.md): the user asks for a change to the open flow (saved first), the agent
  * builds it on a draft, and the user applies the proposed changes they choose.
  */
 export function AgentPanel() {
-  const { savedFlowStore } = useAppStores();
-  const flowId = useStore(savedFlowStore, (state) => state.currentId);
   const { exchanges, isWaiting, ask } = useAgentConversation();
   const [goal, setGoal] = useState("");
-  const canSend = flowId !== undefined && !isWaiting && goal.trim() !== "";
+  const canSend = !isWaiting && goal.trim() !== "";
   const send = () => {
     if (!canSend) return;
     setGoal("");
-    void ask(goal.trim(), flowId);
+    void ask(goal.trim());
   };
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
@@ -31,7 +27,6 @@ export function AgentPanel() {
   };
   return (
     <div className="web-agent">
-      {flowId === undefined && <p className="web-caption">{text.needsSavedFlow}</p>}
       {exchanges.map((exchange) => (
         <AgentExchange key={exchange.id} exchange={exchange} />
       ))}
@@ -40,7 +35,6 @@ export function AgentPanel() {
           label={text.composer}
           placeholder={text.composerPlaceholder}
           value={goal}
-          disabled={flowId === undefined}
           onChange={setGoal}
         />
         <Button variant="primary" disabled={!canSend} onClick={send}>

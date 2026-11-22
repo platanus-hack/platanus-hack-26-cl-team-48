@@ -385,8 +385,6 @@ export const MESSAGES = {
   },
   agent: {
     draft: "Trabaja en un borrador: nada cambia en tu flujo hasta que apliques",
-    needsSavedFlow:
-      "El agente trabaja sobre un flujo guardado. Agrega un nodo para que tu flujo se guarde.",
     notConfigured: "El agente no está configurado en este sitio.",
     working: "El agente está trabajando… puede tardar unos minutos.",
     choose: "Elige qué cambios aplicar",
