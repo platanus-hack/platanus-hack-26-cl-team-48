@@ -11,7 +11,7 @@ import { withoutPrivateParams } from "./hub-flow.ts";
 import { manifestsToInstall } from "./hub-install.ts";
 import { useHub } from "./hub-context.ts";
 import { EmptyState } from "./PublicationCard.tsx";
-import { useHubQuery } from "./use-hub-query.ts";
+import { useQuery } from "../async/use-query.ts";
 
 type PublicationPageProps = {
   readonly handle: string;
@@ -178,12 +178,12 @@ const snapshotOf = (version: PublishedVersion) =>
 
 function usePublication(handle: string, slug: string) {
   const hub = useHub();
-  return useHubQuery(useCallback(() => hub.publication(handle, slug), [hub, handle, slug]));
+  return useQuery(useCallback(() => hub.publication(handle, slug), [hub, handle, slug]));
 }
 
 function usePublishedVersion(publicationId: string, version: string) {
   const hub = useHub();
-  return useHubQuery(
+  return useQuery(
     useCallback(() => hub.version(publicationId, version), [hub, publicationId, version]),
   );
 }

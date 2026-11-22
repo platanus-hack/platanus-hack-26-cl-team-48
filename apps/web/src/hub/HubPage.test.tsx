@@ -1,13 +1,27 @@
+import type { Hub } from "@nodomics/hub";
 import { err } from "@nodomics/protocol";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { createSeededHub, createTestHub, renderWithHub } from "./hub-pages-fixtures.tsx";
+import { AppStoresContext } from "../app-context.ts";
+import { HubContext } from "./hub-context.ts";
+import {
+  ANA,
+  CLEAN_NODE_MANIFEST,
+  createSeededHub,
+  createTestHub,
+  draftOf,
+  publishAs,
+  renderWithHub,
+} from "./hub-pages-fixtures.tsx";
 import { HubPage } from "./HubPage.tsx";
 
-const searchField = () => screen.getByLabelText("Buscar en el hub");
-const kindChips = () => screen.getByRole("radiogroup", { name: "Tipo" });
-const kindChip = (name: string) => within(kindChips()).getByRole("radio", { name });
+const radioGroup = (name: string) => screen.getByRole("radiogroup", { name });
+const radioIn = (group: string, name: string) =>
+  within(radioGroup(group)).getByRole("radio", { name });
+const kindChips = () => radioGroup("Tipo");
+const kindChip = (name: string) => radioIn("Tipo", name);
+const exploreOption = (name: string) => radioIn("Explorar", name);
 const isChecked = (radio: HTMLElement) =>
   radio instanceof HTMLInputElement ? radio.checked : radio.getAttribute("aria-checked") === "true";
 const cardTitled = async (title: string) => {
@@ -16,6 +30,106 @@ const cardTitled = async (title: string) => {
   if (card === null) throw new Error(`The link "${title}" is not inside a card`);
   return card;
 };
+const TITLES = ["Clima diario", "Limpiar texto", "Ventas por región"];
+/** The titles of the listed cards, in alphabetical order. */
+const cardTitles = () =>
+  TITLES.filter((title) =>
+    screen
+      .queryAllByRole("article")
+      .some((card) => within(card).queryByRole("link", { name: title }) !== null),
+  );
+const tagGroup = () => screen.getByRole("group", { name: "Etiquetas" });
+const tagButton = (name: string) => within(tagGroup()).getByRole("button", { name });
+const tagNames = () =>
+  within(tagGroup())
+    .getAllByRole("button")
+    .map((button) => button.textContent.trim());
+const sectionHeading = (name: string) => screen.queryByRole("heading", { level: 2, name });
+
+/** Renders the page and hands back a way to change the text the header would send. */
+function renderHubPage(hub: Hub, text = "") {
+  const rendered = renderWithHub(<HubPage text={text} />, hub);
+  const showText = (next: string) => {
+    rendered.rerender(
+      <AppStoresContext value={rendered.stores}>
+        <HubContext value={hub}>
+          <HubPage text={next} />
+        </HubContext>
+      </AppStoresContext>,
+    );
+  };
+  return { ...rendered, showText };
+}
+
+/** Ventas (comercial, mensual) and Limpiar (texto) by Ana; Clima (clima, mensual) by Beto. */
+async function createTaggedHub(): Promise<Hub> {
+  const hub = createTestHub();
+  await publishAs(hub, ANA.handle, [
+    draftOf({ tags: ["mensual", "comercial"] }),
+    draftOf({
+      slug: "limpiar",
+      kind: "node",
+      title: "Limpiar texto",
+      description: "Quita espacios y acentos",
+      tags: ["texto"],
+      manifest: CLEAN_NODE_MANIFEST,
+    }),
+  ]);
+  await publishAs(hub, "beto", [
+    draftOf({
+      slug: "clima",
+      title: "Clima diario",
+      description: "Temperaturas de cada día",
+      tags: ["mensual", "clima"],
+    }),
+  ]);
+  return hub;
+}
+
+async function createUntaggedHub(): Promise<Hub> {
+  const hub = createTestHub();
+  await publishAs(hub, ANA.handle, [draftOf({ tags: [] })]);
+  return hub;
+}
+
+async function signedInAs(hub: Hub, handle: string): Promise<Hub> {
+  await hub.signIn({ kind: "email", email: handle });
+  return hub;
+}
+
+async function chooseExplore(name: string) {
+  await userEvent.click(exploreOption(name));
+}
+
+/** Ventas (comercial) by Ana as a flow and Limpiar (no tags) by Ana as a node. */
+async function createHubWithUntaggedNode(): Promise<Hub> {
+  const hub = createTestHub();
+  await publishAs(hub, ANA.handle, [
+    draftOf({ tags: ["comercial"] }),
+    draftOf({
+      slug: "limpiar",
+      kind: "node",
+      title: "Limpiar texto",
+      description: "Quita espacios y acentos",
+      tags: [],
+      manifest: CLEAN_NODE_MANIFEST,
+    }),
+  ]);
+  return hub;
+}
+
+/** Wraps the hub so that every handle asked to publicationsOf is recorded. */
+function spyingOnPublicationsOf(hub: Hub) {
+  const handles: string[] = [];
+  const spied: Hub = {
+    ...hub,
+    publicationsOf: (handle) => {
+      handles.push(handle);
+      return hub.publicationsOf(handle);
+    },
+  };
+  return { hub: spied, handles };
+}
 
 afterEach(() => {
   window.history.replaceState(null, "", "/");
@@ -23,19 +137,24 @@ afterEach(() => {
 
 describe("HubPage", () => {
   it("shows the Hub heading", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     expect(screen.getByRole("heading", { level: 1, name: "Hub" })).toBeTruthy();
   });
 
-  it("offers a search field", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+  it("has no search field of its own", async () => {
+    renderHubPage(await createSeededHub());
 
-    expect(searchField().tagName).toBe("INPUT");
+    await cardTitled("Clima diario");
+
+    expect({
+      searchbox: screen.queryByRole("searchbox"),
+      labelled: screen.queryByLabelText("Buscar en el hub"),
+    }).toEqual({ searchbox: null, labelled: null });
   });
 
   it("offers the kinds Todo, Flujos and Nodos as chips", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     const radios = within(kindChips()).getAllByRole("radio");
 
@@ -43,7 +162,7 @@ describe("HubPage", () => {
   });
 
   it("starts with Todo chosen", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     expect(["Todo", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
       true,
@@ -54,7 +173,7 @@ describe("HubPage", () => {
 
   it("chooses the chip the user clicks", async () => {
     const user = userEvent.setup();
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     await user.click(kindChip("Nodos"));
 
@@ -66,7 +185,7 @@ describe("HubPage", () => {
   });
 
   it("shows one card per publication", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     await cardTitled("Clima diario");
 
@@ -74,7 +193,7 @@ describe("HubPage", () => {
   });
 
   it("links each card's title to the publication page", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     const link = await screen.findByRole("link", { name: "Ventas por región" });
 
@@ -82,7 +201,7 @@ describe("HubPage", () => {
   });
 
   it("shows the description and the owner's handle on each card", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     const card = await cardTitled("Clima diario");
 
@@ -92,22 +211,28 @@ describe("HubPage", () => {
     }).toEqual({ description: true, owner: true });
   });
 
-  it("narrows the results as the user types", async () => {
-    const user = userEvent.setup();
-    renderWithHub(<HubPage />, await createSeededHub());
-    await cardTitled("Clima diario");
-
-    await user.type(searchField(), "clima");
+  it("shows only the publications matching the text it receives", async () => {
+    renderHubPage(await createSeededHub(), "clima");
 
     await waitFor(() => {
-      expect(screen.getAllByRole("article")).toHaveLength(1);
+      expect(cardTitles()).toEqual(["Clima diario"]);
     });
-    expect(screen.getByRole("link", { name: "Clima diario" })).toBeTruthy();
+  });
+
+  it("narrows the results when the text changes", async () => {
+    const { showText } = renderHubPage(await createSeededHub());
+    await cardTitled("Clima diario");
+
+    showText("clima");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Clima diario"]);
+    });
   });
 
   it("shows only node publications when Nodos is chosen", async () => {
     const user = userEvent.setup();
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
     await cardTitled("Clima diario");
 
     await user.click(kindChip("Nodos"));
@@ -120,7 +245,7 @@ describe("HubPage", () => {
 
   it("shows only flow publications when Flujos is chosen", async () => {
     const user = userEvent.setup();
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
     await cardTitled("Clima diario");
 
     await user.click(kindChip("Flujos"));
@@ -132,18 +257,14 @@ describe("HubPage", () => {
   });
 
   it("says nothing matches when the search finds no publication", async () => {
-    const user = userEvent.setup();
-    renderWithHub(<HubPage />, await createSeededHub());
-    await cardTitled("Clima diario");
-
-    await user.type(searchField(), "zzzz");
+    renderHubPage(await createSeededHub(), "zzzz");
 
     expect(await screen.findByText("No hay publicaciones que coincidan")).toBeTruthy();
     expect(screen.queryAllByRole("article")).toHaveLength(0);
   });
 
   it("says nothing matches when the hub is empty", async () => {
-    renderWithHub(<HubPage />, createTestHub());
+    renderHubPage(createTestHub());
 
     expect(await screen.findByText("No hay publicaciones que coincidan")).toBeTruthy();
   });
@@ -153,7 +274,7 @@ describe("HubPage", () => {
       ...(await createSeededHub()),
       search: () => Promise.resolve(err({ kind: "unavailable" as const })),
     };
-    renderWithHub(<HubPage />, hub);
+    renderHubPage(hub);
 
     const alert = await screen.findByRole("alert");
 
@@ -162,7 +283,7 @@ describe("HubPage", () => {
 
   it("goes to the publication within the app when its title is clicked", async () => {
     const user = userEvent.setup();
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     await user.click(await screen.findByRole("link", { name: "Ventas por región" }));
 
@@ -170,18 +291,382 @@ describe("HubPage", () => {
   });
 });
 
-describe("HubPage Para ti mockup", () => {
+describe("HubPage Explorar filter", () => {
+  it("offers Para ti, Recientes and Mis publicaciones", async () => {
+    renderHubPage(await createSeededHub());
+
+    const radios = within(radioGroup("Explorar")).getAllByRole("radio");
+
+    expect(radios).toEqual([
+      exploreOption("Para ti"),
+      exploreOption("Recientes"),
+      exploreOption("Mis publicaciones"),
+    ]);
+  });
+
+  it("starts with Para ti chosen", async () => {
+    renderHubPage(await createSeededHub());
+
+    expect(
+      ["Para ti", "Recientes", "Mis publicaciones"].map((name) => isChecked(exploreOption(name))),
+    ).toEqual([true, false, false]);
+  });
+
+  it("chooses the option the user clicks", async () => {
+    renderHubPage(await createSeededHub());
+
+    await chooseExplore("Recientes");
+
+    expect(
+      ["Para ti", "Recientes", "Mis publicaciones"].map((name) => isChecked(exploreOption(name))),
+    ).toEqual([false, true, false]);
+  });
+});
+
+describe("HubPage Para ti view", () => {
   it("shows a Para ti section", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+    renderHubPage(await createSeededHub());
 
     expect(screen.getByRole("heading", { name: "Para ti" })).toBeTruthy();
   });
 
-  it("says the recommendations are a mockup", async () => {
-    renderWithHub(<HubPage />, await createSeededHub());
+  it("lists the publications under Recientes", async () => {
+    renderHubPage(await createSeededHub());
+
+    await cardTitled("Clima diario");
+
+    expect(sectionHeading("Recientes")).toBeTruthy();
+  });
+
+  it("heads the list Resultados when there is search text", async () => {
+    renderHubPage(await createSeededHub(), "clima");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Clima diario"]);
+    });
+
+    expect({
+      results: sectionHeading("Resultados") !== null,
+      recent: sectionHeading("Recientes") !== null,
+    }).toEqual({ results: true, recent: false });
+  });
+});
+
+describe("HubPage Recientes view", () => {
+  it("hides the Para ti section", async () => {
+    renderHubPage(await createSeededHub());
+
+    await chooseExplore("Recientes");
+
+    expect(screen.queryByRole("heading", { name: "Para ti" })).toBeNull();
+  });
+
+  it("lists every publication under Recientes", async () => {
+    renderHubPage(await createSeededHub());
+    await cardTitled("Clima diario");
+
+    await chooseExplore("Recientes");
+
+    expect({ heading: sectionHeading("Recientes") !== null, cards: cardTitles() }).toEqual({
+      heading: true,
+      cards: TITLES,
+    });
+  });
+
+  it("heads the list Resultados when there is search text", async () => {
+    renderHubPage(await createSeededHub(), "clima");
+
+    await chooseExplore("Recientes");
+
+    expect({
+      results: sectionHeading("Resultados") !== null,
+      recent: sectionHeading("Recientes") !== null,
+    }).toEqual({ results: true, recent: false });
+  });
+});
+
+describe("HubPage Mis publicaciones view", () => {
+  it("shows only the signed-in user's publications", async () => {
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto", "Ventas por región"]);
+    });
+  });
+
+  it("heads the list Mis publicaciones", async () => {
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
+
+    await chooseExplore("Mis publicaciones");
 
     expect(
-      screen.getByText(/Maqueta: recomendaciones según los flujos en los que trabajas\./),
+      await screen.findByRole("heading", { level: 2, name: "Mis publicaciones" }),
     ).toBeTruthy();
+  });
+
+  it("keeps only the chosen kind among the user's publications", async () => {
+    const user = userEvent.setup();
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
+    await chooseExplore("Mis publicaciones");
+    await cardTitled("Limpiar texto");
+
+    await user.click(kindChip("Nodos"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto"]);
+    });
+  });
+
+  it("keeps only the user's publications whose title matches the text", async () => {
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle), "ventas");
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Ventas por región"]);
+    });
+  });
+
+  it("keeps only the user's publications whose description matches the text", async () => {
+    renderHubPage(await signedInAs(await createSeededHub(), ANA.handle), "acentos");
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto"]);
+    });
+  });
+
+  it("keeps only the user's publications with the pressed tag", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), ANA.handle));
+    await chooseExplore("Mis publicaciones");
+    await cardTitled("Limpiar texto");
+
+    await userEvent.click(tagButton("texto"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto"]);
+    });
+  });
+
+  it("keeps only the user's publications with a tag that matches the text", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), ANA.handle), "comercial");
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Ventas por región"]);
+    });
+  });
+
+  it("matches the user's publications regardless of accents in the text", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), ANA.handle), "region");
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Ventas por región"]);
+    });
+  });
+
+  it("does not ask the hub for the user's publications while signed out", async () => {
+    const { hub, handles } = spyingOnPublicationsOf(await createSeededHub());
+    renderHubPage(hub);
+    await cardTitled("Clima diario");
+
+    await chooseExplore("Mis publicaciones");
+    await screen.findByText("Entra para ver tus publicaciones.");
+
+    expect(handles).toEqual([]);
+  });
+
+  it("asks to sign in when signed out", async () => {
+    renderHubPage(await createSeededHub());
+
+    await chooseExplore("Mis publicaciones");
+
+    expect(await screen.findByText("Entra para ver tus publicaciones.")).toBeTruthy();
+  });
+
+  it("lists no publications when signed out", async () => {
+    renderHubPage(await createSeededHub());
+
+    await chooseExplore("Mis publicaciones");
+    await screen.findByText("Entra para ver tus publicaciones.");
+
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+  });
+});
+
+describe("HubPage Etiquetas filter", () => {
+  it("offers one toggle per distinct tag of the listed publications, sorted", async () => {
+    renderHubPage(await createTaggedHub());
+
+    await cardTitled("Clima diario");
+
+    expect(tagNames()).toEqual(["clima", "comercial", "mensual", "texto"]);
+  });
+
+  it("starts with no tag pressed", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+
+    const pressed = within(tagGroup())
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-pressed"));
+
+    expect(pressed).toEqual(["false", "false", "false", "false"]);
+  });
+
+  it("marks a tag pressed when clicked", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+
+    await userEvent.click(tagButton("mensual"));
+
+    expect(tagButton("mensual").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps only the publications with the pressed tag", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+
+    await userEvent.click(tagButton("mensual"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Clima diario", "Ventas por región"]);
+    });
+  });
+
+  it("keeps only the publications that have every pressed tag", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+
+    await userEvent.click(tagButton("mensual"));
+    await userEvent.click(tagButton("comercial"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Ventas por región"]);
+    });
+  });
+
+  it("removes a tag's filter when it is pressed again", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("mensual"));
+    await userEvent.click(tagButton("comercial"));
+
+    await userEvent.click(tagButton("comercial"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Clima diario", "Ventas por región"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("offers only the tags of the publications of the chosen kind", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+
+    await userEvent.click(kindChip("Nodos"));
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["texto"]);
+    });
+  });
+
+  it("keeps offering a pressed tag after the kind changes so that it can be unpressed", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+
+    await userEvent.click(kindChip("Nodos"));
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["comercial", "texto"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("lifts a pressed tag's filter when it is pressed again after the kind changes", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+    await userEvent.click(kindChip("Nodos"));
+    await waitFor(() => {
+      expect(cardTitles()).toEqual([]);
+    });
+
+    await userEvent.click(tagButton("comercial"));
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Limpiar texto"]);
+    });
+  });
+
+  it("stops offering an unpressed tag that no listed publication has", async () => {
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+    await userEvent.click(kindChip("Nodos"));
+    await waitFor(() => {
+      expect(cardTitles()).toEqual([]);
+    });
+
+    await userEvent.click(tagButton("comercial"));
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["texto"]);
+    });
+  });
+
+  it("keeps offering a pressed tag after the text changes", async () => {
+    const { showText } = renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+
+    showText("clima");
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["clima", "comercial", "mensual"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps offering a pressed tag after the Explorar view changes", async () => {
+    renderHubPage(await signedInAs(await createTaggedHub(), "beto"));
+    await cardTitled("Clima diario");
+    await userEvent.click(tagButton("comercial"));
+
+    await chooseExplore("Mis publicaciones");
+
+    await waitFor(() => {
+      expect(tagNames()).toEqual(["clima", "comercial", "mensual"]);
+    });
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("shows the Etiquetas group with the pressed tag when no listed publication has tags", async () => {
+    renderHubPage(await createHubWithUntaggedNode());
+    await cardTitled("Ventas por región");
+    await userEvent.click(tagButton("comercial"));
+
+    await userEvent.click(kindChip("Nodos"));
+    await waitFor(() => {
+      expect(cardTitles()).toEqual([]);
+    });
+
+    expect(tagNames()).toEqual(["comercial"]);
+    expect(tagButton("comercial").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("hides the Etiquetas group when no publication has tags", async () => {
+    renderHubPage(await createUntaggedHub());
+
+    await cardTitled("Ventas por región");
+
+    expect(screen.queryByRole("group", { name: "Etiquetas" })).toBeNull();
   });
 });

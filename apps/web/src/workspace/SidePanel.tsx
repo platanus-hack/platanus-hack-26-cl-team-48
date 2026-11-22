@@ -53,10 +53,17 @@ export function SidePanel({ section, onHide, onAdd }: SidePanelProps) {
   );
 }
 
-/** Another tab may have saved flows since this one listed them. */
+/** Another tab (a copy opened from the hub) may have saved flows since this one listed them. */
 function useSavedFlowsRefresh(section: SideSection) {
   const { savedFlowStore } = useAppStores();
   useEffect(() => {
-    void savedFlowStore.getState().refresh();
+    const refresh = () => {
+      void savedFlowStore.getState().refresh();
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+    };
   }, [savedFlowStore, section]);
 }

@@ -53,6 +53,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@nodomics/profile':
+        specifier: workspace:*
+        version: link:../../packages/profile
       '@nodomics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -101,6 +104,9 @@ importers:
       '@nodomics/hub':
         specifier: workspace:*
         version: link:../../packages/hub
+      '@nodomics/profile':
+        specifier: workspace:*
+        version: link:../../packages/profile
       '@nodomics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -291,6 +297,15 @@ importers:
       '@nodomics/protocol':
         specifier: workspace:*
         version: link:../protocol
+
+  packages/profile:
+    dependencies:
+      '@nodomics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@sinclair/typebox':
+        specifier: 0.34.52
+        version: 0.34.52
 
   packages/protocol:
     dependencies:

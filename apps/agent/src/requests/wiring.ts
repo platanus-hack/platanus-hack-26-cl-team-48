@@ -13,6 +13,7 @@ import {
   REQUESTS_PER_MINUTE,
   ROUTES_PER_MINUTE,
 } from "../http/guards/rate-limit.ts";
+import { buildFeedRoutes } from "../feed/feed-wiring.ts";
 import { createServer } from "../server.ts";
 import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
 import type { MemoryPort } from "../memory/memory-port.ts";
@@ -210,14 +211,21 @@ const MEMORY_FACTORIES: Readonly<Record<MemoryMode, (config: AgentConfig) => Mem
 export const selectMemory = (config: AgentConfig): MemoryPort =>
   MEMORY_FACTORIES[config.memory](config);
 
-/** One memory serves both the recording MCP of /agent/requests and the router. */
-export function assembleServer(deps: RequestDeps, memory: MemoryPort): Server {
+/**
+ * One memory serves both the recording MCP of /agent/requests and the router.
+ * Lanes that need the full config (the feed) pass their routes as `extraRoutes`.
+ */
+export function assembleServer(
+  deps: RequestDeps,
+  memory: MemoryPort,
+  extraRoutes: readonly Route[] = [],
+): Server {
   const recorded = deps.memoryForUser
     ? deps
     : { ...deps, mcp: buildMemoryDeps(memory).wrapMcp(deps.mcp) };
   const router = createRouter({
     identity: deps.identity,
-    routes: buildRoutes(deps, memory),
+    routes: [...buildRoutes(deps, memory), ...extraRoutes],
     rateLimiter: createRateLimiter({ perMinute: ROUTES_PER_MINUTE }),
   });
   const rateLimiter = createRateLimiter({ perMinute: REQUESTS_PER_MINUTE });
@@ -226,5 +234,5 @@ export function assembleServer(deps: RequestDeps, memory: MemoryPort): Server {
 
 /** The LLM, identity and memory are created once and shared by /agent/requests and the router. */
 export function buildServer(config: AgentConfig): Server {
-  return assembleServer(buildRequestDeps(config), selectMemory(config));
+  return assembleServer(buildRequestDeps(config), selectMemory(config), buildFeedRoutes(config));
 }

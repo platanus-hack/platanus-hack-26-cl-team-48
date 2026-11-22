@@ -1,7 +1,8 @@
 import { err, ok, type Result } from "@nodomics/protocol";
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createUserScopedClient, type ClientFactory } from "../supabase/user-scoped-client.ts";
 import type { Edge, Episode, MemoryError, MemoryPort } from "./memory-port.ts";
 import { edgesValidAt } from "./temporal-graph.ts";
 
@@ -167,41 +168,20 @@ export type UserScopedConfig = {
   readonly accessToken: string;
 };
 
-type ClientFactory = (
-  url: string,
-  key: string,
-  options: {
-    readonly global: { readonly headers: Readonly<Record<string, string>> };
-    readonly auth: { readonly persistSession: false; readonly autoRefreshToken: false };
-  },
-) => SupabaseClient;
-
-const SERVICE_ROLE = "service_role";
-
-function jwtRole(key: string): unknown {
-  try {
-    const payload: unknown = JSON.parse(atob(key.split(".")[1] ?? ""));
-    return typeof payload === "object" && payload !== null && "role" in payload
-      ? payload.role
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
+const MEMORY_CLIENT_MESSAGES = {
+  MISSING_TOKEN: "A user access token is required for the agent memory",
+  SERVICE_ROLE_KEY: "The agent memory must not use a service role key",
+} as const;
 
 export function createUserScopedMemory(
   config: UserScopedConfig,
-  factory: ClientFactory = createClient,
+  factory?: ClientFactory,
 ): Outcome<MemoryPort> {
-  if (config.accessToken === "") {
-    return storeFailed("A user access token is required for the agent memory");
-  }
-  if (jwtRole(config.anonKey) === SERVICE_ROLE) {
-    return storeFailed("The agent memory must not use a service role key");
-  }
-  const client = factory(config.supabaseUrl, config.anonKey, {
-    global: { headers: { Authorization: `Bearer ${config.accessToken}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return ok(createSupabaseMemory(client));
+  const client = createUserScopedClient(
+    { url: config.supabaseUrl, anonKey: config.anonKey, accessToken: config.accessToken },
+    factory,
+  );
+  return client.ok
+    ? ok(createSupabaseMemory(client.value))
+    : storeFailed(MEMORY_CLIENT_MESSAGES[client.error.code]);
 }

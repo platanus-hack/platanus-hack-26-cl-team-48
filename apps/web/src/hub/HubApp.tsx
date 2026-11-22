@@ -1,32 +1,51 @@
 import type { Flow } from "@nodomics/protocol";
-import { ICON_SIZE, Icon } from "@nodomics/ui";
+import { useState } from "react";
+import { ICON_SIZE, Icon, Input } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { encodeSharedFlow } from "../flow/flow-file.ts";
 import { MESSAGES } from "../messages.ts";
 import { pathOf, type Route } from "../routing/routes.ts";
-import { useRoute } from "../routing/use-route.ts";
+import { navigate, useRoute } from "../routing/use-route.ts";
 import { AccountButton } from "./AccountButton.tsx";
 import { HubPage } from "./HubPage.tsx";
 import { ProfilePage } from "./ProfilePage.tsx";
 import { PublicationPage } from "./PublicationPage.tsx";
+import "../feed/feed.css";
 import "./hub.css";
 
-type HubRoute = Exclude<Route, { readonly page: "workspace" }>;
+type PageRoute = Exclude<Route, { readonly page: "workspace" | "hub" }>;
 
 /** The hub in its own browser tab (ADR 0018); flows open as a copy in a new editor tab. */
 export function HubApp() {
   const route = useRoute();
+  const [text, setText] = useState("");
   return (
     <div className="web-hub-app">
-      <HubBar />
+      <HubBar
+        text={text}
+        onSearch={(next) => {
+          setText(next);
+          if (route.page !== "hub") navigate({ page: "hub" });
+        }}
+      />
       <div className="web-hub-scroll">
-        {route.page === "workspace" ? <HubPage /> : <HubRoutePage route={route} />}
+        {route.page === "workspace" || route.page === "hub" ? (
+          <HubPage text={text} />
+        ) : (
+          <HubRoutePage route={route} />
+        )}
       </div>
     </div>
   );
 }
 
-function HubBar() {
+function HubBar({
+  text,
+  onSearch,
+}: {
+  readonly text: string;
+  readonly onSearch: (text: string) => void;
+}) {
   return (
     <header className="web-hub-bar">
       <p className="web-brand">
@@ -34,6 +53,16 @@ function HubBar() {
         {MESSAGES.app.title}
         <span className="web-hub-bar-section">{MESSAGES.hub.title}</span>
       </p>
+      <search className="web-hub-bar-search">
+        <Input
+          type="search"
+          icon="search"
+          label={MESSAGES.hub.search}
+          placeholder={MESSAGES.hub.searchPlaceholder}
+          value={text}
+          onChange={onSearch}
+        />
+      </search>
       <div className="web-hub-bar-end">
         <a
           className="nd-btn nd-btn-secondary"
@@ -50,11 +79,9 @@ function HubBar() {
   );
 }
 
-function HubRoutePage({ route }: { readonly route: HubRoute }) {
+function HubRoutePage({ route }: { readonly route: PageRoute }) {
   const { personalLibraryStore } = useAppStores();
   switch (route.page) {
-    case "hub":
-      return <HubPage />;
     case "profile":
       return <ProfilePage key={route.handle} handle={route.handle} />;
     case "publication":

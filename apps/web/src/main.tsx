@@ -14,8 +14,13 @@ import { createAppStores } from "./app-stores.ts";
 import { ENGINES } from "./engine-registry.ts";
 import { decodeSharedFlow } from "./flow/flow-file.ts";
 import { describeFlowFileError } from "./flow/use-flow-files.ts";
-import { createStorageWorkspacePreferences } from "./layout/storage-workspace-preferences.ts";
+import {
+  createStorageWorkspacePreferences,
+  readPreferences,
+} from "./layout/storage-workspace-preferences.ts";
 import { MESSAGES } from "./messages.ts";
+import { createAppFeed } from "./feed/create-app-feed.ts";
+import { FeedContext } from "./feed/feed-context.ts";
 import { createAppHub } from "./hub/create-app-hub.ts";
 import { HubContext } from "./hub/hub-context.ts";
 import { HubApp } from "./hub/HubApp.tsx";
@@ -25,6 +30,7 @@ import {
 } from "./library/storage-personal-library.ts";
 import { routeOf } from "./routing/routes.ts";
 import { applyTheme } from "./theme/ThemeControl.tsx";
+import { followStoredTheme } from "./theme/theme-sync.ts";
 
 // Composition root: the one place that reads the URL, creates the stores and picks the engines.
 const shared = decodeSharedFlow(window.location.hash);
@@ -67,9 +73,20 @@ async function startEditorFlow() {
 
 const hub = createAppHub(import.meta.env);
 
+// The hub port does not expose the Supabase access token yet, so the agent service sees no session.
+const getNoAccessTokenYet = () => Promise.resolve(undefined);
+const feed = createAppFeed(import.meta.env, {
+  getAccessToken: getNoAccessTokenYet,
+  currentHandle: async () => (await hub.currentProfile())?.handle,
+});
+
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.
-if (isHubTab) applyTheme(preferenceStorage.read().theme);
+if (isHubTab) {
+  const readTheme = () => readPreferences(() => window.localStorage).theme;
+  applyTheme(readTheme());
+  followStoredTheme(window, readTheme, applyTheme);
+}
 
 const [defaultEngine] = ENGINES;
 const root = document.getElementById("root");
@@ -80,16 +97,18 @@ createRoot(root).render(
   <StrictMode>
     <AppStoresContext value={stores}>
       <HubContext value={hub}>
-        {isHubTab ? (
-          <HubApp />
-        ) : (
-          <App
-            preferenceStorage={preferenceStorage}
-            engines={ENGINES}
-            defaultEngine={defaultEngine}
-            shouldRunOnConnect={shared?.ok === true}
-          />
-        )}
+        <FeedContext value={feed}>
+          {isHubTab ? (
+            <HubApp />
+          ) : (
+            <App
+              preferenceStorage={preferenceStorage}
+              engines={ENGINES}
+              defaultEngine={defaultEngine}
+              shouldRunOnConnect={shared?.ok === true}
+            />
+          )}
+        </FeedContext>
       </HubContext>
     </AppStoresContext>
   </StrictMode>,
