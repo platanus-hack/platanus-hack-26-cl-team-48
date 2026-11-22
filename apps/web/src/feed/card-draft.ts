@@ -1,4 +1,10 @@
-import type { DomainDepth, ProfileCard, ProfileLinks, TechnicalLevel } from "@nodomics/profile";
+import {
+  MAX_LINK_LENGTH,
+  type DomainDepth,
+  type ProfileCard,
+  type ProfileLinks,
+  type TechnicalLevel,
+} from "@nodomics/profile";
 
 export type DomainDraft = { readonly name: string; readonly depth: DomainDepth };
 
@@ -96,6 +102,7 @@ const withHttps = (url: string): string => {
 };
 
 const isWebAddress = (url: string): boolean =>
+  url.length <= MAX_LINK_LENGTH &&
   url.startsWith(HTTPS_SCHEME) &&
   !WHITESPACE.test(url) &&
   URL.canParse(url) &&

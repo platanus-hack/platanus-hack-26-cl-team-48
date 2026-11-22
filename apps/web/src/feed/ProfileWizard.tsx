@@ -16,6 +16,7 @@ type Busy = ReturnType<typeof useCardEditor>["busy"];
 const TEXT = MESSAGES.feed.wizard;
 const NUMBERED_STEPS = [1, 2, 3, 4] as const satisfies ReadonlyArray<NumberedStep>;
 const STEP_COUNT = NUMBERED_STEPS.length;
+const LINKS_STEP: Step = 3;
 const STEP_TITLES: Readonly<Record<Step, string>> = {
   start: TEXT.start.title,
   cv: TEXT.cv.title,
@@ -66,7 +67,7 @@ export function ProfileWizard({ feed, profile, initial, onSaved, onCancel }: Pro
         step={step}
         entry={entry}
         busy={editor.busy}
-        canAdvance={!hasInvalidLinks(editor.draft)}
+        canAdvance={step !== LINKS_STEP || !hasInvalidLinks(editor.draft)}
         onGo={goTo}
         onSave={() => void editor.save()}
         onCancel={onCancel}
