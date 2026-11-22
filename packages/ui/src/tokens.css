@@ -41,6 +41,8 @@
   --type-image: #b03f78;
   --type-model: #7150c4;
   --type-chart: #b0442c;
+  --type-repo: #7d7414;
+  --type-service: #9b2fa8;
   --type-any: #69737e;
   --engine-browser: #2d6e4e;
   --engine-local: #3a5aa8;
@@ -189,6 +191,8 @@
   --type-image: #e886b6;
   --type-model: #a993ec;
   --type-chart: #ec8e78;
+  --type-repo: #d1c55c;
+  --type-service: #d98ae6;
   --type-any: #9aa4ae;
   --engine-browser: #6cc49a;
   --engine-local: #8aa6ea;
@@ -252,6 +256,8 @@
     --type-image: #e886b6;
     --type-model: #a993ec;
     --type-chart: #ec8e78;
+    --type-repo: #d1c55c;
+    --type-service: #d98ae6;
     --type-any: #9aa4ae;
     --engine-browser: #6cc49a;
     --engine-local: #8aa6ea;

@@ -376,6 +376,12 @@
 .nd-type-chart {
   --nd-type: var(--type-chart);
 }
+.nd-type-repo {
+  --nd-type: var(--type-repo);
+}
+.nd-type-service {
+  --nd-type: var(--type-service);
+}
 .nd-type-any {
   --nd-type: var(--type-any);
 }

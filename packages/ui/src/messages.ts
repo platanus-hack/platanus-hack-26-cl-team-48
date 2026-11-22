@@ -43,6 +43,8 @@ export const MESSAGES = {
     image: "Imagen",
     model: "Modelo",
     chart: "Gráfico",
+    repo: "Repositorio",
+    service: "Servicio",
     any: "Cualquiera",
   } satisfies Record<DataType, string>,
   columnTypes: {

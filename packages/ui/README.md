@@ -44,7 +44,7 @@ En tu CSS usa siempre `var(--…)`:
 | Texto | `--ink`, `--ink-muted`, `--ink-faint`, `--ink-inverse` |
 | Acento y foco | `--accent`, `--accent-hover`, `--on-accent`, `--accent-soft`, `--accent-ink`, `--focus-ring` |
 | Estados | `--status-queued`, `--status-running`, `--status-ok`, `--status-ok-soft`, `--status-stale`, `--status-warn`, `--status-warn-soft`, `--status-error`, `--status-error-soft`, `--on-status` |
-| Tipos de dato | `--type-table`, `--type-column`, `--type-value`, `--type-geo`, `--type-image`, `--type-model`, `--type-chart`, `--type-any` |
+| Tipos de dato | `--type-table`, `--type-column`, `--type-value`, `--type-geo`, `--type-image`, `--type-model`, `--type-chart`, `--type-repo`, `--type-service`, `--type-any` |
 | Motores | `--engine-browser`, `--engine-local`, `--engine-cloud` |
 | Confianza | `--trust-official`, `--trust-verified`, `--trust-org`, `--trust-community` |
 | IA y colaboración | `--ai-pending`, `--ai-pending-soft`, `--collab-1` … `--collab-6` |

@@ -1,4 +1,5 @@
-export type DataType = "table" | "column" | "value" | "geo" | "image" | "model" | "chart" | "any";
+export type DataType =
+  "table" | "column" | "value" | "geo" | "image" | "model" | "chart" | "repo" | "service" | "any";
 
 export type ColumnType = "number" | "text" | "date" | "bool" | "geo";
 

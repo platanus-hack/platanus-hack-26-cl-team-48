@@ -10,6 +10,9 @@ const COLUMN_X_RATIO = 0.3;
 const COLUMN_WIDTH_RATIO = 0.4;
 const HEXAGON_SIDE_RATIO = 0.25;
 const CORNER_CUT_RATIO = 0.35;
+const BOOKMARK_SIDE_RATIO = 0.2;
+const BOOKMARK_NOTCH_RATIO = 0.3;
+const HOUSE_EAVE_RATIO = 0.45;
 const EDGE = 0.75;
 const CORNER = 1;
 const HALF_STROKE = 0.5;
@@ -73,6 +76,44 @@ const SHAPES: Record<DataType, (size: number) => ReactElement> = {
           s - near,
           near,
           s - near,
+        )}
+      />
+    );
+  },
+  repo: (s) => {
+    const side = s * BOOKMARK_SIDE_RATIO;
+    return (
+      <polygon
+        points={points(
+          side,
+          EDGE,
+          s - side,
+          EDGE,
+          s - side,
+          s - EDGE,
+          s / 2,
+          s - s * BOOKMARK_NOTCH_RATIO,
+          side,
+          s - EDGE,
+        )}
+      />
+    );
+  },
+  service: (s) => {
+    const eave = s * HOUSE_EAVE_RATIO;
+    return (
+      <polygon
+        points={points(
+          s / 2,
+          EDGE,
+          s - EDGE,
+          eave,
+          s - EDGE,
+          s - CORNER,
+          EDGE,
+          s - CORNER,
+          EDGE,
+          eave,
         )}
       />
     );

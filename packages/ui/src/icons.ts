@@ -145,6 +145,18 @@ export const ICONS = {
     { tag: "path", attributes: { d: "M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" } },
     { tag: "path", attributes: { d: "M12 12v3" } },
   ],
+  "git-branch": [
+    { tag: "line", attributes: { x1: "6", x2: "6", y1: "3", y2: "15" } },
+    { tag: "circle", attributes: { cx: "18", cy: "6", r: "3" } },
+    { tag: "circle", attributes: { cx: "6", cy: "18", r: "3" } },
+    { tag: "path", attributes: { d: "M18 9a9 9 0 0 1-9 9" } },
+  ],
+  server: [
+    { tag: "rect", attributes: { width: "20", height: "8", x: "2", y: "2", rx: "2", ry: "2" } },
+    { tag: "rect", attributes: { width: "20", height: "8", x: "2", y: "14", rx: "2", ry: "2" } },
+    { tag: "line", attributes: { x1: "6", x2: "6.01", y1: "6", y2: "6" } },
+    { tag: "line", attributes: { x1: "6", x2: "6.01", y1: "18", y2: "18" } },
+  ],
   eye: [
     {
       tag: "path",
