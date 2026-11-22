@@ -17,6 +17,7 @@ export function createAppDeploy(
     return {
       plan: notConfigured,
       apply: notConfigured,
+      redeploy: notConfigured,
       list: notConfigured,
       remove: notConfigured,
     };

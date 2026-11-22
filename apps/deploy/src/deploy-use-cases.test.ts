@@ -33,6 +33,7 @@ type Overrides = {
   readonly provider?: Partial<HostingProvider>;
   readonly store?: Partial<DeploymentStore>;
   readonly reader?: FlowReader;
+  readonly now?: () => Date;
 };
 
 function fakeFlows() {
@@ -47,7 +48,9 @@ function fakeFlows() {
   };
   const set = (identity: UserIdentity, flowId: string, flow: Flow) =>
     flows.set(keyOf(identity.userId, flowId), flow);
-  return { reader, set, reads };
+  const remove = (identity: UserIdentity, flowId: string) =>
+    flows.delete(keyOf(identity.userId, flowId));
+  return { reader, set, remove, reads };
 }
 
 function recordingProvider() {
@@ -100,7 +103,7 @@ function setup(overrides: Overrides = {}) {
     flows: overrides.reader ?? flows.reader,
     deployments: delegatingStore(store, overrides.store),
     provider: { ...recording.provider, ...overrides.provider },
-    now: () => NOW,
+    now: overrides.now ?? (() => NOW),
     createId: () => `dep-${String((nextId += 1))}`,
   });
   return { useCases, flows, store, ...recording };
@@ -712,5 +715,380 @@ describe("remove", () => {
     const result = await useCases.remove(ALICE, deployment.id);
 
     expect(codeOf(result)).toBe("PROVIDER_ERROR");
+  });
+});
+
+/** Lets the event loop run once, so that calls started together overlap inside the provider. */
+const nextTick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/** A provider whose create resolves only after a tick, counting how many times it was called. */
+function slowCreateProvider() {
+  const memory = createMemoryHostingProvider();
+  const created: string[] = [];
+  const provider: Partial<HostingProvider> = {
+    create: async (input) => {
+      created.push(input.name);
+      await nextTick();
+      return memory.create(input);
+    },
+  };
+  return { provider, created };
+}
+
+async function applyCreate(useCases: DeployUseCases, flowId: string) {
+  return useCases.apply(ALICE, {
+    flowId,
+    nodeId: "web",
+    planHash: hashSpec(specOfFlow(FLOW)),
+    secrets: SECRETS,
+  });
+}
+
+describe("apply — quotas under concurrency", () => {
+  it("lets only one of two parallel creates through when the user has one slot left", async () => {
+    const slow = slowCreateProvider();
+    const { useCases, flows, store } = setup({ provider: slow.provider });
+    flows.set(ALICE, "flow-2", FLOW);
+    flows.set(ALICE, "flow-3", FLOW);
+    await store.save(recordOf({ id: "a1", flowId: "other-1" }));
+
+    const results = await Promise.all([
+      applyCreate(useCases, "flow-2"),
+      applyCreate(useCases, "flow-3"),
+    ]);
+
+    expect(results.map(codeOf).sort()).toEqual(["QUOTA_USER", undefined]);
+    expect(slow.created).toHaveLength(1);
+    expect(await store.countByOwner(ALICE.userId)).toEqual({ ok: true, value: 2 });
+  });
+
+  it("lets only one of two parallel creates through when there is one slot left in total", async () => {
+    const slow = slowCreateProvider();
+    const { useCases, flows, store } = setup({ provider: slow.provider });
+    flows.set(ALICE, "flow-2", FLOW);
+    flows.set(ALICE, "flow-3", FLOW);
+    for (let index = 0; index < 19; index += 1)
+      await store.save(
+        recordOf({ id: `other-${String(index)}`, ownerId: `user-${String(index)}` }),
+      );
+
+    const results = await Promise.all([
+      applyCreate(useCases, "flow-2"),
+      applyCreate(useCases, "flow-3"),
+    ]);
+
+    expect(results.map(codeOf).sort()).toEqual(["QUOTA_TOTAL", undefined]);
+    expect(slow.created).toHaveLength(1);
+    expect(await store.countAll()).toEqual({ ok: true, value: 20 });
+  });
+
+  it("still creates both services when two parallel creates fit in the quota", async () => {
+    const slow = slowCreateProvider();
+    const { useCases, flows } = setup({ provider: slow.provider });
+    flows.set(ALICE, "flow-2", FLOW);
+    flows.set(ALICE, "flow-3", FLOW);
+
+    const results = await Promise.all([
+      applyCreate(useCases, "flow-2"),
+      applyCreate(useCases, "flow-3"),
+    ]);
+
+    expect(results.map(codeOf)).toEqual([undefined, undefined]);
+    expect(slow.created).toHaveLength(2);
+  });
+});
+
+describe("apply — orphan compensation", () => {
+  it("fails with UNAVAILABLE and removes the created service when the record cannot be saved", async () => {
+    const { useCases, calls, services } = setup({
+      store: { save: () => Promise.resolve(err({ message: "Supabase down" })) },
+    });
+    const planHash = await planHashOf(useCases);
+
+    const result = await useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash,
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(calls).toEqual(["create", "remove srv-1"]);
+    expect(services.size).toBe(0);
+  });
+
+  it("removes the service id that create returned", async () => {
+    const removed: string[] = [];
+    const { useCases } = setup({
+      provider: {
+        create: () => Promise.resolve(ok({ serviceId: "srv-orphan-42" })),
+        remove: (serviceId) => {
+          removed.push(serviceId);
+          return Promise.resolve(ok(undefined));
+        },
+      },
+      store: { save: () => Promise.resolve(err({ message: "Supabase down" })) },
+    });
+    const planHash = await planHashOf(useCases);
+
+    const result = await useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash,
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(removed).toEqual(["srv-orphan-42"]);
+  });
+});
+
+describe("redeploy", () => {
+  const EDITED_FLOW = deployFlow({ repo: { branch: "release" }, service: { env: ENV } });
+  const LATER = new Date("2026-11-22T12:30:00.000Z");
+
+  function movableClock() {
+    let current = NOW;
+    return { now: () => current, advanceTo: (date: Date) => (current = date) };
+  }
+
+  function updateRecorder() {
+    const memory = createMemoryHostingProvider();
+    const updates: { serviceId: string; input: { spec: ServiceSpec; secrets: unknown } }[] = [];
+    const provider: Partial<HostingProvider> = {
+      create: (input) => memory.create(input),
+      update: (serviceId, input) => {
+        updates.push({ serviceId, input });
+        return memory.update(serviceId, input);
+      },
+      status: (serviceId) => memory.status(serviceId),
+    };
+    return { provider, updates };
+  }
+
+  it("fails with DEPLOYMENT_NOT_FOUND when the node was never deployed", async () => {
+    const { useCases, calls } = setup();
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("DEPLOYMENT_NOT_FOUND");
+    expect(calls).toEqual([]);
+  });
+
+  it("fails with PLAN_CHANGED without updating when the flow changed since the deploy", async () => {
+    const { useCases, flows, calls } = setup();
+    await deployOnce(useCases);
+    flows.set(ALICE, "flow-1", EDITED_FLOW);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("PLAN_CHANGED");
+    expect(calls).toEqual(["create"]);
+  });
+
+  it("fails with MISSING_SECRET without updating when a secret has no value", async () => {
+    const { useCases, calls } = setup();
+    await deployOnce(useCases);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: {},
+    });
+
+    expect(codeOf(result)).toBe("MISSING_SECRET");
+    expect(calls).toEqual(["create"]);
+  });
+
+  it("updates the provider service with the deployed spec and the given secrets", async () => {
+    const recorder = updateRecorder();
+    const { useCases } = setup({ provider: recorder.provider });
+    await deployOnce(useCases);
+
+    await useCases.redeploy(ALICE, { flowId: "flow-1", nodeId: "web", secrets: SECRETS });
+
+    expect(recorder.updates).toEqual([
+      { serviceId: "srv-1", input: { spec: specOfFlow(FLOW), secrets: SECRETS } },
+    ]);
+  });
+
+  it("returns the deployment as deploying with the current time", async () => {
+    const clock = movableClock();
+    const { useCases } = setup({ now: clock.now });
+    const deployed = await deployOnce(useCases);
+    await useCases.list(ALICE, "flow-1");
+    clock.advanceTo(LATER);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { ...deployed, status: "deploying", updatedAt: LATER.toISOString() },
+    });
+  });
+
+  it("saves the record as deploying with the current time and the same spec", async () => {
+    const clock = movableClock();
+    const { useCases, store } = setup({ now: clock.now });
+    await deployOnce(useCases);
+    await useCases.list(ALICE, "flow-1");
+    clock.advanceTo(LATER);
+
+    await useCases.redeploy(ALICE, { flowId: "flow-1", nodeId: "web", secrets: SECRETS });
+
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: {
+        id: "dep-1",
+        providerServiceId: "srv-1",
+        specHash: hashSpec(specOfFlow(FLOW)),
+        status: "deploying",
+        updatedAt: LATER.toISOString(),
+      },
+    });
+  });
+
+  it("never saves the secret values in the record when redeploying", async () => {
+    const { useCases, store } = setup();
+    await deployOnce(useCases);
+
+    await useCases.redeploy(ALICE, { flowId: "flow-1", nodeId: "web", secrets: SECRETS });
+
+    expect(JSON.stringify(await store.listByFlow(ALICE.userId, "flow-1"))).not.toContain(
+      SECRET_VALUE,
+    );
+  });
+
+  it("fails with PROVIDER_ERROR when the provider cannot update", async () => {
+    const { useCases } = setup({
+      provider: { update: () => Promise.resolve(err({ message: "Render is down" })) },
+    });
+    await deployOnce(useCases);
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("PROVIDER_ERROR");
+  });
+
+  it("fails with FLOW_NOT_FOUND when the flow no longer exists", async () => {
+    const { useCases, flows, calls } = setup();
+    await deployOnce(useCases);
+    flows.remove(ALICE, "flow-1");
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("FLOW_NOT_FOUND");
+    expect(calls).toEqual(["create"]);
+  });
+
+  it("fails with FLOW_NOT_FOUND when redeploying another user's flow", async () => {
+    const { useCases, calls } = setup();
+    await deployOnce(useCases);
+
+    const result = await useCases.redeploy(BOB, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(codeOf(result)).toBe("FLOW_NOT_FOUND");
+    expect(calls).toEqual(["create"]);
+  });
+});
+
+describe("plan and apply — changing the kind of service", () => {
+  const flowWithBuild = (build: Record<string, unknown>) =>
+    deployFlow({ service: { env: ENV, ...build } });
+  const STATIC_FLOW = flowWithBuild({ build: "static", publishPath: "dist" });
+  const NATIVE_FLOW = flowWithBuild({ build: "native" });
+  const DOCKER_FLOW = flowWithBuild({ build: "docker" });
+
+  async function deployedAs(flow: Flow) {
+    const context = setup();
+    context.flows.set(ALICE, "flow-1", flow);
+    await deployOnce(context.useCases);
+    return context;
+  }
+
+  it.each<[string, Flow, Flow]>([
+    ["static to native", STATIC_FLOW, NATIVE_FLOW],
+    ["static to docker", STATIC_FLOW, DOCKER_FLOW],
+    ["native to static", NATIVE_FLOW, STATIC_FLOW],
+    ["docker to static", DOCKER_FLOW, STATIC_FLOW],
+  ])("fails the plan with SERVICE_KIND_CHANGED from %s", async (_case, before, after) => {
+    const { useCases, flows } = await deployedAs(before);
+    flows.set(ALICE, "flow-1", after);
+
+    const result = await useCases.plan(ALICE, { flowId: "flow-1", nodeId: "web" });
+
+    expect(codeOf(result)).toBe("SERVICE_KIND_CHANGED");
+  });
+
+  it.each<[string, Flow, Flow]>([
+    ["static to native", STATIC_FLOW, NATIVE_FLOW],
+    ["native to static", NATIVE_FLOW, STATIC_FLOW],
+  ])(
+    "fails the apply with SERVICE_KIND_CHANGED from %s without calling the provider",
+    async (_case, before, after) => {
+      const { useCases, flows, calls } = await deployedAs(before);
+      flows.set(ALICE, "flow-1", after);
+
+      const result = await useCases.apply(ALICE, {
+        flowId: "flow-1",
+        nodeId: "web",
+        planHash: hashSpec(specOfFlow(after)),
+        secrets: SECRETS,
+      });
+
+      expect(codeOf(result)).toBe("SERVICE_KIND_CHANGED");
+      expect(calls).toEqual(["create"]);
+    },
+  );
+
+  it.each<[string, Flow, Flow]>([
+    ["native to docker", NATIVE_FLOW, DOCKER_FLOW],
+    ["docker to native", DOCKER_FLOW, NATIVE_FLOW],
+  ])("plans a normal update from %s", async (_case, before, after) => {
+    const { useCases, flows } = await deployedAs(before);
+    flows.set(ALICE, "flow-1", after);
+
+    const result = await useCases.plan(ALICE, { flowId: "flow-1", nodeId: "web" });
+
+    expect(result).toMatchObject({ ok: true, value: { action: "update" } });
+  });
+
+  it("applies an update from native to docker on the same service", async () => {
+    const { useCases, flows, calls } = await deployedAs(NATIVE_FLOW);
+    flows.set(ALICE, "flow-1", DOCKER_FLOW);
+
+    const result = await useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash: hashSpec(specOfFlow(DOCKER_FLOW)),
+      secrets: SECRETS,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual(["create", "update srv-1"]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyEvent, createEngineState, type EngineState } from "../engine/engine-state.ts";
-import { CATALOG, edgeOf, flowOf, nodeOf } from "./canvas-fixtures.ts";
+import { CATALOG, edgeOf, flowOf, manifestOf, nodeOf } from "./canvas-fixtures.ts";
 import { toEdgeViews, toNodeViews } from "./node-views.ts";
 
 const FLOW = flowOf(
@@ -168,5 +168,42 @@ describe("node and edge views of the floating design", () => {
     expect(toEdgeViews({ flow: FLOW, catalog: CATALOG, engine })).toMatchObject([
       { id: "e1", rows: 200, columns: 2 },
     ]);
+  });
+});
+
+describe("toNodeViews for resource nodes", () => {
+  const REPO = manifestOf("core.deploy.repo", {
+    name: "Repo",
+    category: "Hosteo",
+    inputs: [],
+    outputs: [{ id: "repo", type: "repo" }],
+    impl: { kind: "resource", resource: "repo" },
+  });
+  const flow = flowOf([nodeOf("r", REPO.id), nodeOf("f", "core.filter")]);
+  const resourceViewOf = (id: string, engine: Partial<EngineState>) =>
+    toNodeViews({
+      flow,
+      catalog: [...CATALOG, REPO],
+      engine: { ...createEngineState(), ...engine },
+    }).find((view) => view.id === id);
+
+  it("shows a stale resource node as idle", () => {
+    const view = resourceViewOf("r", { nodes: { r: { state: "stale" } } });
+
+    expect(view?.props.state).toBe("idle");
+  });
+
+  it("still shows a failed resource node as error with its message", () => {
+    const view = resourceViewOf("r", {
+      nodes: { r: { state: "error", error: { code: "PARAM_REQUIRED", message: "Falta la url" } } },
+    });
+
+    expect(view?.props).toMatchObject({ state: "error", errorMessage: "Falta la url" });
+  });
+
+  it("still shows a stale data node as stale", () => {
+    const view = resourceViewOf("f", { nodes: { f: { state: "stale" } } });
+
+    expect(view?.props.state).toBe("stale");
   });
 });

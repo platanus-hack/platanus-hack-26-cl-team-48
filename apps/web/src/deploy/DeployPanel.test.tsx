@@ -139,8 +139,8 @@ const FLOW: Flow = flowOf(
 );
 
 const CHANGES = [
-  { field: "build.startCommand", before: "npm start", after: "node server.js" },
-  { field: "env.MODE", after: "prod" },
+  { field: "build", before: "npm start", after: "node server.js" },
+  { field: "env", after: "MODE=prod" },
 ];
 const planOf = (action: DeployPlan["action"]): DeployPlan => ({
   action,
@@ -169,6 +169,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 type ApplyRequest = Parameters<DeployService["apply"]>[0];
+type RedeployRequest = Parameters<DeployService["redeploy"]>[0];
 
 /** The deploy service in memory: it keeps the flow's deployments and records every call. */
 function createFakeDeploy(initial: ReadonlyArray<Deployment> = []) {
@@ -178,10 +179,13 @@ function createFakeDeploy(initial: ReadonlyArray<Deployment> = []) {
     apply: [] as ApplyRequest[],
     list: [] as string[],
     remove: [] as string[],
+    redeploy: [] as RedeployRequest[],
   };
   const replies = {
     plans: [Promise.resolve<DeployResult<DeployPlan>>(ok(planOf("create")))],
     apply: undefined as Promise<DeployResult<Deployment>> | undefined,
+    redeploy: undefined as Promise<DeployResult<Deployment>> | undefined,
+    lists: [] as Promise<DeployResult<readonly Deployment[]>>[],
     failure: undefined as DeployErrorCode | undefined,
   };
   const failed = () => (replies.failure === undefined ? undefined : err({ code: replies.failure }));
@@ -202,9 +206,21 @@ function createFakeDeploy(initial: ReadonlyArray<Deployment> = []) {
         ];
       return result;
     },
+    redeploy: async (request) => {
+      calls.redeploy.push({ ...request, secrets: { ...request.secrets } });
+      const result =
+        (await replies.redeploy) ??
+        ok(deploymentOf({ nodeId: request.nodeId, status: "deploying" }));
+      if (result.ok)
+        state.deployments = [
+          ...state.deployments.filter((each) => each.nodeId !== request.nodeId),
+          result.value,
+        ];
+      return result;
+    },
     list: (flowId) => {
       calls.list.push(flowId);
-      return Promise.resolve(failed() ?? ok([...state.deployments]));
+      return replies.lists.shift() ?? Promise.resolve(failed() ?? ok([...state.deployments]));
     },
     remove: (deploymentId) => {
       calls.remove.push(deploymentId);
@@ -221,6 +237,13 @@ function createFakeDeploy(initial: ReadonlyArray<Deployment> = []) {
     },
     applyWith: (reply: Promise<DeployResult<Deployment>>) => {
       replies.apply = reply;
+    },
+    redeployWith: (reply: Promise<DeployResult<Deployment>>) => {
+      replies.redeploy = reply;
+    },
+    /** The next `list` call answers with `reply` instead of the current deployments. */
+    nextListWith: (reply: Promise<DeployResult<readonly Deployment[]>>) => {
+      replies.lists.push(reply);
     },
     failWith: (code: DeployErrorCode) => {
       replies.failure = code;
@@ -293,6 +316,7 @@ async function openDeployConfirmation() {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -308,7 +332,7 @@ describe("DeployPanel without a saved flow", () => {
 
     await screen.findByText(NEEDS_SAVED_FLOW);
 
-    expect(deploy.calls).toEqual({ plan: [], apply: [], list: [], remove: [] });
+    expect(deploy.calls).toEqual({ plan: [], apply: [], list: [], remove: [], redeploy: [] });
   });
 });
 
@@ -395,8 +419,8 @@ describe("DeployPanel plan", () => {
       await screen.findByText(PLAN_TEXT[action]);
 
       expect([
-        screen.queryByText(/build\.startCommand/) !== null,
-        screen.queryByText(/env\.MODE/) !== null,
+        document.body.textContent.includes("Construcción"),
+        document.body.textContent.includes("Variables de entorno"),
       ]).toEqual([true, true]);
     },
   );
@@ -771,4 +795,379 @@ describe("ParamsPanel Despliegue tab", () => {
 
     expect({ plan: deploy.calls.plan, list: deploy.calls.list }).toEqual({ plan: [], list: [] });
   });
+});
+
+const REDEPLOY = "Redesplegar";
+const CONFIRM_REDEPLOY = "Confirmar redespliegue";
+const CONFIRM_REDEPLOY_QUESTION =
+  "Se volverá a construir el servicio con el último commit de la rama y las credenciales actuales.";
+const RATE_LIMITED_MESSAGE =
+  "Demasiadas solicitudes seguidas. Espera un momento y vuelve a intentar.";
+const NO_URL = "Todavía sin dirección";
+const REFRESH_INTERVAL_MS = 5000;
+
+/** A fake whose node already has a live deployment and nothing new to deploy. */
+function deployedAndUnchanged() {
+  const deploy = createFakeDeploy([deploymentOf()]);
+  deploy.planWith(Promise.resolve(ok(planOf("unchanged"))));
+  return deploy;
+}
+
+async function openRedeployConfirmation() {
+  await screen.findByText(PLAN_TEXT.unchanged);
+  await screen.findByText(/En línea/);
+  await userEvent.click(screen.getByRole("button", { name: REDEPLOY }));
+}
+
+describe("DeployPanel redeploy button", () => {
+  it("is enabled when the node has a deployment and nothing changed", async () => {
+    await renderPanel({ deploy: deployedAndUnchanged() });
+
+    await screen.findByText(PLAN_TEXT.unchanged);
+    await screen.findByText(/En línea/);
+
+    expect(isDisabled(screen.getByRole("button", { name: REDEPLOY }))).toBe(false);
+  });
+
+  it("cannot be pressed when the node has no deployment", async () => {
+    const deploy = createFakeDeploy();
+    deploy.planWith(Promise.resolve(ok(planOf("unchanged"))));
+
+    await renderPanel({ deploy });
+    await screen.findByText(PLAN_TEXT.unchanged);
+
+    expect(cannotPress(REDEPLOY)).toBe(true);
+  });
+
+  it.each(["create", "update"] as const)("is disabled with a %s plan", async (action) => {
+    const deploy = createFakeDeploy([deploymentOf()]);
+    deploy.planWith(Promise.resolve(ok(planOf(action))));
+
+    await renderPanel({ deploy });
+    await screen.findByText(PLAN_TEXT[action]);
+    await screen.findByText(/En línea/);
+
+    expect(isDisabled(screen.getByRole("button", { name: REDEPLOY }))).toBe(true);
+  });
+});
+
+describe("DeployPanel redeploying", () => {
+  it("asks for confirmation in the page instead of redeploying at once", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { deploy } = await renderPanel({ deploy: deployedAndUnchanged() });
+
+    await openRedeployConfirmation();
+
+    expect({
+      redeployed: deploy.calls.redeploy.length,
+      question: screen.queryByText(CONFIRM_REDEPLOY_QUESTION) !== null,
+      confirm: screen.queryByRole("button", { name: CONFIRM_REDEPLOY }) !== null,
+      cancel: screen.queryByRole("button", { name: CANCEL }) !== null,
+      windowConfirm: confirmSpy.mock.calls.length,
+    }).toEqual({ redeployed: 0, question: true, confirm: true, cancel: true, windowConfirm: 0 });
+  });
+
+  it("redeploys the node with the credentials its variables reference once confirmed", async () => {
+    const { deploy } = await renderPanel({ deploy: deployedAndUnchanged() });
+    await openRedeployConfirmation();
+
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_REDEPLOY }));
+
+    await waitFor(() => {
+      expect(deploy.calls.redeploy).toEqual([
+        { flowId: FLOW_ID, nodeId: NODE_ID, secrets: { [STRIPE.name]: STRIPE.value } },
+      ]);
+    });
+  });
+
+  it("shows the new status redeploy returns", async () => {
+    await renderPanel({ deploy: deployedAndUnchanged() });
+    await openRedeployConfirmation();
+
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_REDEPLOY }));
+
+    expect((await screen.findByText(/Desplegando/)).textContent).toContain("Desplegando");
+  });
+
+  it("does not redeploy when the confirmation is cancelled", async () => {
+    const { deploy } = await renderPanel({ deploy: deployedAndUnchanged() });
+    await openRedeployConfirmation();
+
+    await userEvent.click(screen.getByRole("button", { name: CANCEL }));
+
+    expect({
+      redeployed: deploy.calls.redeploy.length,
+      confirm: screen.queryByRole("button", { name: CONFIRM_REDEPLOY }),
+    }).toEqual({ redeployed: 0, confirm: null });
+  });
+
+  it("shows the rate limit message when redeploy is refused for too many requests", async () => {
+    const deploy = deployedAndUnchanged();
+    deploy.redeployWith(Promise.resolve(err({ code: "RATE_LIMITED" })));
+    await renderPanel({ deploy });
+    await openRedeployConfirmation();
+
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_REDEPLOY }));
+
+    expect(await screen.findByText(RATE_LIMITED_MESSAGE)).toBeTruthy();
+  });
+});
+
+describe("DeployPanel asking for the plan again", () => {
+  it("asks for the plan and the deployments again when refreshing", async () => {
+    const { deploy } = await renderPanel();
+    await screen.findByText(PLAN_TEXT.create);
+
+    await userEvent.click(screen.getByRole("button", { name: REFRESH }));
+
+    await waitFor(() => {
+      expect({ plans: deploy.calls.plan.length, lists: deploy.calls.list.length }).toEqual({
+        plans: 2,
+        lists: 2,
+      });
+    });
+  });
+
+  it("shows the plan refreshing returns", async () => {
+    const deploy = createFakeDeploy();
+    deploy.planWith(Promise.resolve(ok(planOf("create"))), Promise.resolve(ok(planOf("update"))));
+    await renderPanel({ deploy });
+    await screen.findByText(PLAN_TEXT.create);
+
+    await userEvent.click(screen.getByRole("button", { name: REFRESH }));
+
+    expect(PLAN_TEXT.update.test((await screen.findByText(PLAN_TEXT.update)).textContent)).toBe(
+      true,
+    );
+  });
+
+  it("asks for the plan again by itself after a deploy fails with PLAN_CHANGED", async () => {
+    const deploy = createFakeDeploy();
+    deploy.planWith(Promise.resolve(ok(planOf("create"))), Promise.resolve(ok(planOf("update"))));
+    deploy.applyWith(Promise.resolve(err({ code: "PLAN_CHANGED" })));
+    await renderPanel({ deploy });
+    await openDeployConfirmation();
+
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_DEPLOY }));
+
+    expect({
+      isUpdate: PLAN_TEXT.update.test((await screen.findByText(PLAN_TEXT.update)).textContent),
+      plans: deploy.calls.plan.length,
+    }).toEqual({ isUpdate: true, plans: 2 });
+  });
+});
+
+describe("DeployPanel plan field labels", () => {
+  const LABELLED_CHANGES = [
+    { field: "repo", before: "https://github.com/ana/web", after: "https://github.com/ana/site" },
+    { field: "build", before: "native", after: "docker" },
+    { field: "env", after: "MODE=prod" },
+    { field: "healthCheckPath", before: "/health", after: "/ready" },
+  ];
+
+  async function renderLabelledPlan() {
+    const deploy = createFakeDeploy();
+    deploy.planWith(
+      Promise.resolve(ok({ action: "update", hash: "hash-update", changes: LABELLED_CHANGES })),
+    );
+    await renderPanel({ deploy });
+    await screen.findByText(PLAN_TEXT.update);
+    return document.body.textContent;
+  }
+
+  it.each([
+    ["repo", "Repo"],
+    ["build", "Construcción"],
+    ["env", "Variables de entorno"],
+    ["healthCheckPath", "Health check"],
+  ])("shows the %s field as %s", async (_field, label) => {
+    const text = await renderLabelledPlan();
+
+    expect(text).toContain(label);
+  });
+
+  it.each(["repo", "build", "env", "healthCheckPath"])(
+    "never shows the raw %s key",
+    async (field) => {
+      const text = await renderLabelledPlan();
+
+      expect(text).not.toContain(field);
+    },
+  );
+});
+
+describe("DeployPanel error messages", () => {
+  it("asks to connect a Repo node when the plan has no repo", async () => {
+    const deploy = createFakeDeploy();
+    deploy.planWith(Promise.resolve(err({ code: "MISSING_REPO" })));
+
+    await renderPanel({ deploy });
+
+    expect(await screen.findByText("Conecta un nodo Repo a la entrada del servicio.")).toBeTruthy();
+  });
+
+  it.each([
+    [
+      "SERVICE_KIND_CHANGED",
+      "No se puede cambiar entre Estático y Docker/Nativo en un servicio desplegado. Elimínalo y vuelve a desplegar.",
+    ],
+    ["RATE_LIMITED", RATE_LIMITED_MESSAGE],
+  ] as const)("shows the %s message when deploying fails", async (code, message) => {
+    const deploy = createFakeDeploy();
+    deploy.applyWith(Promise.resolve(err({ code })));
+    await renderPanel({ deploy });
+    await openDeployConfirmation();
+
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_DEPLOY }));
+
+    expect(await screen.findByText(message)).toBeTruthy();
+  });
+
+  it("shows the RATE_LIMITED message when the plan is refused", async () => {
+    const deploy = createFakeDeploy();
+    deploy.planWith(Promise.resolve(err({ code: "RATE_LIMITED" })));
+
+    await renderPanel({ deploy });
+
+    expect(await screen.findByText(RATE_LIMITED_MESSAGE)).toBeTruthy();
+  });
+});
+
+describe("DeployPanel periodic refresh", () => {
+  async function renderWithFakeClock(deploy: FakeDeploy) {
+    const stores = await createStores(FLOW_ID);
+    const hub = await signedInHub();
+    vi.useFakeTimers();
+    const view = renderWithStores(
+      withDeploy(<DeployPanel nodeId={NODE_ID} />, { hub, deploy }),
+      stores,
+    );
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    return view;
+  }
+
+  const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+
+  it("asks for the deployments again every 5 seconds while open", async () => {
+    const deploy = createFakeDeploy([deploymentOf()]);
+    await renderWithFakeClock(deploy);
+    const counts = [deploy.calls.list.length];
+
+    await advance(REFRESH_INTERVAL_MS - 1);
+    counts.push(deploy.calls.list.length);
+    await advance(1);
+    counts.push(deploy.calls.list.length);
+    await advance(REFRESH_INTERVAL_MS);
+    counts.push(deploy.calls.list.length);
+
+    expect(counts).toEqual([1, 1, 2, 3]);
+  });
+
+  it("shows the status the periodic refresh brings", async () => {
+    const deploy = createFakeDeploy([deploymentOf({ status: "deploying" })]);
+    await renderWithFakeClock(deploy);
+    deploy.state.deployments = [deploymentOf({ status: "live" })];
+
+    await advance(REFRESH_INTERVAL_MS);
+
+    expect(screen.queryByText(/En línea/)?.textContent).toContain("En línea");
+  });
+
+  it("stops asking for the deployments after the panel closes", async () => {
+    const deploy = createFakeDeploy([deploymentOf()]);
+    const view = await renderWithFakeClock(deploy);
+    const before = deploy.calls.list.length;
+
+    view.unmount();
+    await advance(REFRESH_INTERVAL_MS * 3);
+
+    expect(deploy.calls.list.length).toBe(before);
+  });
+});
+
+describe("DeployPanel stale list replies", () => {
+  /** Sends a list request through Actualizar estado whose reply arrives only when resolved. */
+  async function sendSlowList(deploy: FakeDeploy) {
+    const slowList = deferred<DeployResult<readonly Deployment[]>>();
+    deploy.nextListWith(slowList.promise);
+    const lists = deploy.calls.list.length;
+    await userEvent.click(screen.getByRole("button", { name: REFRESH }));
+    await waitFor(() => {
+      expect(deploy.calls.list.length).toBe(lists + 1);
+    });
+    return slowList;
+  }
+
+  it("keeps the deployment apply returned when an older list answers later", async () => {
+    const { deploy } = await renderPanel();
+    await screen.findByText(PLAN_TEXT.create);
+    const slowList = await sendSlowList(deploy);
+    deploy.applyWith(Promise.resolve(ok(deploymentOf({ status: "deploying" }))));
+    await openDeployConfirmation();
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_DEPLOY }));
+    await screen.findByText(/Desplegando/);
+
+    await act(async () => {
+      slowList.resolve(ok([]));
+      await slowList.promise;
+    });
+
+    expect(screen.queryByText(/Desplegando/) !== null).toBe(true);
+  });
+
+  it("keeps the deployment redeploy returned when an older list answers later", async () => {
+    const { deploy } = await renderPanel({ deploy: deployedAndUnchanged() });
+    await screen.findByText(/En línea/);
+    const slowList = await sendSlowList(deploy);
+    await openRedeployConfirmation();
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_REDEPLOY }));
+    await screen.findByText(/Desplegando/);
+
+    await act(async () => {
+      slowList.resolve(ok([deploymentOf({ status: "live" })]));
+      await slowList.promise;
+    });
+
+    expect({
+      deploying: screen.queryByText(/Desplegando/) !== null,
+      live: screen.queryByText(/En línea/),
+    }).toEqual({ deploying: true, live: null });
+  });
+
+  it("does not bring back a removed deployment when an older list answers later", async () => {
+    const { deploy } = await renderPanel({ deploy: createFakeDeploy([deploymentOf()]) });
+    await screen.findByText(/En línea/);
+    const slowList = await sendSlowList(deploy);
+    await userEvent.click(screen.getByRole("button", { name: REMOVE }));
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_REMOVE }));
+    await waitFor(() => {
+      expect(screen.queryByText(/En línea/)).toBeNull();
+    });
+
+    await act(async () => {
+      slowList.resolve(ok([deploymentOf()]));
+      await slowList.promise;
+    });
+
+    expect({ status: screen.queryByText(/En línea/), link: linkTo(SITE_URL) }).toEqual({
+      status: null,
+      link: undefined,
+    });
+  });
+});
+
+describe("DeployPanel unsafe deployment URLs", () => {
+  it.each(["javascript:alert(1)", "http://nd-ana-web.onrender.com"])(
+    "shows %s as Todavía sin dirección and never as a link",
+    async (url) => {
+      await renderPanel({ deploy: createFakeDeploy([deploymentOf({ url })]) });
+
+      await screen.findByText(/En línea/);
+
+      expect({ noUrl: screen.queryByText(NO_URL) !== null, link: linkTo(url) }).toEqual({
+        noUrl: true,
+        link: undefined,
+      });
+    },
+  );
 });

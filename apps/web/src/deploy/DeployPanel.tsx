@@ -6,7 +6,13 @@ import { ConfirmAction } from "./ConfirmAction.tsx";
 import { deployErrorMessage } from "./deploy-error-message.ts";
 import { secretsForDeploy } from "./deploy-secrets.ts";
 import type { Deployment, DeploymentStatus, DeployPlan, DeployResult } from "./deploy-service.ts";
-import { hasChangesToDeploy, isNotConfigured, viewDeployments } from "./deploy-view.ts";
+import {
+  canRedeploy,
+  hasChangesToDeploy,
+  isNotConfigured,
+  viewDeployments,
+} from "./deploy-view.ts";
+import { isHttpsUrl } from "./parse-deploy-reply.ts";
 import { useDeployments, type DeploymentsState } from "./use-deployments.ts";
 
 const text = MESSAGES.deploy;
@@ -43,7 +49,7 @@ function FlowDeployments({ flowId, nodeId }: { readonly flowId: string; readonly
     <div className="web-deploy">
       {own !== undefined && <DeploymentCard deployment={own} state={state} />}
       <PlanSection plan={state.plan} />
-      <DeployActions nodeId={nodeId} state={state} />
+      <DeployActions nodeId={nodeId} deployment={own} state={state} />
       {state.failure !== undefined && (
         <p className="web-deploy-error" role="alert">
           {deployErrorMessage(state.failure)}
@@ -61,16 +67,14 @@ function FlowDeployments({ flowId, nodeId }: { readonly flowId: string; readonly
 
 function DeployActions({
   nodeId,
+  deployment,
   state,
 }: {
   readonly nodeId: string;
+  readonly deployment: Deployment | undefined;
   readonly state: DeploymentsState;
 }) {
-  const { secretStore } = useAppStores();
-  const secrets = useStore(secretStore, (store) => store.secrets);
-  const env = useFlowState(
-    (flow) => flow.flow.nodes.find(({ id }) => id === nodeId)?.params["env"],
-  );
+  const secretsOfNode = useSecretsOfNode(nodeId);
   return (
     <div className="web-deploy-actions">
       <ConfirmAction
@@ -78,7 +82,15 @@ function DeployActions({
         isDisabled={state.isBusy || !hasChangesToDeploy(state.plan)}
         confirmation={{ question: text.confirmDeployQuestion, label: text.confirmDeploy }}
         onConfirm={() => {
-          state.deploy(secretsForDeploy(env, secrets));
+          state.deploy(secretsOfNode());
+        }}
+      />
+      <ConfirmAction
+        label={text.redeploy}
+        isDisabled={state.isBusy || !canRedeploy(state.plan, deployment)}
+        confirmation={{ question: text.confirmRedeployQuestion, label: text.confirmRedeploy }}
+        onConfirm={() => {
+          state.redeploy(secretsOfNode());
         }}
       />
       <Button size="sm" variant="ghost" icon="rotate-ccw" onClick={state.refresh}>
@@ -87,6 +99,20 @@ function DeployActions({
     </div>
   );
 }
+
+/** The credentials the node's environment variables use, read when the user confirms. */
+function useSecretsOfNode(nodeId: string): () => Readonly<Record<string, string>> {
+  const { secretStore } = useAppStores();
+  const secrets = useStore(secretStore, (store) => store.secrets);
+  const env = useFlowState(
+    (flow) => flow.flow.nodes.find(({ id }) => id === nodeId)?.params["env"],
+  );
+  return () => secretsForDeploy(env, secrets);
+}
+
+const PLAN_FIELD_LABELS: ReadonlyMap<string, string> = new Map(Object.entries(text.planFields));
+
+const planFieldLabel = (field: string): string => PLAN_FIELD_LABELS.get(field) ?? field;
 
 function PlanSection({ plan }: { readonly plan: DeployResult<DeployPlan> | undefined }) {
   return (
@@ -114,7 +140,7 @@ function PlanSummary({ plan }: { readonly plan: DeployPlan }) {
       {plan.action !== "unchanged" && plan.changes.length > 0 && (
         <ul className="web-deploy-changes" aria-label={text.changes}>
           {plan.changes.map(({ field }) => (
-            <li key={field}>{field}</li>
+            <li key={field}>{planFieldLabel(field)}</li>
           ))}
         </ul>
       )}
@@ -164,7 +190,7 @@ function Orphans({
 }
 
 function DeploymentLink({ deployment }: { readonly deployment: Deployment }) {
-  if (deployment.url === undefined) return <span className="web-caption">{text.noUrl}</span>;
+  if (!isHttpsUrl(deployment.url)) return <span className="web-caption">{text.noUrl}</span>;
   return (
     <a className="web-deploy-url" href={deployment.url} target="_blank" rel="noreferrer">
       {deployment.url}

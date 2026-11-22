@@ -88,7 +88,9 @@ export type DeployErrorCode =
   | "MISSING_SECRET"
   | "DEPLOYMENT_NOT_FOUND"
   | "PROVIDER_ERROR"
-  | "UNAVAILABLE";
+  | "UNAVAILABLE"
+  | "SERVICE_KIND_CHANGED"
+  | "RATE_LIMITED";
 export type DeployError = { readonly code: DeployErrorCode; readonly message: string };
 
 export type UserIdentity = { readonly userId: string; readonly accessToken: string };

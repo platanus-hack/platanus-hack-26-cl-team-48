@@ -7,6 +7,7 @@ import { useEngineQuery } from "../engine/use-engine-query.ts";
 import { usePreviewLocation } from "../layout/preview-location.ts";
 import { Segmented } from "../layout/Segmented.tsx";
 import { MESSAGES } from "../messages.ts";
+import { isResourceManifest } from "../canvas/resource-nodes.ts";
 import { ChartPreview } from "./ChartPreview.tsx";
 import { FigureImage } from "./FigureImage.tsx";
 import { toGridColumns } from "./preview-model.ts";
@@ -21,7 +22,8 @@ type Content = "data" | "profile";
 /** The preview drawn inside a node: its chart, the first figure its code showed, or its table. */
 export function InNodePreview({ nodeId }: { readonly nodeId: string }) {
   const type = useFlowState((state) => state.flow.nodes.find((node) => node.id === nodeId)?.type);
-  const isView = useCatalog().find((manifest) => manifest.id === type)?.impl.kind === "view";
+  const manifest = useCatalog().find((candidate) => candidate.id === type);
+  const isView = manifest?.impl.kind === "view";
   const resultRef = useEngineState((state) => Object.values(state.results[nodeId] ?? {}).at(0));
   const viewVersion = useEngineState((state) => selectViewVersion(state, nodeId));
   const displays = useEngineState((state) => state.displays[nodeId]);
@@ -30,7 +32,11 @@ export function InNodePreview({ nodeId }: { readonly nodeId: string }) {
   if (displays !== undefined && displays.length > 0)
     return <InNodeFigure nodeId={nodeId} displays={displays} />;
   if (resultRef === undefined)
-    return <p className="web-in-node-hint">{MESSAGES.preview.noResult}</p>;
+    return (
+      <p className="web-in-node-hint">
+        {isResourceManifest(manifest) ? MESSAGES.preview.resource : MESSAGES.preview.noResult}
+      </p>
+    );
   return <InNodeTable nodeId={nodeId} resultRef={resultRef} />;
 }
 

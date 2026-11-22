@@ -2,7 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { createAppStores } from "../app-stores.ts";
-import { BAR, flowOf, nodeOf } from "../canvas/canvas-fixtures.ts";
+import { BAR, CATALOG, FILTER, flowOf, manifestOf, nodeOf } from "../canvas/canvas-fixtures.ts";
 import { renderWithEngine } from "../testing/render-with-engine.tsx";
 import { PreviewPanel } from "./PreviewPanel.tsx";
 
@@ -168,4 +168,37 @@ it("names the previewed node and the size of its result in the header", async ()
   const header = screen.getByRole("heading", { name: "Vista previa" }).closest("header");
   expect(header?.textContent).toContain(BAR.name);
   expect(header?.textContent).toContain("1.200 filas · 1 col.");
+});
+
+describe("PreviewPanel of a resource node", () => {
+  const REPO = manifestOf("core.deploy.repo", {
+    name: "Repo",
+    category: "Hosteo",
+    inputs: [],
+    outputs: [{ id: "repo", type: "repo" }],
+    impl: { kind: "resource", resource: "repo" },
+  });
+  const RUN_HINT = "Ejecuta el flujo para ver los datos de este nodo.";
+
+  async function renderSelected(type: string) {
+    const stores = createAppStores(flowOf([nodeOf("n", type)]));
+    stores.selectionStore.getState().select(["n"]);
+    stores.engineStore.getState().dispatch({ type: "catalog.loaded", nodes: [...CATALOG, REPO] });
+    renderWithEngine(<PreviewPanel />, { stores });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  it("does not ask to run the flow to see a resource node's data", async () => {
+    await renderSelected(REPO.id);
+
+    expect(screen.queryByText(RUN_HINT)).toBeNull();
+  });
+
+  it("still asks to run the flow to see a data node's data", async () => {
+    await renderSelected(FILTER.id);
+
+    expect(screen.getByText(RUN_HINT)).toBeDefined();
+  });
 });
