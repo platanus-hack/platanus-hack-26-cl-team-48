@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { MESSAGES } from "../messages.ts";
 import { ALL_KINDS, type HubView, type KindFilter } from "./hub-filters.ts";
+import { TagPicker } from "./TagPicker.tsx";
 
 const KIND_OPTIONS = ([ALL_KINDS, "app", "flow", "node"] as const).map((value) => ({
   value,
@@ -39,7 +40,7 @@ export function HubFilters({ filters, views, tags, onView, onKind, onTag }: HubF
         value={filters.kind}
         onChange={onKind}
       />
-      {tags.length > 0 && <TagToggles tags={tags} pressed={filters.pressedTags} onTag={onTag} />}
+      {tags.length > 0 && <TagPicker tags={tags} pressed={filters.pressedTags} onTag={onTag} />}
     </aside>
   );
 }
@@ -71,35 +72,5 @@ function RadioList<T extends string>(props: {
         </label>
       ))}
     </fieldset>
-  );
-}
-
-function TagToggles(props: {
-  readonly tags: ReadonlyArray<string>;
-  readonly pressed: ReadonlySet<string>;
-  readonly onTag: (tag: string) => void;
-}) {
-  const heading = useId();
-  return (
-    <div className="web-hub-filter" role="group" aria-labelledby={heading}>
-      <span id={heading} className="web-overline">
-        {MESSAGES.hub.tags}
-      </span>
-      <div className="web-hub-tags">
-        {props.tags.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            className="web-hub-tag"
-            aria-pressed={props.pressed.has(tag)}
-            onClick={() => {
-              props.onTag(tag);
-            }}
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

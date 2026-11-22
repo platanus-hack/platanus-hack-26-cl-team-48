@@ -58,7 +58,7 @@ const containsText = (publication: PublicationSummary, text: string) => {
 };
 
 // The same folding as the hub's own search, so "region" finds "región".
-const normalize = (text: string) =>
+export const normalize = (text: string) =>
   text
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
