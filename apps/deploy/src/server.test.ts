@@ -62,6 +62,10 @@ function fakeUseCases(failWith?: DeployErrorCode) {
       record("apply", identity, input);
       return failWith === undefined ? Promise.resolve(ok(DEPLOYMENT)) : failure();
     },
+    redeploy: (identity, input) => {
+      record("redeploy", identity, input);
+      return failWith === undefined ? Promise.resolve(ok(DEPLOYMENT)) : failure();
+    },
     list: (identity, flowId) => {
       record("list", identity, flowId);
       return failWith === undefined ? Promise.resolve(ok([DEPLOYMENT])) : failure();
@@ -74,12 +78,21 @@ function fakeUseCases(failWith?: DeployErrorCode) {
   return { useCases, calls };
 }
 
-function handlerWith(options: { failWith?: DeployErrorCode; identity?: "UNAVAILABLE" } = {}) {
+type HandlerOptions = {
+  failWith?: DeployErrorCode;
+  identity?: "UNAVAILABLE";
+  rateLimit?: { readonly maxRequests: number; readonly windowMs: number };
+  now?: () => number;
+};
+
+function handlerWith(options: HandlerOptions = {}) {
   const fake = fakeUseCases(options.failWith);
   const handler = createDeployHandler({
     identity: fakeIdentity(options.identity),
     useCases: fake.useCases,
     allowedOrigins: [ALLOWED_ORIGIN],
+    ...(options.rateLimit === undefined ? {} : { rateLimit: options.rateLimit }),
+    ...(options.now === undefined ? {} : { now: options.now }),
   });
   return { handler, calls: fake.calls };
 }
@@ -108,6 +121,7 @@ const authed = (method: string, path: string, body?: unknown): Request =>
 const PROTECTED_ROUTES: [string, string, unknown][] = [
   ["POST", "/plan", { flowId: "flow-1", nodeId: "web" }],
   ["POST", "/apply", { flowId: "flow-1", nodeId: "web", planHash: "hash-1", secrets: {} }],
+  ["POST", "/redeploy", { flowId: "flow-1", nodeId: "web", secrets: {} }],
   ["GET", "/deployments?flowId=flow-1", undefined],
   ["DELETE", "/deployments/dep-1", undefined],
 ];
@@ -335,6 +349,7 @@ describe("createDeployHandler — domain errors", () => {
     ["QUOTA_USER", 409],
     ["QUOTA_TOTAL", 409],
     ["PLAN_CHANGED", 409],
+    ["SERVICE_KIND_CHANGED", 409],
     ["MISSING_SECRET", 400],
     ["DEPLOYMENT_NOT_FOUND", 404],
     ["PROVIDER_ERROR", 502],
@@ -529,5 +544,195 @@ describe("createDeployHandler — with the in-memory use cases", () => {
     );
 
     expect(await response.json()).toEqual({ ok: true, deployments: [] });
+  });
+});
+
+describe("createDeployHandler — redeploy", () => {
+  it("redeploys a node with its secrets", async () => {
+    const { handler, calls } = handlerWith();
+    const body = { flowId: "flow-1", nodeId: "web", secrets: { "github-token": "ghp_value" } };
+
+    const response = await handler(authed("POST", "/redeploy", body));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, deployment: DEPLOYMENT });
+    expect(calls).toEqual([{ name: "redeploy", identity: ALICE, input: body }]);
+  });
+
+  it("redeploys with no secrets as an empty object", async () => {
+    const { handler, calls } = handlerWith();
+
+    await handler(authed("POST", "/redeploy", { flowId: "flow-1", nodeId: "web" }));
+
+    expect(calls[0]?.input).toEqual({ flowId: "flow-1", nodeId: "web", secrets: {} });
+  });
+
+  it.each([
+    ["no body", undefined],
+    ["a missing nodeId", { flowId: "flow-1" }],
+    ["an empty flowId", { flowId: "", nodeId: "web" }],
+    ["secrets as an array", { flowId: "flow-1", nodeId: "web", secrets: ["x"] }],
+    ["a non-string secret", { flowId: "flow-1", nodeId: "web", secrets: { a: 1 } }],
+  ])("rejects a redeploy with %s as 400 BAD_REQUEST", async (_case, body) => {
+    const { handler, calls } = handlerWith();
+
+    const response = await handler(authed("POST", "/redeploy", body));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, error: { code: "BAD_REQUEST" } });
+    expect(calls).toEqual([]);
+  });
+
+  it.each<[DeployErrorCode, number]>([
+    ["DEPLOYMENT_NOT_FOUND", 404],
+    ["PLAN_CHANGED", 409],
+    ["MISSING_SECRET", 400],
+    ["PROVIDER_ERROR", 502],
+  ])("answers a redeploy failing with %s with HTTP %i", async (code, status) => {
+    const { handler } = handlerWith({ failWith: code });
+
+    const response = await handler(authed("POST", "/redeploy", { flowId: "f", nodeId: "n" }));
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ ok: false, error: { code, message: "It failed" } });
+  });
+});
+
+describe("createDeployHandler — malformed paths", () => {
+  it("rejects a deployment id with malformed percent-encoding as 400 BAD_REQUEST", async () => {
+    const { handler, calls } = handlerWith();
+
+    const response = await handler(authed("DELETE", "/deployments/%E0%A4%A"));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, error: { code: "BAD_REQUEST" } });
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("createDeployHandler — rate limit", () => {
+  const WINDOW_MS = 60_000;
+  const START = 20 * WINDOW_MS;
+  const LIST = "/deployments?flowId=flow-1";
+
+  function limitedHandler(maxRequests = 2) {
+    let current = START;
+    const limited = handlerWith({
+      rateLimit: { maxRequests, windowMs: WINDOW_MS },
+      now: () => current,
+    });
+    return { ...limited, advanceTo: (time: number) => (current = time) };
+  }
+
+  const listAs = (token: string) => request("GET", LIST, { token });
+
+  it("serves requests up to the limit", async () => {
+    const { handler } = limitedHandler(2);
+
+    const first = await handler(listAs("alice-token"));
+    const second = await handler(listAs("alice-token"));
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+  });
+
+  it("answers 429 RATE_LIMITED past the limit without calling the use cases", async () => {
+    const { handler, calls } = limitedHandler(2);
+    await handler(listAs("alice-token"));
+    await handler(listAs("alice-token"));
+
+    const response = await handler(listAs("alice-token"));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ ok: false, error: { code: "RATE_LIMITED" } });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("counts requests to different routes of the same user together", async () => {
+    const { handler } = limitedHandler(2);
+    await handler(authed("POST", "/plan", { flowId: "flow-1", nodeId: "web" }));
+    await handler(listAs("alice-token"));
+
+    const response = await handler(authed("DELETE", "/deployments/dep-1"));
+
+    expect(response.status).toBe(429);
+  });
+
+  it("does not limit another user when one user is limited", async () => {
+    const { handler } = limitedHandler(2);
+    await handler(listAs("alice-token"));
+    await handler(listAs("alice-token"));
+    await handler(listAs("alice-token"));
+
+    const response = await handler(listAs("bob-token"));
+
+    expect(response.status).toBe(200);
+  });
+
+  it("keeps limiting the user until the window has passed", async () => {
+    const { handler, advanceTo } = limitedHandler(2);
+    await handler(listAs("alice-token"));
+    await handler(listAs("alice-token"));
+    advanceTo(START + WINDOW_MS - 1);
+
+    const response = await handler(listAs("alice-token"));
+
+    expect(response.status).toBe(429);
+  });
+
+  it("allows the user again once the window has passed", async () => {
+    const { handler, advanceTo } = limitedHandler(2);
+    await handler(listAs("alice-token"));
+    await handler(listAs("alice-token"));
+    await handler(listAs("alice-token"));
+    advanceTo(START + WINDOW_MS + 1);
+
+    const response = await handler(listAs("alice-token"));
+
+    expect(response.status).toBe(200);
+  });
+
+  it("never limits health checks", async () => {
+    const { handler } = limitedHandler(1);
+    await handler(request("GET", "/health"));
+    await handler(request("GET", "/health"));
+
+    const health = await handler(request("GET", "/health"));
+    const listed = await handler(listAs("alice-token"));
+
+    expect(health.status).toBe(200);
+    expect(listed.status).toBe(200);
+  });
+
+  it("never limits preflight requests", async () => {
+    const { handler } = limitedHandler(1);
+    const preflight = () =>
+      handler(
+        new Request(`${BASE}/apply`, {
+          method: "OPTIONS",
+          headers: {
+            origin: ALLOWED_ORIGIN,
+            "access-control-request-method": "POST",
+            authorization: "Bearer alice-token",
+          },
+        }),
+      );
+    await preflight();
+    await preflight();
+
+    const response = await preflight();
+    const listed = await handler(listAs("alice-token"));
+
+    expect(response.status).toBe(204);
+    expect(listed.status).toBe(200);
+  });
+
+  it("does not limit anyone when no rate limit is configured", async () => {
+    const { handler } = handlerWith();
+    for (let index = 0; index < 50; index += 1) await handler(listAs("alice-token"));
+
+    const response = await handler(listAs("alice-token"));
+
+    expect(response.status).toBe(200);
   });
 });
