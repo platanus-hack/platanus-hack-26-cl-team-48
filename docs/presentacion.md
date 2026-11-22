@@ -16,7 +16,10 @@ Tres frases, una por diapositiva:
 
 1. **Hay una desconexión entre quienes saben hacer herramientas y quienes las necesitan.** La ingeniera civil sabe exactamente qué índice necesita; el programador sabe hacerlo, pero nunca se van a cruzar.
 2. **Los expertos de nicho no programan.** Su conocimiento (cómo se mide la resiliencia de una comunidad, cuándo se pudre una fresa, cómo se normaliza una serie) queda en planillas, tesis y cabezas.
-3. **Hoy se crean más herramientas que nunca, y nadie se entera.** Con la IA, cualquiera hace un script en una tarde. Terminan en un repo de GitHub, en un anexo de una tesis o en un notebook olvidado. La persona que lo necesita al otro lado del mundo, o en la facultad de al lado, vuelve a empezar desde cero.
+3. **Hoy se crean más herramientas que nunca, y casi nadie logra reusarlas.** Con la IA, cualquiera hace un script en una tarde, pero terminan en un repo, en un anexo de una tesis o en un notebook. Evidencia (de `docs/gabo/estado_del_arte_cr_tico_minga_y_nodomic.md`):
+   - De 103 flujos científicos públicos, **el 62 % no se pudo ejecutar** al reusarlos (37 de 89 en Nextflow y 2 de 14 en Snakemake corrieron), y en el subconjunto de WorkflowHub **falló el 90 %** (Maligeay, Bossut y Belhajjame, SSDBM 2024).
+   - Quien no programa **no logra verificar** el código que genera la IA, aun con explicaciones en texto (Virk y Liu, VL/HCC 2025).
+   - No hay una cifra fiable de "cuántas herramientas se crean": no la inventemos en el pitch. Tampoco decir "el 88 % de las empresas fracasa con Excel" ni que "ninguna plataforma combina nodos, comunidad e IA" (KNIME y n8n ya lo hacen); ver la lista de afirmaciones a evitar en ese mismo documento.
 
 Frase de cierre del problema:
 
