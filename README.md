@@ -1,10 +1,10 @@
-# Nodomic
+# Nodomics
 
-<img src="./docs/design-system/assets/knot-mark.svg" width="72" alt="Símbolo de Nodomic: dos aros entrelazados">
+<img src="./docs/design-system/assets/knot-mark.svg" width="72" alt="Símbolo de Nodomics: dos aros entrelazados">
 
-Nodomic es un espacio para que personas que conocen su oficio, aunque no programen, compartan herramientas que les funcionan. Puedes partir del trabajo de un colega, ver qué reglas utiliza y probar una adaptación con datos que conoces.
+Nodomics es un espacio para que personas que conocen su oficio, aunque no programen, compartan herramientas que les funcionan. Puedes partir del trabajo de un colega, ver qué reglas utiliza y probar una adaptación con datos que conoces.
 
-**[Abrir Nodomic](https://nodomics-web.onrender.com)** · Platanus Hack 26, Santiago · Track Multiplayer
+**[Abrir Nodomics](https://nodomics-web.onrender.com/)** · Platanus Hack 26, Santiago · Track Multiplayer
 
 ## Cómo se usa
 
