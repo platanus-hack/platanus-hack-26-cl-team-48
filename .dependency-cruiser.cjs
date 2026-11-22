@@ -39,6 +39,19 @@ module.exports = {
       to: { path: "^apps/mcp/" },
     },
     {
+      name: "deploy-uses-only-protocol",
+      comment: "ADR 0027: the hosting service parses flows and talks to Supabase and Render.",
+      severity: "error",
+      from: { path: "^apps/deploy/" },
+      to: { path: internal, pathNot: ["^apps/deploy/", pkg("protocol")] },
+    },
+    {
+      name: "nothing-imports-deploy",
+      severity: "error",
+      from: { pathNot: "^apps/deploy/" },
+      to: { path: "^apps/deploy/" },
+    },
+    {
       name: "web-only-uses-protocol-client-ui",
       severity: "error",
       from: { path: "^apps/web/", pathNot: "^apps/web/src/engine-registry\\.ts$" },
