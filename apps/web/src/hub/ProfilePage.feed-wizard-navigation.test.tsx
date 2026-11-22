@@ -1,6 +1,7 @@
+import type { ProfileCard } from "@nodomics/profile";
 import { waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { ANA_CARD } from "../feed/feed-fixtures.ts";
+import { ANA_CARD, MINIMAL_CARD } from "../feed/feed-fixtures.ts";
 import {
   clickInWizard,
   clickNext,
@@ -113,5 +114,68 @@ describe("ProfilePage wizard focus", () => {
     await clickInWizard(user, "Volver a editar");
 
     await expectFocusOnHeading("¿Qué estás buscando?");
+  });
+});
+
+const TWICE_STATISTICS: ProfileCard = {
+  ...MINIMAL_CARD,
+  domains: [
+    { name: "estadística", depth: "curious" },
+    { name: "estadística", depth: "expert" },
+  ],
+};
+
+async function editTopicsTwice() {
+  const rendered = await editCard(TWICE_STATISTICS);
+  await clickNext(rendered.user);
+  return rendered;
+}
+
+const statisticsGroups = () =>
+  within(wizard()).queryAllByRole("radiogroup", { name: "Nivel en estadística" });
+
+const isCheckedIn = (group: HTMLElement, name: string) =>
+  within(group).getByRole<HTMLInputElement>("radio", { name }).checked;
+
+describe("ProfilePage wizard with repeated topic names", () => {
+  it("changes only the level of the topic row that was clicked", async () => {
+    const { user } = await editTopicsTwice();
+    const [first] = statisticsGroups();
+    if (first === undefined) throw new Error("No topic row for estadística");
+
+    await user.click(within(first).getByRole("radio", { name: "Lo practico" }));
+
+    const [firstAfter, secondAfter] = statisticsGroups();
+    expect([
+      firstAfter !== undefined && isCheckedIn(firstAfter, "Lo practico"),
+      secondAfter !== undefined && isCheckedIn(secondAfter, "Soy experto/a"),
+    ]).toEqual([true, true]);
+  });
+
+  it("removes only the topic row whose Quitar was clicked", async () => {
+    const { user } = await editTopicsTwice();
+
+    const [firstRemove] = within(wizard()).getAllByRole("button", { name: "Quitar estadística" });
+    if (firstRemove === undefined) throw new Error("No Quitar button for estadística");
+    await user.click(firstRemove);
+
+    expect(statisticsGroups()).toHaveLength(1);
+  });
+
+  it("saves exactly the remaining topic after removing one", async () => {
+    const { user, saveProfile } = await editTopicsTwice();
+    const [firstRemove] = within(wizard()).getAllByRole("button", { name: "Quitar estadística" });
+    if (firstRemove === undefined) throw new Error("No Quitar button for estadística");
+    await user.click(firstRemove);
+    await clickNext(user, 2);
+
+    await clickInWizard(user, "Guardar perfil");
+
+    await waitFor(() => {
+      expect(saveProfile).toHaveBeenCalledWith({
+        ...MINIMAL_CARD,
+        domains: [{ name: "estadística", depth: "expert" }],
+      });
+    });
   });
 });

@@ -17,6 +17,7 @@ import {
 } from "./profile-wizard-fixtures.tsx";
 
 const SAVE = "Guardar perfil";
+const INVALID_TITLE = "No pudimos guardar tu perfil. Revisa estos datos:";
 
 afterEach(() => {
   window.history.replaceState(null, "", "/");
@@ -102,7 +103,7 @@ describe("ProfilePage wizard save", () => {
         Promise.resolve(err({ code: "INVALID_CARD", issues: [{ path: "/about", message: "x" }] })),
     });
 
-    expect(await screen.findByText("Revisa los campos marcados.")).toBeTruthy();
+    expect(await screen.findByText(INVALID_TITLE)).toBeTruthy();
     expect(wizardIsOpen()).toBe(true);
   });
 
@@ -163,18 +164,21 @@ const INVALID_ISSUES = [
 ];
 
 /** The title and its detail live in one notice: an alert or status region, else the title's parent. */
-async function invalidCardNotice(): Promise<string> {
+async function invalidCardNotice(issues?: typeof INVALID_ISSUES): Promise<string> {
   await saveMinimalCard({
-    saveProfile: () => Promise.resolve(err({ code: "INVALID_CARD", issues: INVALID_ISSUES })),
+    saveProfile: () =>
+      Promise.resolve(
+        err(issues === undefined ? { code: "INVALID_CARD" } : { code: "INVALID_CARD", issues }),
+      ),
   });
-  const title = await within(wizard()).findByText("Revisa los campos marcados.");
+  const title = await within(wizard()).findByText(INVALID_TITLE);
   const notice = title.closest('[role="alert"], [role="status"]') ?? title.parentElement;
   return notice?.textContent ?? "";
 }
 
 describe("ProfilePage wizard INVALID_CARD detail", () => {
   it("names the fields with their friendly labels", async () => {
-    const text = await invalidCardNotice();
+    const text = await invalidCardNotice(INVALID_ISSUES);
 
     expect({ about: text.includes("Sobre ti"), github: text.includes("GitHub") }).toEqual({
       about: true,
@@ -183,11 +187,17 @@ describe("ProfilePage wizard INVALID_CARD detail", () => {
   });
 
   it("does not show the raw card paths", async () => {
-    const text = await invalidCardNotice();
+    const text = await invalidCardNotice(INVALID_ISSUES);
 
     expect({ about: text.includes("/about"), github: text.includes("/links/github") }).toEqual({
       about: false,
       github: false,
     });
+  });
+
+  it("asks to review the data when there are no issues", async () => {
+    const text = await invalidCardNotice();
+
+    expect(text).toContain("Revisa tus datos e intenta de nuevo.");
   });
 });

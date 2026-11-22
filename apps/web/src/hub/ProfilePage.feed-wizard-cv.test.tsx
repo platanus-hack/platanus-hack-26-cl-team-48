@@ -11,6 +11,7 @@ import {
   startNewCard,
   textbox,
   wizard,
+  wizardIsOpen,
 } from "./profile-wizard-fixtures.tsx";
 
 const BUILD = "Armar mi perfil";
@@ -171,20 +172,50 @@ describe("ProfilePage wizard CV extraction", () => {
 });
 
 describe("ProfilePage wizard while the CV is being read", () => {
-  it("disables Cancelar and Atrás until the reading ends", async () => {
+  async function startReading() {
     const pending = deferred<ProfileCard>();
-
-    await buildFromPastedText({ extractProfile: () => pending.promise });
-
-    await waitFor(() => {
-      expect({ cancel: isButtonDisabled("Cancelar"), back: isButtonDisabled("Atrás") }).toEqual({
-        cancel: true,
-        back: true,
+    const rendered = await buildFromPastedText({ extractProfile: () => pending.promise });
+    await within(wizard()).findByText("Leyendo tu CV… toma unos segundos.");
+    const finishReading = async () => {
+      await act(async () => {
+        pending.resolve(ok(ANA_CARD));
+        await pending.promise;
       });
-    });
-    await act(async () => {
-      pending.resolve(ok(ANA_CARD));
-      await pending.promise;
-    });
+    };
+    return { ...rendered, finishReading };
+  }
+
+  it("disables Atrás until the reading ends", async () => {
+    const { finishReading } = await startReading();
+
+    const disabled = isButtonDisabled("Atrás");
+
+    expect(disabled).toBe(true);
+    await finishReading();
+  });
+
+  it("keeps Cancelar enabled", async () => {
+    const { finishReading } = await startReading();
+
+    const disabled = isButtonDisabled("Cancelar");
+
+    expect(disabled).toBe(false);
+    await finishReading();
+  });
+
+  it("discards a reading that ends after Cancelar", async () => {
+    const { user, saveProfile, finishReading } = await startReading();
+    await clickInWizard(user, "Cancelar");
+
+    await finishReading();
+
+    expect(
+      await screen.findByText("Cuéntanos qué haces y te conectamos con quien te complementa."),
+    ).toBeTruthy();
+    expect({
+      open: wizardIsOpen(),
+      saved: saveProfile.mock.calls.length,
+      extractedShown: screen.queryByText(ANA_CARD.about) !== null,
+    }).toEqual({ open: false, saved: 0, extractedShown: false });
   });
 });
