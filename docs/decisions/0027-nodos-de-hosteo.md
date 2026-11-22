@@ -1,6 +1,6 @@
 # 0027. Nodos de hosteo: Repo y Servicio desplegados en Render
 
-- **Estado:** propuesta
+- **Estado:** aceptada (decisión del líder)
 - **Fecha:** 2026-11-22
 - **Relacionada con:** ADR 0002 (nodos como datos), 0017 (credenciales), 0023 (flujos en Supabase), 0026 (aislamiento del MCP).
 
