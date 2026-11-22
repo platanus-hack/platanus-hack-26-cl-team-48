@@ -257,36 +257,26 @@ export const MESSAGES = {
     openHub: "Abrir el hub en otra pestaña",
   },
   agent: {
-    mockup: "Maqueta: el agente todavía no está conectado.",
-    request: "Marca las ventas fuera de lo normal antes de agrupar, y muéstralas en el gráfico.",
-    answer:
-      "Propongo 3 cambios sobre un borrador. Revisa cada uno: nada cambia en tu flujo hasta que lo aceptes.",
-    proposals: [
-      {
-        kind: "Nodo nuevo",
-        title: "Marcar atípicos",
-        reason:
-          "Agrega la columna es_atípico: ventas a más de 3 desvíos del promedio de su producto.",
-      },
-      {
-        kind: "Cambio",
-        title: "Agrupar conserva es_atípico",
-        reason: "Sin esto la marca se pierde al resumir por mes.",
-      },
-      {
-        kind: "Cambio",
-        title: "El gráfico resalta los meses con atípicos",
-        reason: "Los meses con al menos una venta atípica se pintan distinto.",
-      },
-    ],
-    draft: "Trabaja en un borrador",
-    accept: "Aceptar",
-    reject: "Rechazar",
-    viewOnCanvas: "Ver en el lienzo",
-    acceptAll: "Aceptar los 3",
-    discard: "Descartar borrador",
+    draft: "Trabaja en un borrador: nada cambia en tu flujo hasta que apliques",
+    needsSavedFlow:
+      "El agente trabaja sobre un flujo guardado. Agrega un nodo para que tu flujo se guarde.",
+    notConfigured: "El agente no está configurado en este sitio.",
+    working: "El agente está trabajando… puede tardar unos minutos.",
+    choose: "Elige qué cambios aplicar",
+    apply: "Aplicar seleccionados",
+    discard: "Descartar",
+    applied: "Cambios aplicados: el flujo se recargó con ellos.",
+    discarded: "Propuesta descartada.",
     composer: "Escribe al agente",
     composerPlaceholder: "Pide un cambio o una explicación…",
+    send: "Enviar",
+    errors: {
+      STALE: "El flujo cambió mientras el agente trabajaba; vuelve a pedirlo.",
+      RATE_LIMITED: "Enviaste muchos pedidos seguidos. Espera un minuto y vuelve a intentar.",
+      TIMEOUT: "El agente tardó demasiado en responder. Prueba con un pedido más acotado.",
+      UNAUTHENTICATED: "Tu sesión expiró. Vuelve a entrar para usar el agente.",
+      generic: "No pudimos hablar con el agente. Vuelve a intentar en un momento.",
+    },
   },
   library: {
     invalid: "Descartamos entradas inválidas de tu biblioteca personal.",

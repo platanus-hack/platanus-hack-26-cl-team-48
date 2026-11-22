@@ -446,8 +446,39 @@ body {
   margin-top: var(--space-1);
 }
 
+.web-agent-change {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-top: var(--stroke-hairline) solid var(--line-subtle);
+}
+
+.web-agent-change-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.web-agent-change-title input {
+  accent-color: var(--ai-pending);
+}
+
+.web-agent-change-values {
+  font: var(--text-mono);
+  color: var(--ink-muted);
+}
+
 .web-agent-composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: auto;
+}
+
+.web-agent-composer .nd-input {
+  flex: 1;
 }
 
 .web-canvas-controls {

@@ -22,6 +22,8 @@ import {
   readPreferences,
 } from "./layout/storage-workspace-preferences.ts";
 import { MESSAGES } from "./messages.ts";
+import { AgentContext } from "./agent/agent-context.ts";
+import { createAppAgent } from "./agent/create-app-agent.ts";
 import { createAppFeed } from "./feed/create-app-feed.ts";
 import { FeedContext } from "./feed/feed-context.ts";
 import { createAppHub } from "./hub/create-app-hub.ts";
@@ -113,6 +115,8 @@ const feed = createAppFeed(import.meta.env, {
   currentHandle: async () => (await hub.currentProfile())?.handle,
 });
 
+const agent = createAppAgent(import.meta.env, { getAccessToken: () => hub.accessToken() });
+
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.
 if (isHubTab) {
@@ -134,12 +138,14 @@ createRoot(root).render(
           {isHubTab ? (
             <HubApp onOpenEditor={openEditor} onOpenCopy={openCopy} />
           ) : (
-            <App
-              preferenceStorage={preferenceStorage}
-              engines={ENGINES}
-              defaultEngine={defaultEngine}
-              shouldRunOnConnect={shared?.ok === true}
-            />
+            <AgentContext value={agent}>
+              <App
+                preferenceStorage={preferenceStorage}
+                engines={ENGINES}
+                defaultEngine={defaultEngine}
+                shouldRunOnConnect={shared?.ok === true}
+              />
+            </AgentContext>
           )}
         </FeedContext>
       </HubContext>

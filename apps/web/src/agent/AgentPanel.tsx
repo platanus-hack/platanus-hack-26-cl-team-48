@@ -1,48 +1,75 @@
 import { Button, Input } from "@nodomics/ui";
+import { useState, type SyntheticEvent } from "react";
+import { useStore } from "zustand";
+import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
+import { agentErrorMessage } from "./agent-error-message.ts";
+import { AgentProposal } from "./AgentProposal.tsx";
+import { useAgentConversation, type Exchange } from "./use-agent-conversation.ts";
 
 const text = MESSAGES.agent;
 
 /**
- * Mockup of the agent (docs/05-capa-agente.md): a conversation whose proposals are accepted
- * change by change. Nothing here is connected yet.
+ * The agent (docs/05-capa-agente.md): the user asks for a change to the saved flow, the agent
+ * builds it on a draft, and the user applies the proposed changes they choose.
  */
 export function AgentPanel() {
+  const { savedFlowStore } = useAppStores();
+  const flowId = useStore(savedFlowStore, (state) => state.currentId);
+  const { exchanges, isWaiting, ask } = useAgentConversation();
+  const [goal, setGoal] = useState("");
+  const canSend = flowId !== undefined && !isWaiting && goal.trim() !== "";
+  const send = () => {
+    if (!canSend) return;
+    setGoal("");
+    void ask(goal.trim(), flowId);
+  };
+  const submit = (event: SyntheticEvent) => {
+    event.preventDefault();
+    send();
+  };
   return (
     <div className="web-agent">
-      <p className="web-mockup-note">{text.mockup}</p>
-      <span className="web-agent-draft">{text.draft}</span>
-      <p className="web-agent-message" data-from="user">
-        {text.request}
-      </p>
-      <p className="web-agent-message">{text.answer}</p>
-      {text.proposals.map((proposal) => (
-        <section key={proposal.title} className="web-agent-proposal" aria-label={proposal.title}>
-          <span className="web-overline">{proposal.kind}</span>
-          <strong>{proposal.title}</strong>
-          <span className="web-caption">{proposal.reason}</span>
-          <div className="web-agent-proposal-actions">
-            <Button size="sm" variant="primary" disabled>
-              {text.accept}
-            </Button>
-            <Button size="sm" disabled>
-              {text.reject}
-            </Button>
-            <Button size="sm" variant="ghost" disabled>
-              {text.viewOnCanvas}
-            </Button>
-          </div>
-        </section>
+      {flowId === undefined && <p className="web-caption">{text.needsSavedFlow}</p>}
+      {exchanges.map((exchange) => (
+        <AgentExchange key={exchange.id} exchange={exchange} />
       ))}
-      <div className="web-agent-proposal-actions">
-        <Button variant="primary" disabled>
-          {text.acceptAll}
+      <form className="web-agent-composer" onSubmit={submit}>
+        <Input
+          label={text.composer}
+          placeholder={text.composerPlaceholder}
+          value={goal}
+          disabled={flowId === undefined}
+          onChange={setGoal}
+        />
+        <Button variant="primary" disabled={!canSend} onClick={send}>
+          {text.send}
         </Button>
-        <Button disabled>{text.discard}</Button>
-      </div>
-      <div className="web-agent-composer">
-        <Input label={text.composer} placeholder={text.composerPlaceholder} value="" disabled />
-      </div>
+      </form>
     </div>
+  );
+}
+
+function AgentExchange({ exchange: { goal, reply } }: { readonly exchange: Exchange }) {
+  return (
+    <>
+      <p className="web-agent-message" data-from="user">
+        {goal}
+      </p>
+      {reply === undefined ? (
+        <p className="web-agent-message web-caption" role="status">
+          {text.working}
+        </p>
+      ) : reply.ok ? (
+        <>
+          <p className="web-agent-message">{reply.value.summary}</p>
+          {reply.value.proposal !== undefined && <AgentProposal proposal={reply.value.proposal} />}
+        </>
+      ) : (
+        <p className="web-agent-message" role="alert">
+          {agentErrorMessage(reply.error.code)}
+        </p>
+      )}
+    </>
   );
 }
