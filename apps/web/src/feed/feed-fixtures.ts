@@ -49,6 +49,14 @@ export function componentHit(kind: "node" | "flow", id: string, title: string): 
   return { kind, id, title, payload: {}, similarity: 0.8 };
 }
 
+export function componentHitWithSummary(
+  kind: "node" | "flow",
+  title: string,
+  summary: unknown,
+): FeedHit {
+  return { ...componentHit(kind, `${kind}-${title}`, title), payload: { summary } };
+}
+
 /** A hand-written fake: every operation succeeds with an empty result unless overridden; each override runs inside the spy the result exposes. */
 export function createFakeFeed(overrides: Partial<FeedService> = {}) {
   const search = vi.fn<FeedService["search"]>(overrides.search ?? (() => Promise.resolve(ok([]))));

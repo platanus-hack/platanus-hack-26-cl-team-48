@@ -24,7 +24,7 @@ async function renderHub(text: string) {
   const mapPeople = vi.fn<NonNullable<FeedService["mapPeople"]>>(() => Promise.resolve(ok([BETO])));
   renderWithHub(
     <FeedContext value={{ ...feed, mapPeople }}>
-      <HubPage text={text} onOpenEditor={vi.fn()} onOpenCopy={vi.fn()} />
+      <HubPage text={text} onSearch={vi.fn()} onOpenEditor={vi.fn()} onOpenCopy={vi.fn()} />
     </FeedContext>,
     await createSeededHub(),
   );
