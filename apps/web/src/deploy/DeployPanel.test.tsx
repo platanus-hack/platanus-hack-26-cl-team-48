@@ -1,6 +1,6 @@
 import type { Hub } from "@nodomics/hub";
 import { err, ok, type Flow, type NodeManifest } from "@nodomics/protocol";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -979,12 +979,21 @@ describe("DeployPanel plan field labels", () => {
     ["repo", "Repo"],
     ["build", "Construcción"],
     ["env", "Variables de entorno"],
-    ["healthCheckPath", "Health check"],
+    ["healthCheckPath", "Comprobación de salud"],
   ])("shows the %s field as %s", async (_field, label) => {
     const text = await renderLabelledPlan();
 
     expect(text).toContain(label);
   });
+
+  it.each(["Health check", "Health", "Build", "Environment"])(
+    "never shows the English label %s for a plan field",
+    async (englishLabel) => {
+      const text = await renderLabelledPlan();
+
+      expect(text).not.toContain(englishLabel);
+    },
+  );
 
   it.each(["repo", "build", "env", "healthCheckPath"])(
     "never shows the raw %s key",
@@ -1082,6 +1091,147 @@ describe("DeployPanel periodic refresh", () => {
     await advance(REFRESH_INTERVAL_MS * 3);
 
     expect(deploy.calls.list.length).toBe(before);
+  });
+});
+
+describe("DeployPanel out-of-order list replies", () => {
+  type ListReply = Deferred<DeployResult<readonly Deployment[]>>;
+
+  async function renderWithFakeClock(deploy: FakeDeploy) {
+    const stores = await createStores(FLOW_ID);
+    const hub = await signedInHub();
+    vi.useFakeTimers();
+    renderWithStores(withDeploy(<DeployPanel nodeId={NODE_ID} />, { hub, deploy }), stores);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+  }
+
+  const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+
+  const pressRefresh = () =>
+    act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: REFRESH }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+  const answer = (reply: ListReply, status: DeploymentStatus) =>
+    act(async () => {
+      reply.resolve(ok([deploymentOf({ status })]));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+  /** Queues two slow list replies: the first list request gets `earlier`, the next `later`. */
+  function queueTwoSlowLists(deploy: FakeDeploy) {
+    const earlier: ListReply = deferred();
+    const later: ListReply = deferred();
+    deploy.nextListWith(earlier.promise);
+    deploy.nextListWith(later.promise);
+    return { earlier, later };
+  }
+
+  const shownStatus = () => ({
+    live: screen.queryByText(/En línea/) !== null,
+    deploying: screen.queryByText(/Desplegando/) !== null,
+  });
+
+  it("keeps the newer status when the refresh list answers after the later periodic one", async () => {
+    const deploy = createFakeDeploy([deploymentOf({ status: "deploying" })]);
+    await renderWithFakeClock(deploy);
+    const { earlier, later } = queueTwoSlowLists(deploy);
+    await pressRefresh();
+    await advance(REFRESH_INTERVAL_MS);
+    await answer(later, "live");
+
+    await answer(earlier, "deploying");
+
+    expect({ lists: deploy.calls.list.length, ...shownStatus() }).toEqual({
+      lists: 3,
+      live: true,
+      deploying: false,
+    });
+  });
+
+  it("keeps the newer status when the periodic list answers after the later refresh one", async () => {
+    const deploy = createFakeDeploy([deploymentOf({ status: "deploying" })]);
+    await renderWithFakeClock(deploy);
+    const { earlier, later } = queueTwoSlowLists(deploy);
+    await advance(REFRESH_INTERVAL_MS);
+    await pressRefresh();
+    await answer(later, "live");
+
+    await answer(earlier, "deploying");
+
+    expect({ lists: deploy.calls.list.length, ...shownStatus() }).toEqual({
+      lists: 3,
+      live: true,
+      deploying: false,
+    });
+  });
+});
+
+describe("DeployPanel out-of-order plan replies", () => {
+  type PlanReply = Deferred<DeployResult<DeployPlan>>;
+
+  const answer = (reply: PlanReply, action: DeployPlan["action"]) =>
+    act(async () => {
+      reply.resolve(ok(planOf(action)));
+      await reply.promise;
+    });
+
+  const shownPlan = () => ({
+    unchanged: screen.queryByText(PLAN_TEXT.unchanged) !== null,
+    update: screen.queryByText(PLAN_TEXT.update) !== null,
+  });
+
+  it("keeps the refreshed plan when the opening plan answers after it", async () => {
+    const opening: PlanReply = deferred();
+    const deploy = createFakeDeploy();
+    deploy.planWith(opening.promise, Promise.resolve(ok(planOf("unchanged"))));
+    await renderPanel({ deploy });
+    await waitFor(() => {
+      expect(deploy.calls.plan.length).toBe(1);
+    });
+    await userEvent.click(screen.getByRole("button", { name: REFRESH }));
+    await screen.findByText(PLAN_TEXT.unchanged);
+
+    await answer(opening, "update");
+
+    expect({ plans: deploy.calls.plan.length, ...shownPlan() }).toEqual({
+      plans: 2,
+      unchanged: true,
+      update: false,
+    });
+  });
+
+  it("keeps the plan asked after PLAN_CHANGED when an older refresh plan answers later", async () => {
+    const refreshed: PlanReply = deferred();
+    const applied = deferred<DeployResult<Deployment>>();
+    const deploy = createFakeDeploy();
+    deploy.planWith(
+      Promise.resolve(ok(planOf("create"))),
+      refreshed.promise,
+      Promise.resolve(ok(planOf("unchanged"))),
+    );
+    deploy.applyWith(applied.promise);
+    await renderPanel({ deploy });
+    await openDeployConfirmation();
+    await userEvent.click(screen.getByRole("button", { name: CONFIRM_DEPLOY }));
+    await userEvent.click(screen.getByRole("button", { name: REFRESH }));
+    await waitFor(() => {
+      expect(deploy.calls.plan.length).toBe(2);
+    });
+    await act(async () => {
+      applied.resolve(err({ code: "PLAN_CHANGED" }));
+      await applied.promise;
+    });
+    await screen.findByText(PLAN_TEXT.unchanged);
+
+    await answer(refreshed, "update");
+
+    expect({ plans: deploy.calls.plan.length, ...shownPlan() }).toEqual({
+      plans: 3,
+      unchanged: true,
+      update: false,
+    });
   });
 });
 
