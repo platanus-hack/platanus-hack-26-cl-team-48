@@ -29,7 +29,8 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const [plan, setPlan] = useState<DeploymentsState["plan"]>();
   const [isBusy, setBusy] = useState(false);
   const [failure, setFailure] = useState<DeployErrorCode>();
-  // Every list and every action takes a new turn: only the reply to the latest one is shown.
+  // Every request takes a turn; a reply is shown only if no later turn was shown already. An action
+  // claims a turn when it ends, so a list sent before it ended cannot undo it.
   const listTurns = useTurns();
   const planTurns = useTurns();
 
@@ -57,10 +58,9 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const runAction = async <T>(action: Promise<DeployResult<T>>, onDone: (value: T) => void) => {
     setBusy(true);
     setFailure(undefined);
-    listTurns.take();
     const result = await action;
     if (!isMounted.current) return;
-    listTurns.take();
+    listTurns.take().claim();
     setBusy(false);
     if (result.ok) onDone(result.value);
     else failWith(result.error.code);
@@ -107,28 +107,36 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
 }
 
 type Turns = { readonly take: () => Turn };
-type Turn = { readonly isLatest: () => boolean };
+/** `claim` is true, once, when no later turn has been claimed before. */
+type Turn = { readonly claim: () => boolean };
 
 /** Numbers requests so a slow reply cannot overwrite the reply to a later request. */
 function useTurns(): Turns {
-  const latest = useRef(0);
+  const taken = useRef(0);
+  const claimed = useRef(0);
   return useMemo(
     () => ({
       take: () => {
-        latest.current += 1;
-        const turn = latest.current;
-        return { isLatest: () => turn === latest.current };
+        taken.current += 1;
+        const turn = taken.current;
+        return {
+          claim: () => {
+            if (turn <= claimed.current) return false;
+            claimed.current = turn;
+            return true;
+          },
+        };
       },
     }),
     [],
   );
 }
 
-/** Drops replies that arrive after the tab closed or after a later request was sent. */
+/** Drops replies that arrive after the tab closed or after the reply to a later request. */
 const whileLatest =
   <T>(isMounted: RefObject<boolean>, turn: Turn, apply: (value: T) => void) =>
   (value: T) => {
-    if (isMounted.current && turn.isLatest()) apply(value);
+    if (isMounted.current && turn.claim()) apply(value);
   };
 
 function useIsMounted(): RefObject<boolean> {
