@@ -87,6 +87,184 @@
     }
   },
   {
+    "id": "core.deploy.repo",
+    "version": "0.1.0",
+    "name": "Repo",
+    "description": "Código de un repositorio público de GitHub para desplegar.",
+    "category": "Hosteo",
+    "icon": "git-branch",
+    "inputs": [],
+    "outputs": [
+      {
+        "id": "repo",
+        "type": "repo"
+      }
+    ],
+    "params": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "title": "Repositorio",
+          "description": "Repositorio público de GitHub, por ejemplo: https://github.com/dueño/repo"
+        },
+        "branch": {
+          "type": "string",
+          "title": "Rama",
+          "default": "main"
+        },
+        "rootDir": {
+          "type": "string",
+          "title": "Carpeta",
+          "description": "Carpeta del proyecto dentro del repositorio. Vacío si está en la raíz."
+        }
+      },
+      "required": ["url"]
+    },
+    "impl": {
+      "kind": "resource",
+      "resource": "repo"
+    }
+  },
+  {
+    "id": "core.deploy.service",
+    "version": "0.1.0",
+    "name": "Servicio",
+    "description": "Despliega el código de un repo como un servicio web.",
+    "category": "Hosteo",
+    "icon": "server",
+    "inputs": [
+      {
+        "id": "repo",
+        "type": "repo"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "service",
+        "type": "service"
+      }
+    ],
+    "params": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "title": "Cómo se construye",
+          "oneOf": [
+            {
+              "const": "docker",
+              "title": "Docker"
+            },
+            {
+              "const": "native",
+              "title": "Nativo"
+            },
+            {
+              "const": "static",
+              "title": "Estático"
+            }
+          ],
+          "default": "native"
+        },
+        "runtime": {
+          "title": "Runtime",
+          "description": "Solo para Nativo.",
+          "oneOf": [
+            {
+              "const": "node",
+              "title": "Node"
+            },
+            {
+              "const": "python",
+              "title": "Python"
+            },
+            {
+              "const": "go",
+              "title": "Go"
+            },
+            {
+              "const": "ruby",
+              "title": "Ruby"
+            },
+            {
+              "const": "rust",
+              "title": "Rust"
+            },
+            {
+              "const": "elixir",
+              "title": "Elixir"
+            }
+          ],
+          "default": "node"
+        },
+        "buildCommand": {
+          "type": "string",
+          "title": "Comando de build",
+          "description": "Para Nativo y Estático. Por ejemplo: npm install && npm run build"
+        },
+        "startCommand": {
+          "type": "string",
+          "title": "Comando de inicio",
+          "description": "Solo para Nativo, y obligatorio ahí. Por ejemplo: npm start"
+        },
+        "publishPath": {
+          "type": "string",
+          "title": "Carpeta publicada",
+          "description": "Solo para Estático: la carpeta que queda tras el build.",
+          "default": "dist"
+        },
+        "dockerfilePath": {
+          "type": "string",
+          "title": "Dockerfile",
+          "description": "Solo para Docker: ruta del Dockerfile dentro del repositorio.",
+          "default": "Dockerfile"
+        },
+        "dockerContext": {
+          "type": "string",
+          "title": "Contexto",
+          "description": "Solo para Docker: carpeta desde la que se construye la imagen.",
+          "default": "."
+        },
+        "env": {
+          "title": "Variables de entorno",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "title": "Nombre"
+              },
+              "value": {
+                "type": "string",
+                "title": "Valor"
+              },
+              "secret": {
+                "type": "string",
+                "title": "Credencial"
+              }
+            },
+            "required": ["name"]
+          },
+          "default": [],
+          "x-nodomics": {
+            "widget": "key-values"
+          }
+        },
+        "healthCheckPath": {
+          "type": "string",
+          "title": "Ruta de salud",
+          "description": "Para cualquier build. Por ejemplo: /health"
+        }
+      },
+      "required": ["build"]
+    },
+    "impl": {
+      "kind": "resource",
+      "resource": "service"
+    }
+  },
+  {
     "id": "core.filter",
     "version": "0.1.0",
     "name": "Filtrar",

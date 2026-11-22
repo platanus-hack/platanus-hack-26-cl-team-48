@@ -7,7 +7,7 @@ Nodos oficiales de Nodomics definidos como datos (ADR 0002). Ningún nodo es có
 1. Crea la carpeta `nodes/<id>/` (el nombre de la carpeta es el `id` del nodo).
 2. Escribe `node.json` con la forma de `NodeManifest` (`packages/protocol/src/manifest.ts`). Los textos visibles (nombre, categoría, títulos de parámetros) van en español.
 3. Si el nodo es Python, escribe el código en `main.py` y deja `impl` como `{ "kind": "python", "entry": "run" }`, **sin** `code`: el generador lo incrusta.
-4. Escribe `cases.json` con al menos un caso (los nodos `builtin` no llevan casos).
+4. Escribe `cases.json` con al menos un caso. No llevan casos los nodos `builtin` ni los de recurso (`resource`, ADR 0027), porque nunca se ejecutan.
 5. Regenera el catálogo: `pnpm --filter @nodomics/nodes-core generate`.
 6. `pnpm check`.
 

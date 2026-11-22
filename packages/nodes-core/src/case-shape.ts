@@ -19,6 +19,8 @@ const PORT_VALUE_CHECKS: Record<DataType, ValueCheck> = {
   geo: caseFormatMissing("geo"),
   image: caseFormatMissing("image"),
   model: caseFormatMissing("model"),
+  repo: caseFormatMissing("repo"),
+  service: caseFormatMissing("service"),
   any: caseFormatMissing("any"),
 };
 

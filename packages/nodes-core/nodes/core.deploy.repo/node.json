@@ -1,0 +1,40 @@
+{
+  "id": "core.deploy.repo",
+  "version": "0.1.0",
+  "name": "Repo",
+  "description": "Código de un repositorio público de GitHub para desplegar.",
+  "category": "Hosteo",
+  "icon": "git-branch",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "repo",
+      "type": "repo"
+    }
+  ],
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "title": "Repositorio",
+        "description": "Repositorio público de GitHub, por ejemplo: https://github.com/dueño/repo"
+      },
+      "branch": {
+        "type": "string",
+        "title": "Rama",
+        "default": "main"
+      },
+      "rootDir": {
+        "type": "string",
+        "title": "Carpeta",
+        "description": "Carpeta del proyecto dentro del repositorio. Vacío si está en la raíz."
+      }
+    },
+    "required": ["url"]
+  },
+  "impl": {
+    "kind": "resource",
+    "resource": "repo"
+  }
+}
