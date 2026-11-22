@@ -127,3 +127,67 @@ describe("ProfilePage wizard save", () => {
     });
   });
 });
+
+describe("ProfilePage wizard while saving", () => {
+  it("disables Cancelar and Volver a editar until the save ends", async () => {
+    const pending = deferred<ProfileCard>();
+
+    await saveMinimalCard({ saveProfile: () => pending.promise });
+
+    await waitFor(() => {
+      expect({
+        cancel: isButtonDisabled("Cancelar"),
+        backToEdit: isButtonDisabled("Volver a editar"),
+      }).toEqual({ cancel: true, backToEdit: true });
+    });
+    await act(async () => {
+      pending.resolve(err({ code: "UNAVAILABLE" }));
+      await pending.promise;
+    });
+  });
+});
+
+describe("ProfilePage wizard preview", () => {
+  it("shows the handle of the person", async () => {
+    const { user } = await editCard(ANA_CARD);
+
+    await clickNext(user, 3);
+
+    expect(within(wizard()).getByText("@ana")).toBeTruthy();
+  });
+});
+
+const INVALID_ISSUES = [
+  { path: "/about", message: "must NOT have more than 600 characters" },
+  { path: "/links/github", message: "must match format uri" },
+];
+
+/** The title and its detail live in one notice: an alert or status region, else the title's parent. */
+async function invalidCardNotice(): Promise<string> {
+  await saveMinimalCard({
+    saveProfile: () => Promise.resolve(err({ code: "INVALID_CARD", issues: INVALID_ISSUES })),
+  });
+  const title = await within(wizard()).findByText("Revisa los campos marcados.");
+  const notice = title.closest('[role="alert"], [role="status"]') ?? title.parentElement;
+  return notice?.textContent ?? "";
+}
+
+describe("ProfilePage wizard INVALID_CARD detail", () => {
+  it("names the fields with their friendly labels", async () => {
+    const text = await invalidCardNotice();
+
+    expect({ about: text.includes("Sobre ti"), github: text.includes("GitHub") }).toEqual({
+      about: true,
+      github: true,
+    });
+  });
+
+  it("does not show the raw card paths", async () => {
+    const text = await invalidCardNotice();
+
+    expect({ about: text.includes("/about"), github: text.includes("/links/github") }).toEqual({
+      about: false,
+      github: false,
+    });
+  });
+});

@@ -169,3 +169,22 @@ describe("ProfilePage wizard CV extraction", () => {
     }).toEqual({ step: true, about: "" });
   });
 });
+
+describe("ProfilePage wizard while the CV is being read", () => {
+  it("disables Cancelar and Atrás until the reading ends", async () => {
+    const pending = deferred<ProfileCard>();
+
+    await buildFromPastedText({ extractProfile: () => pending.promise });
+
+    await waitFor(() => {
+      expect({ cancel: isButtonDisabled("Cancelar"), back: isButtonDisabled("Atrás") }).toEqual({
+        cancel: true,
+        back: true,
+      });
+    });
+    await act(async () => {
+      pending.resolve(ok(ANA_CARD));
+      await pending.promise;
+    });
+  });
+});
