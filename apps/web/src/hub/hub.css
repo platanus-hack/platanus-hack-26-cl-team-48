@@ -355,6 +355,144 @@
   color: var(--accent-ink);
 }
 
+/* Tag picker: a search field opening a list; only the pressed tags stay visible. */
+.web-hub-tag-picker {
+  position: relative;
+}
+
+.web-hub-tag-picker .web-overline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.web-hub-tag-count {
+  min-width: var(--icon-md);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  text-align: center;
+}
+
+.web-hub-tag-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-md);
+  margin: 0 var(--space-2);
+  padding: 0 var(--space-2);
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-200);
+  color: var(--ink-muted);
+}
+
+.web-hub-tag-field:focus-within {
+  border-color: var(--accent);
+  outline: var(--stroke-strong) solid var(--focus-ring);
+}
+
+.web-hub-tag-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: var(--text-body-sm);
+  outline: none;
+}
+
+.web-hub-tag-chevron {
+  display: inline-flex;
+  transition: transform 160ms ease;
+}
+
+.web-hub-tag-field[data-open="true"] .web-hub-tag-chevron {
+  transform: rotate(180deg);
+}
+
+.web-hub-tag-list {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(var(--control-md) * 2);
+  right: var(--space-2);
+  left: var(--space-2);
+  max-height: calc(var(--control-md) * 8);
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-100);
+  box-shadow: var(--shadow-pop);
+}
+
+.web-hub-tag-option,
+.web-hub-tag-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-sm);
+}
+
+.web-hub-tag-option {
+  cursor: pointer;
+}
+
+.web-hub-tag-option:hover,
+.web-hub-tag-option[data-active="true"] {
+  background: var(--surface-hover);
+}
+
+.web-hub-tag-option[aria-selected="true"] {
+  color: var(--accent-ink);
+}
+
+.web-hub-tag-empty {
+  color: var(--ink-muted);
+}
+
+.web-hub-tag-check {
+  display: inline-flex;
+  width: var(--icon-sm);
+  color: var(--accent);
+}
+
+.web-hub-tags-selected {
+  padding-top: var(--space-2);
+}
+
+.web-hub-tags-selected .web-hub-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.web-hub-tag-clear {
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: var(--text-caption);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.web-hub-tag-clear:hover {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .web-hub-tag-chevron {
+    transition: none;
+  }
+}
+
 .web-hub-section {
   display: grid;
   gap: var(--space-3);
@@ -461,6 +599,49 @@
   width: 100%;
   height: var(--control-md);
   display: block;
+}
+
+/* The preview: a drawing of the kind in the box, and the thread's state as a caption under it. */
+.web-hub-trail {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.web-hub-trail-art {
+  display: grid;
+  place-items: center;
+  height: calc(var(--control-md) * 3);
+  padding: var(--space-2);
+}
+
+.web-hub-trail-art .web-kind-art {
+  height: 100%;
+  fill: var(--brand-surface);
+  stroke: var(--line-strong);
+}
+
+.web-hub-trail-art .web-kind-art .web-kind-art-accent {
+  fill: color-mix(in srgb, var(--lineage-adapt) 14%, var(--brand-surface));
+  stroke: var(--lineage-adapt);
+}
+
+.web-hub-trail-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: var(--stroke-hairline) solid var(--brand-rule);
+  color: var(--ink-muted);
+  font: var(--text-caption);
+}
+
+.web-hub-seed-knot {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--lineage-adapt);
 }
 
 .web-hub-who {
@@ -1310,13 +1491,16 @@
   }
 
   .web-hub-filters {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
+    grid-template-columns: repeat(2, max-content);
+    column-gap: var(--space-8);
     align-items: start;
-    overflow-x: auto;
     border-right: 0;
     border-bottom: var(--stroke-hairline) solid var(--line-subtle);
     padding: var(--space-3) var(--space-4);
+  }
+
+  .web-hub-tag-picker {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1345,4 +1529,9 @@
   .web-hub-tabs > .nd-btn {
     white-space: nowrap;
   }
+}
+
+.web-hub-trail-state .web-hub-strip {
+  flex: 1;
+  height: var(--space-4);
 }

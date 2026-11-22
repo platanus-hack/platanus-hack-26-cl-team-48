@@ -1,8 +1,7 @@
 import type { PublicationSummary } from "@nodomics/hub";
-import { LineageStrip } from "@nodomics/ui";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
-import { lineageFromSummary } from "./hub-lineage.ts";
+import { HubTrail } from "./HubTrail.tsx";
 
 const UPDATED = new Intl.DateTimeFormat("es", { month: "short", year: "numeric" });
 
@@ -26,9 +25,7 @@ export function FeaturedTrip({
         </RouteLink>
       </h2>
       {description !== "" && <p className="web-hub-trip-desc">{description}</p>}
-      <div className="web-hub-trail">
-        <LineageStrip events={lineageFromSummary(publication)} className="web-hub-strip" />
-      </div>
+      <HubTrail publication={publication} />
       <footer className="web-hub-trip-foot">
         <RouteLink route={{ page: "profile", handle: owner.handle }} className="web-hub-owner">
           {owner.displayName !== "" && <span>{owner.displayName}</span>}

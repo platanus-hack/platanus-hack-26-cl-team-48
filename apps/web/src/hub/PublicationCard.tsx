@@ -1,14 +1,12 @@
 import type { PublicationSummary } from "@nodomics/hub";
-import { LineageStrip } from "@nodomics/ui";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
-import { lineageFromSummary } from "./hub-lineage.ts";
+import { HubTrail } from "./HubTrail.tsx";
 import { KindArt } from "./KindArt.tsx";
 
 /** One publication in a list of the hub; the whole card opens it. */
 export function PublicationCard({ publication }: { readonly publication: PublicationSummary }) {
   const { owner, slug, kind, title, description, tags } = publication;
-  const events = lineageFromSummary(publication);
   const kindLabel = MESSAGES.hub.kindLabel[kind];
   const theme = tags[0];
 
@@ -33,9 +31,7 @@ export function PublicationCard({ publication }: { readonly publication: Publica
         </RouteLink>
       </h3>
       {description !== "" && <p className="web-hub-card-desc">{description}</p>}
-      <div className="web-hub-trail">
-        <LineageStrip events={events} className="web-hub-strip" />
-      </div>
+      <HubTrail publication={publication} />
       <p className="web-hub-who">
         <RouteLink route={{ page: "profile", handle: owner.handle }} className="web-hub-owner">
           {owner.displayName !== "" && <span>{owner.displayName}</span>}
