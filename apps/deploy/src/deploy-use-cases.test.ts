@@ -1119,6 +1119,31 @@ function deferredStatus() {
   };
 }
 
+/** A provider status where every call stays pending until the test releases it by call index. */
+function queuedStatuses() {
+  const releases: ((status: DeploymentStatus) => void)[] = [];
+  const waiters: { count: number; resolve: () => void }[] = [];
+  const notifyWaiters = () => {
+    for (const waiter of waiters) if (releases.length >= waiter.count) waiter.resolve();
+  };
+  const status: HostingProvider["status"] = () =>
+    new Promise((resolve) => {
+      releases.push((value) => {
+        resolve(ok(value));
+      });
+      notifyWaiters();
+    });
+  const calledTimes = (count: number) =>
+    new Promise<void>((resolve) => {
+      waiters.push({ count, resolve });
+      notifyWaiters();
+    });
+  const release = (index: number, value: DeploymentStatus) => {
+    releases[index]?.(value);
+  };
+  return { status, calledTimes, release };
+}
+
 const settle = async () => {
   for (let tick = 0; tick < 5; tick += 1) await nextTick();
 };
@@ -1226,6 +1251,54 @@ describe("list — refreshing the status never overwrites concurrent changes", (
     expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
       ok: true,
       value: { status: "deploying", specHash: hashSpec(specOfFlow(EDITED_FLOW)) },
+    });
+  });
+
+  it("keeps the deploying status saved by a redeploy in the same millisecond as the stored record", async () => {
+    const deferred = deferredStatus();
+    const record = liveRecord();
+    const { useCases, store } = setup({
+      provider: { status: deferred.status, update: updateOk },
+      now: () => new Date(record.updatedAt),
+    });
+    await store.save(record);
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    const redeploying = useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("failed");
+    const [, redeployed] = await Promise.all([listing, redeploying]);
+
+    expect(redeployed.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "deploying" },
+    });
+  });
+
+  it("returns the current status when its refresh loses to a newer change", async () => {
+    const statuses = queuedStatuses();
+    const { useCases, store } = setup({ provider: { status: statuses.status } });
+    await store.save({ ...liveRecord(), status: "deploying" });
+    const firstListing = useCases.list(ALICE, "flow-1");
+    await statuses.calledTimes(1);
+    const secondListing = useCases.list(ALICE, "flow-1");
+    await statuses.calledTimes(2);
+    statuses.release(0, "live");
+    await firstListing;
+
+    statuses.release(1, "suspended");
+    const second = await secondListing;
+
+    expect(second).toMatchObject({ ok: true, value: [{ id: "seed", status: "live" }] });
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "live" },
     });
   });
 });
