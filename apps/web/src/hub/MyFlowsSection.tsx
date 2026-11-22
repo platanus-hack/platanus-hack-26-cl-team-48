@@ -1,10 +1,11 @@
 import { Button, Input } from "@nodomics/ui";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "zustand";
 import { useAppStores } from "../app-context.ts";
 import { downloadFlow } from "../flow/download-flow.ts";
 import type { FlowLibrary, SavedFlow } from "../library/flow-library.ts";
 import { publicationStatusOf, type PublicationStatus } from "../library/publication-status.ts";
+import { EmptyPanel } from "./EmptyPanel.tsx";
 import { DeleteAction } from "../library/DeleteAction.tsx";
 import { MESSAGES } from "../messages.ts";
 import type { EditorOpening } from "../routing/routes.ts";
@@ -16,32 +17,43 @@ type OpenEditor = (opening: EditorOpening) => void;
 export function MyFlowsSection({ onOpenEditor }: { readonly onOpenEditor: OpenEditor }) {
   const { savedFlowStore } = useAppStores();
   const flows = useStore(savedFlowStore, (state) => state.flows);
-  const heading = useId();
   // Flows change in the editor, which runs in another page load.
   useEffect(() => {
     void savedFlowStore.getState().refresh();
   }, [savedFlowStore]);
   return (
-    <section className="web-hub-section" aria-labelledby={heading}>
-      <div className="web-hub-section-head">
-        <h2 id={heading}>{MESSAGES.hub.views.flows}</h2>
-        <Button
-          variant="primary"
-          icon="plus"
-          onClick={() => {
-            onOpenEditor({ kind: "new" });
-          }}
-        >
-          {MESSAGES.savedFlows.newFlow}
-        </Button>
-      </div>
-      {flows.length === 0 && <p className="web-panel-hint">{MESSAGES.savedFlows.empty}</p>}
-      <div className="web-hub-grid">
-        {flows.map((flow) => (
-          <MyFlowCard key={flow.id} flow={flow} onOpenEditor={onOpenEditor} />
-        ))}
-      </div>
+    <section className="web-hub-section" aria-label={MESSAGES.hub.views.flows}>
+      {flows.length === 0 ? (
+        <EmptyPanel icon="workflow" text={MESSAGES.savedFlows.empty}>
+          <NewFlowButton onOpenEditor={onOpenEditor} />
+        </EmptyPanel>
+      ) : (
+        <>
+          <div className="web-hub-section-head">
+            <NewFlowButton onOpenEditor={onOpenEditor} />
+          </div>
+          <div className="web-hub-grid">
+            {flows.map((flow) => (
+              <MyFlowCard key={flow.id} flow={flow} onOpenEditor={onOpenEditor} />
+            ))}
+          </div>
+        </>
+      )}
     </section>
+  );
+}
+
+function NewFlowButton({ onOpenEditor }: { readonly onOpenEditor: OpenEditor }) {
+  return (
+    <Button
+      variant="primary"
+      icon="plus"
+      onClick={() => {
+        onOpenEditor({ kind: "new" });
+      }}
+    >
+      {MESSAGES.savedFlows.newFlow}
+    </Button>
   );
 }
 

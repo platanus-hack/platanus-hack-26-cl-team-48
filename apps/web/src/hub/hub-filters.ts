@@ -9,6 +9,8 @@ const ACCOUNT_VIEWS: ReadonlySet<HubView> = new Set(["flows", "mine"]);
 export const PUBLIC_VIEWS: readonly HubView[] = HUB_VIEWS.filter(
   (view) => !ACCOUNT_VIEWS.has(view),
 );
+/** The views of the side column; "Mis flujos" is a tab of its own. */
+export const BROWSE_VIEWS: readonly HubView[] = ["for-you", "recent", "mine"];
 export const isAccountView = (view: HubView) => ACCOUNT_VIEWS.has(view);
 
 type Publications = ReadonlyArray<PublicationSummary>;

@@ -4,13 +4,13 @@ import {
   readPreferences,
 } from "../layout/storage-workspace-preferences.ts";
 import type { Theme } from "../layout/workspace-preferences.ts";
-import { ThemeControl } from "./ThemeControl.tsx";
+import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import { followStoredTheme } from "./theme-sync.ts";
 
 const storage = () => window.localStorage;
 const readTheme = () => readPreferences(storage).theme;
 
-/** The theme menu outside the editor: it shares the editor's stored choice, in both directions. */
+/** The theme switch outside the editor: it shares the editor's stored choice, in both directions. */
 export function StoredThemeControl() {
   const [theme, setTheme] = useState(readTheme);
   useEffect(() => followStoredTheme(window, readTheme, setTheme), []);
@@ -18,5 +18,5 @@ export function StoredThemeControl() {
     createStorageWorkspacePreferences(storage).write({ ...readPreferences(storage), theme: next });
     setTheme(next);
   };
-  return <ThemeControl theme={theme} onChange={choose} />;
+  return <ThemeSwitch theme={theme} onChange={choose} />;
 }

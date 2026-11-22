@@ -41,6 +41,7 @@ export const MESSAGES = {
     search: "Buscar en el hub",
     searchPlaceholder: "Buscar flujos, nodos o personas…",
     heroTitle: "Encuentra lo que ya funcionó en otro lugar.",
+    heroEmphasis: "ya funcionó",
     heroSearch: "Busca un problema",
     heroPlaceholder: "Busca un problema: controles atrasados, churn, limpiar un censo…",
     quickTopics: "Temas rápidos",
@@ -82,6 +83,7 @@ export const MESSAGES = {
     landing: {
       title:
         "Convierte el conocimiento de tu oficio en herramientas que otros pueden probar, entender y mejorar.",
+      titleEmphasis: "herramientas",
       subtitle:
         "Para expertos que no programan. Describe un problema con tus palabras y tu agente te ayuda a encontrar una solución que ya le funcionó a alguien, adaptarla a tu contexto o construirla si todavía hace falta.",
       searchLabel: "Describe tu problema",
@@ -101,7 +103,20 @@ export const MESSAGES = {
           text: "Cuando alguien mejora la herramienta, decides qué incorporar.",
         },
       ],
+      shareTitle: "Qué puedes compartir",
+      share: [
+        {
+          title: "Una aplicación completa",
+          text: "Un flujo entero, listo para probar con tus datos.",
+        },
+        {
+          title: "Un módulo",
+          text: "Un conjunto de pasos que resuelve una parte del problema.",
+        },
+        { title: "Un solo nodo", text: "Una regla o un cálculo que otros pueden reutilizar." },
+      ],
       closing: "Un espacio de colaboración real entre expertos.",
+      footer: "Hecho para expertos que no programan.",
     },
     sections: "Secciones del hub",
     tabs: { "for-you": "Para ti", flows: "Mis flujos", people: "Personas" },
@@ -114,6 +129,7 @@ export const MESSAGES = {
     forYouSignIn: "Entra para ver con quién puedes colaborar.",
     forYouNoProfile: "Completa tu perfil para ver con quién puedes colaborar.",
     completeProfile: "Completar perfil",
+    peopleEmpty: "Completa tu perfil para encontrar personas con experiencia en tu problema.",
     forYouEmpty: "Todavía no hay recomendaciones para ti.",
     forYouFailed: "No pudimos cargar tus recomendaciones.",
     loading: "Cargando…",

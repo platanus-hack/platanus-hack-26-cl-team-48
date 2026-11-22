@@ -1,6 +1,8 @@
 import { Input } from "@nodomics/ui";
 import { MESSAGES } from "../messages.ts";
 import { AccountButton } from "./AccountButton.tsx";
+import { Highlighted } from "./Highlighted.tsx";
+import { HubShare } from "./HubShare.tsx";
 import { HubThread } from "./HubThread.tsx";
 import { RecentPublications, SearchResults } from "./PublicationResults.tsx";
 
@@ -13,27 +15,33 @@ type HubLandingProps = {
 export function HubLanding({ text, onSearch }: HubLandingProps) {
   const { landing } = MESSAGES.hub;
   return (
-    <main className="web-hub-page web-hub-landing">
-      <div className="web-hub-landing-main">
-        <h1 className="web-hub-landing-title">{landing.title}</h1>
-        <p className="web-hub-landing-sub">{landing.subtitle}</p>
-        <div className="web-hub-hero-search" role="search">
-          <Input
-            type="text"
-            icon="search"
-            label={landing.searchLabel}
-            placeholder={landing.searchPlaceholder}
-            value={text}
-            onChange={onSearch}
-          />
+    <main className="web-hub-landing">
+      <div className="web-hub-landing-inner web-hub-landing-top">
+        <div className="web-hub-landing-main">
+          <h1 className="web-hub-landing-title">
+            <Highlighted text={landing.title} emphasis={landing.titleEmphasis} />
+          </h1>
+          <p className="web-hub-landing-sub">{landing.subtitle}</p>
+          <div className="web-hub-hero-search" role="search">
+            <Input
+              type="text"
+              icon="search"
+              label={landing.searchLabel}
+              placeholder={landing.searchPlaceholder}
+              value={text}
+              onChange={onSearch}
+            />
+          </div>
         </div>
+        {text.trim() === "" ? <RecentPublications /> : <SearchResults text={text} />}
       </div>
-      {text.trim() === "" ? <RecentPublications /> : <SearchResults text={text} />}
       <HubThread />
-      <div className="web-hub-landing-close">
+      <HubShare />
+      <section className="web-hub-band web-hub-landing-close">
         <p>{landing.closing}</p>
-        <AccountButton variant="primary" />
-      </div>
+        <AccountButton variant="secondary" />
+      </section>
+      <p className="web-hub-landing-footer">{landing.footer}</p>
     </main>
   );
 }
