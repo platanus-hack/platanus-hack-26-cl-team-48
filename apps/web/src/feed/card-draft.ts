@@ -59,6 +59,15 @@ const entriesOf = (entries: ReadonlyArray<string>): string[] =>
 
 function linksOf(draft: CardDraft): ProfileLinks {
   return Object.fromEntries(
-    LINK_KEYS.map((key) => [key, draft[key].trim()] as const).filter(([, url]) => url !== ""),
+    LINK_KEYS.map((key) => [key, draft[key].trim()] as const)
+      .filter(([, url]) => url !== "")
+      .map(([key, url]) => [key, withScheme(url)] as const),
   );
 }
+
+const URL_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
+const DEFAULT_SCHEME = "https://";
+
+/** People type "github.com/ana"; the card stores a full address so the link opens. */
+const withScheme = (url: string): string =>
+  URL_SCHEME.test(url) ? url : `${DEFAULT_SCHEME}${url}`;
