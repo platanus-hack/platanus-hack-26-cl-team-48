@@ -16,7 +16,7 @@ import { SignInDialog } from "./SignInDialog.tsx";
 import { useAccountAction } from "./use-account-action.ts";
 import type { EditorOpening } from "../routing/routes.ts";
 import { EmptyState } from "./PublicationCard.tsx";
-import { useHubQuery } from "./use-hub-query.ts";
+import { useQuery } from "../async/use-query.ts";
 
 type PublicationPageProps = {
   readonly handle: string;
@@ -217,12 +217,12 @@ const snapshotOf = (version: PublishedVersion) =>
 
 function usePublication(handle: string, slug: string) {
   const hub = useHub();
-  return useHubQuery(useCallback(() => hub.publication(handle, slug), [hub, handle, slug]));
+  return useQuery(useCallback(() => hub.publication(handle, slug), [hub, handle, slug]));
 }
 
 function usePublishedVersion(publicationId: string, version: string) {
   const hub = useHub();
-  return useHubQuery(
+  return useQuery(
     useCallback(() => hub.version(publicationId, version), [hub, publicationId, version]),
   );
 }

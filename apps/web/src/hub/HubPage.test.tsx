@@ -352,14 +352,6 @@ describe("HubPage Para ti view", () => {
     expect(screen.getByRole("heading", { name: "Para ti" })).toBeTruthy();
   });
 
-  it("says the recommendations are a mockup", async () => {
-    renderHubPage(await createSeededHub());
-
-    expect(
-      screen.getByText(/Maqueta: recomendaciones según los flujos en los que trabajas\./),
-    ).toBeTruthy();
-  });
-
   it("lists the publications under Recientes", async () => {
     renderHubPage(await createSeededHub());
 

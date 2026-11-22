@@ -1,7 +1,9 @@
-import type { PublicationSummary } from "@nodomics/hub";
+import type { HubError, PublicationSummary } from "@nodomics/hub";
 import { ok, type Flow } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
 import { useCallback, useId, useState } from "react";
+import { ForYouSection } from "../feed/ForYouSection.tsx";
+import { PeopleSection } from "../feed/PeopleSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { useHub, useHubProfile } from "./hub-context.ts";
 import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
@@ -19,10 +21,10 @@ import {
 import { PublicationList } from "./PublicationCard.tsx";
 import { MyFlowsSection } from "./MyFlowsSection.tsx";
 import type { EditorOpening } from "../routing/routes.ts";
-import { useHubQuery, type HubQuery } from "./use-hub-query.ts";
+import { useQuery, type Query } from "../async/use-query.ts";
 
 const SEARCH_DELAY_MS = 200;
-type Listed = HubQuery<ReadonlyArray<PublicationSummary>>;
+type Listed = Query<ReadonlyArray<PublicationSummary>, HubError>;
 
 const INITIAL_FILTERS: HubFilterState = {
   view: "for-you",
@@ -63,15 +65,18 @@ export function HubPage({ text, onOpenEditor }: HubPageProps) {
       />
       <main className="web-hub-page">
         <h1 className="web-visually-hidden">{MESSAGES.hub.title}</h1>
-        {filters.view === "for-you" && <ForYouMockup />}
+        {filters.view === "for-you" && <ForYouSection />}
         {filters.view === "flows" ? (
           <MyFlowsSection onOpenEditor={onOpenEditor} />
         ) : (
-          <PublicationsSection
-            heading={listHeading(filters, text)}
-            listed={listed}
-            pressedTags={filters.pressedTags}
-          />
+          <>
+            <PeopleSection text={text} />
+            <PublicationsSection
+              heading={listHeading(filters, text)}
+              listed={listed}
+              pressedTags={filters.pressedTags}
+            />
+          </>
         )}
       </main>
     </div>
@@ -114,25 +119,6 @@ const listHeading = ({ view }: HubFilterState, text: string) => {
   return text.trim() === "" ? MESSAGES.hub.views.recent : MESSAGES.hub.results;
 };
 
-function ForYouMockup() {
-  const heading = useId();
-  return (
-    <section className="web-hub-for-you" aria-labelledby={heading}>
-      <h2 id={heading}>{MESSAGES.hub.forYou}</h2>
-      <p className="web-mockup-note">{MESSAGES.hub.forYouMockup}</p>
-      <ul className="web-hub-for-you-list" aria-hidden="true">
-        {MESSAGES.hub.forYouExamples.map((example) => (
-          <li key={example.title} className="web-hub-for-you-card">
-            <span className="web-hub-for-you-kind">{example.kind}</span>
-            <strong>{example.title}</strong>
-            <span className="web-hub-for-you-reason">{example.reason}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 /** The account's views need a session: signed out, they go back to "Para ti". */
 const reachableFilters = (filters: HubFilterState, isSignedIn: boolean): HubFilterState =>
   isSignedIn || !isAccountView(filters.view) ? filters : { ...filters, view: "for-you" };
@@ -162,7 +148,7 @@ function useSearch(text: string, kind: KindFilter) {
     () => hub.search({ text: text.trim(), ...(kind === ALL_KINDS ? {} : { kind }) }),
     [hub, text, kind],
   );
-  return useHubQuery(search, SEARCH_DELAY_MS);
+  return useQuery(search, SEARCH_DELAY_MS);
 }
 
 /** Asks the hub only for someone's publications: none while signed out or in another view. */
@@ -172,5 +158,5 @@ function useOwnPublications(handle: string | undefined) {
     () => (handle === undefined ? Promise.resolve(ok([])) : hub.publicationsOf(handle)),
     [hub, handle],
   );
-  return useHubQuery(ask);
+  return useQuery(ask);
 }

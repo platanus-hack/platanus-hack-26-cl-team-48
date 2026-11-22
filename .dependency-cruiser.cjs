@@ -5,12 +5,31 @@ const internal = "^(packages|apps)/";
 module.exports = {
   forbidden: [
     {
+      name: "agent-uses-only-protocol",
+      severity: "error",
+      from: { path: "^apps/agent/" },
+      to: { path: internal, pathNot: ["^apps/agent/", pkg("protocol"), pkg("profile")] },
+    },
+    {
+      name: "nothing-imports-agent",
+      severity: "error",
+      from: { pathNot: "^apps/agent/" },
+      to: { path: "^apps/agent/" },
+    },
+    {
       name: "web-only-uses-protocol-client-ui",
       severity: "error",
       from: { path: "^apps/web/", pathNot: "^apps/web/src/engine-registry\\.ts$" },
       to: {
         path: internal,
-        pathNot: ["^apps/web/", pkg("protocol"), pkg("client"), pkg("ui"), pkg("hub")],
+        pathNot: [
+          "^apps/web/",
+          pkg("protocol"),
+          pkg("client"),
+          pkg("ui"),
+          pkg("hub"),
+          pkg("profile"),
+        ],
       },
     },
     {
@@ -87,6 +106,14 @@ module.exports = {
       severity: "error",
       from: { path: pkg("hub") },
       to: { path: internal, pathNot: [pkg("hub"), pkg("protocol")] },
+    },
+    {
+      name: "profile-uses-only-protocol",
+      comment:
+        "ADR 0022: the profile card model is pure and shared by the web and the agent service.",
+      severity: "error",
+      from: { path: pkg("profile") },
+      to: { path: internal, pathNot: [pkg("profile"), pkg("protocol")] },
     },
     {
       name: "nothing-imports-apps",

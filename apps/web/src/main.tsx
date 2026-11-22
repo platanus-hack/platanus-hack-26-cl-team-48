@@ -22,6 +22,8 @@ import {
   readPreferences,
 } from "./layout/storage-workspace-preferences.ts";
 import { MESSAGES } from "./messages.ts";
+import { createAppFeed } from "./feed/create-app-feed.ts";
+import { FeedContext } from "./feed/feed-context.ts";
 import { createAppHub } from "./hub/create-app-hub.ts";
 import { HubContext } from "./hub/hub-context.ts";
 import { HubApp } from "./hub/HubApp.tsx";
@@ -106,6 +108,13 @@ function openCopy(flow: Flow) {
   window.location.assign(`${pathOf({ page: "workspace" })}${encodeSharedFlow(flow)}`);
 }
 
+// The hub port does not expose the Supabase access token yet, so the agent service sees no session.
+const getNoAccessTokenYet = () => Promise.resolve(undefined);
+const feed = createAppFeed(import.meta.env, {
+  getAccessToken: getNoAccessTokenYet,
+  currentHandle: async () => (await hub.currentProfile())?.handle,
+});
+
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.
 if (isHubTab) {
@@ -123,16 +132,18 @@ createRoot(root).render(
   <StrictMode>
     <AppStoresContext value={stores}>
       <HubContext value={hub}>
-        {isHubTab ? (
-          <HubApp onOpenEditor={openEditor} onOpenCopy={openCopy} />
-        ) : (
-          <App
-            preferenceStorage={preferenceStorage}
-            engines={ENGINES}
-            defaultEngine={defaultEngine}
-            shouldRunOnConnect={shared?.ok === true}
-          />
-        )}
+        <FeedContext value={feed}>
+          {isHubTab ? (
+            <HubApp onOpenEditor={openEditor} onOpenCopy={openCopy} />
+          ) : (
+            <App
+              preferenceStorage={preferenceStorage}
+              engines={ENGINES}
+              defaultEngine={defaultEngine}
+              shouldRunOnConnect={shared?.ok === true}
+            />
+          )}
+        </FeedContext>
       </HubContext>
     </AppStoresContext>
   </StrictMode>,

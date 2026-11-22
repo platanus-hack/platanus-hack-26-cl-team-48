@@ -9,6 +9,7 @@ import { AccountButton } from "./AccountButton.tsx";
 import { HubPage } from "./HubPage.tsx";
 import { ProfilePage } from "./ProfilePage.tsx";
 import { PublicationPage } from "./PublicationPage.tsx";
+import "../feed/feed.css";
 import "./hub.css";
 
 type PageRoute = Exclude<Route, { readonly page: "workspace" | "hub" }>;
