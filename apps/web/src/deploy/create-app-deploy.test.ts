@@ -43,7 +43,7 @@ describe("createAppDeploy without a deploy URL", () => {
 
 describe("createAppDeploy with a deploy URL", () => {
   it("calls the deploy service at that URL with the session's token", async () => {
-    const fetchSpy = vi.fn((_input: unknown, _init?: RequestInit) =>
+    const fetchSpy = vi.fn<typeof fetch>(() =>
       Promise.resolve(new Response(JSON.stringify({ ok: true, deployments: [] }), { status: 200 })),
     );
     vi.stubGlobal("fetch", fetchSpy);
@@ -54,7 +54,7 @@ describe("createAppDeploy with a deploy URL", () => {
     const [input, init] = fetchSpy.mock.calls[0] ?? [];
     expect({
       result,
-      url: String(input),
+      url: input instanceof Request ? input.url : input?.toString(),
       authorization: new Headers(init?.headers).get("authorization"),
     }).toEqual({
       result: { ok: true, value: [] },
