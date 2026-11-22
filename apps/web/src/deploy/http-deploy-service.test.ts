@@ -365,6 +365,21 @@ describe("createHttpDeployService without a token", () => {
       calls: 0,
     });
   });
+
+  it.each(OPERATIONS)(
+    "returns UNAVAILABLE from %s when token lookup fails",
+    async (_name, call) => {
+      const service = createHttpDeployService({
+        baseUrl: BASE_URL,
+        getAccessToken: () => Promise.reject(new Error("session unavailable")),
+        fetch: () => Promise.resolve(responseOf({ status: 200, body: { ok: true } })),
+      });
+
+      const result = await call(service);
+
+      expect(result).toEqual({ ok: false, error: { code: "UNAVAILABLE" } });
+    },
+  );
 });
 
 describe("createHttpDeployService unsafe deployment URLs", () => {
