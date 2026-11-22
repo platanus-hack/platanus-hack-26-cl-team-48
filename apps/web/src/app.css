@@ -957,6 +957,22 @@ body {
   font: var(--text-title);
 }
 
+/* A service node has a fourth tab; the tabs share the panel's width instead of overflowing it. */
+.web-params-tabs {
+  display: flex;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.web-params-tabs .web-seg-button {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .web-params-body {
   display: flex;
   flex-direction: column;
@@ -1516,4 +1532,89 @@ body {
 .web-app:is([data-viewport="narrow"], [data-viewport="phone"]) .web-params,
 .web-app[data-viewport="phone"] .web-side-panel {
   display: none;
+}
+
+/* Despliegue tab of a service node (ADR 0027) ---------------------------------------------- */
+
+.web-deploy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.web-deploy-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.web-deploy-section h4 {
+  margin: 0;
+}
+
+.web-deploy-card {
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--stroke-hairline) solid var(--line-subtle);
+  border-radius: var(--radius-md);
+}
+
+.web-deploy-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.web-deploy-url {
+  overflow-wrap: anywhere;
+  font: var(--text-mono);
+  color: var(--accent);
+}
+
+.web-deploy-plan {
+  margin: 0;
+}
+
+.web-deploy-changes {
+  margin: 0;
+  padding-left: var(--space-4);
+  font: var(--text-mono);
+  color: var(--ink-muted);
+}
+
+.web-deploy-orphans {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.web-deploy-orphans .web-deploy-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.web-deploy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.web-deploy-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.web-deploy-confirm .web-caption {
+  margin: 0;
+}
+
+.web-deploy-error {
+  margin: 0;
+  color: var(--status-error);
 }

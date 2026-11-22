@@ -4,15 +4,18 @@ import { MESSAGES } from "../messages.ts";
 
 export type NodeDetailTab = keyof typeof MESSAGES.params.tabs;
 
-const TABS: readonly NodeDetailTab[] = ["params", "ports", "history"];
+const FIRST_TAB: NodeDetailTab = "params";
 
 type NodeDetailTabsProps = {
+  readonly tabs: readonly NodeDetailTab[];
   readonly children: (tab: NodeDetailTab) => ReactNode;
 };
 
-export function NodeDetailTabs({ children }: NodeDetailTabsProps) {
+export function NodeDetailTabs({ tabs, children }: NodeDetailTabsProps) {
   const id = useId();
-  const [selected, setSelected] = useState<NodeDetailTab>("params");
+  const [chosen, setSelected] = useState<NodeDetailTab>(FIRST_TAB);
+  // A tab can leave while chosen (another node, or signing out): the first one takes its place.
+  const selected = tabs.includes(chosen) ? chosen : FIRST_TAB;
   return (
     <>
       <div
@@ -20,7 +23,7 @@ export function NodeDetailTabs({ children }: NodeDetailTabsProps) {
         role="tablist"
         aria-label={MESSAGES.params.details}
       >
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             type="button"
             key={tab}
@@ -34,7 +37,7 @@ export function NodeDetailTabs({ children }: NodeDetailTabsProps) {
               setSelected(tab);
             }}
             onKeyDown={(event) => {
-              selectAdjacentTab(event, { selected, onSelect: setSelected });
+              selectAdjacentTab(event, { tabs, selected, onSelect: setSelected });
             }}
           >
             {MESSAGES.params.tabs[tab]}
@@ -57,12 +60,17 @@ export function NodeDetailTabs({ children }: NodeDetailTabsProps) {
 function selectAdjacentTab(
   event: KeyboardEvent<HTMLButtonElement>,
   {
+    tabs,
     selected,
     onSelect,
-  }: { readonly selected: NodeDetailTab; readonly onSelect: (tab: NodeDetailTab) => void },
+  }: {
+    readonly tabs: readonly NodeDetailTab[];
+    readonly selected: NodeDetailTab;
+    readonly onSelect: (tab: NodeDetailTab) => void;
+  },
 ) {
-  const index = navigateTabs({ index: TABS.indexOf(selected), key: event.key, count: TABS.length });
-  const next = index === undefined ? undefined : TABS[index];
+  const index = navigateTabs({ index: tabs.indexOf(selected), key: event.key, count: tabs.length });
+  const next = index === undefined ? undefined : tabs[index];
   if (index === undefined || next === undefined) return;
   event.preventDefault();
   onSelect(next);

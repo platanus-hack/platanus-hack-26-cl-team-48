@@ -12,9 +12,18 @@ export function useHub(): Hub {
 
 /** The signed-in profile, following sign in and sign out; undefined while unknown or signed out. */
 export function useHubProfile(): HubProfile | undefined {
-  const hub = useHub();
+  return useProfileOf(useHub());
+}
+
+/** Like useHubProfile, but also undefined where no hub is provided (a panel rendered on its own). */
+export function useOptionalHubProfile(): HubProfile | undefined {
+  return useProfileOf(useContext(HubContext));
+}
+
+function useProfileOf(hub: Hub | undefined): HubProfile | undefined {
   const [profile, setProfile] = useState<HubProfile | undefined>(undefined);
   useEffect(() => {
+    if (hub === undefined) return;
     let isCurrent = true;
     void hub.currentProfile().then((current) => {
       if (isCurrent) setProfile(current);

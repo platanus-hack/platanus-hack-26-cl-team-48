@@ -24,6 +24,8 @@ import {
 import { MESSAGES } from "./messages.ts";
 import { AgentContext } from "./agent/agent-context.ts";
 import { createAppAgent } from "./agent/create-app-agent.ts";
+import { createAppDeploy } from "./deploy/create-app-deploy.ts";
+import { DeployContext } from "./deploy/deploy-context.ts";
 import { createAppFeed } from "./feed/create-app-feed.ts";
 import { FeedContext } from "./feed/feed-context.ts";
 import { createAppHub } from "./hub/create-app-hub.ts";
@@ -116,6 +118,7 @@ const feed = createAppFeed(import.meta.env, {
 });
 
 const agent = createAppAgent(import.meta.env, { getAccessToken: () => hub.accessToken() });
+const deploy = createAppDeploy(import.meta.env, { getAccessToken: () => hub.accessToken() });
 
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.
@@ -139,12 +142,14 @@ createRoot(root).render(
             <HubApp onOpenEditor={openEditor} onOpenCopy={openCopy} />
           ) : (
             <AgentContext value={agent}>
-              <App
-                preferenceStorage={preferenceStorage}
-                engines={ENGINES}
-                defaultEngine={defaultEngine}
-                shouldRunOnConnect={shared?.ok === true}
-              />
+              <DeployContext value={deploy}>
+                <App
+                  preferenceStorage={preferenceStorage}
+                  engines={ENGINES}
+                  defaultEngine={defaultEngine}
+                  shouldRunOnConnect={shared?.ok === true}
+                />
+              </DeployContext>
             </AgentContext>
           )}
         </FeedContext>

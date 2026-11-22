@@ -1,4 +1,4 @@
-import type { FlowNode } from "@nodomics/protocol";
+import type { FlowNode, NodeManifest } from "@nodomics/protocol";
 import { useId, useRef } from "react";
 import { Button, ICON_SIZE, Icon, StatusIndicator } from "@nodomics/ui";
 import { NODE_ACTION_MESSAGES } from "../canvas/node-action-messages.ts";
@@ -20,7 +20,9 @@ import { ResizeHandle } from "../layout/ResizeHandle.tsx";
 import { PARAMS_WIDTH_RANGE } from "../layout/size-range.ts";
 import { UpdateNode } from "./UpdateNode.tsx";
 import { PortList } from "./PortList.tsx";
-import { NodeDetailTabs } from "./NodeDetailTabs.tsx";
+import { NodeDetailTabs, type NodeDetailTab } from "./NodeDetailTabs.tsx";
+import { DeployPanel } from "../deploy/DeployPanel.tsx";
+import { useOptionalHubProfile } from "../hub/hub-context.ts";
 import { MESSAGES } from "../messages.ts";
 
 type ParamsPanelProps = {
@@ -100,6 +102,7 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
   const runError = useEngineState((state) => state.nodes[node.id]?.error);
   const dispatch = useDispatch();
   const flow = useFlowState((state) => state.flow);
+  const isSignedIn = useOptionalHubProfile() !== undefined;
   if (manifest === undefined)
     return <p className="web-panel-hint">{MESSAGES.params.unknownNode}</p>;
   return (
@@ -116,8 +119,9 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
           <p className="web-params-description">{manifest.description}</p>
         )}
       </div>
-      <NodeDetailTabs>
+      <NodeDetailTabs tabs={detailTabsOf(manifest, isSignedIn)}>
         {(tab) => {
+          if (tab === "deploy") return <DeployPanel key={node.id} nodeId={node.id} />;
           if (tab === "ports") return <PortList node={node} manifest={manifest} />;
           if (tab === "history")
             return <p className="web-mockup-note">{MESSAGES.params.historyMockup}</p>;
@@ -142,6 +146,15 @@ function NodeParams({ node }: { readonly node: FlowNode }) {
     </>
   );
 }
+
+const BASE_TABS: readonly NodeDetailTab[] = ["params", "ports", "history"];
+
+/** A service node can be deployed from its own tab, by a signed-in user (ADR 0027 §5). */
+const detailTabsOf = (manifest: NodeManifest, isSignedIn: boolean): readonly NodeDetailTab[] =>
+  isSignedIn && isService(manifest) ? [...BASE_TABS, "deploy"] : BASE_TABS;
+
+const isService = ({ impl }: NodeManifest) =>
+  impl.kind === "resource" && impl.resource === "service";
 
 /** The node's last run and a way to run just it, as on its card in the canvas. */
 function NodeRunHeader({ nodeId }: { readonly nodeId: string }) {
