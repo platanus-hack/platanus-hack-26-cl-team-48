@@ -9,7 +9,7 @@ import { createMemoryHostingProvider } from "./memory-hosting-provider.ts";
 import { hashSpec } from "./spec/plan.ts";
 import { serviceSpecOf } from "./spec/service-spec.ts";
 import { deployFlow } from "./testing/deploy-flows.ts";
-import type { ServiceSpec, UserIdentity } from "./types.ts";
+import type { DeploymentStatus, ServiceSpec, UserIdentity } from "./types.ts";
 
 const ALICE: UserIdentity = {
   userId: "3F2A9C1E-77aa-4b4b-9e0d-123456789abc",
@@ -34,6 +34,7 @@ type Overrides = {
   readonly store?: Partial<DeploymentStore>;
   readonly reader?: FlowReader;
   readonly now?: () => Date;
+  readonly reportOrphan?: (serviceId: string) => void;
 };
 
 function fakeFlows() {
@@ -88,6 +89,7 @@ function delegatingStore(store: DeploymentStore, overrides: Partial<DeploymentSt
     countAll: () => store.countAll(),
     save: (record) => store.save(record),
     remove: (id) => store.remove(id),
+    updateStatus: (id, status, updatedAt) => store.updateStatus(id, status, updatedAt),
     ...overrides,
   };
   return deployments;
@@ -105,6 +107,7 @@ function setup(overrides: Overrides = {}) {
     provider: { ...recording.provider, ...overrides.provider },
     now: overrides.now ?? (() => NOW),
     createId: () => `dep-${String((nextId += 1))}`,
+    ...(overrides.reportOrphan === undefined ? {} : { reportOrphan: overrides.reportOrphan }),
   });
   return { useCases, flows, store, ...recording };
 }
@@ -1090,5 +1093,185 @@ describe("plan and apply — changing the kind of service", () => {
 
     expect(result.ok).toBe(true);
     expect(calls).toEqual(["create", "update srv-1"]);
+  });
+});
+
+/** A provider status that stays pending until the test releases it with a status. */
+function deferredStatus() {
+  let release: (status: DeploymentStatus) => void = () => undefined;
+  let markCalled: () => void = () => undefined;
+  const called = new Promise<void>((resolve) => {
+    markCalled = resolve;
+  });
+  const status: HostingProvider["status"] = () =>
+    new Promise((resolve) => {
+      release = (value) => {
+        resolve(ok(value));
+      };
+      markCalled();
+    });
+  return {
+    status,
+    called,
+    release: (value: DeploymentStatus) => {
+      release(value);
+    },
+  };
+}
+
+const settle = async () => {
+  for (let tick = 0; tick < 5; tick += 1) await nextTick();
+};
+
+describe("list — refreshing the status never overwrites concurrent changes", () => {
+  const EDITED_FLOW = deployFlow({ repo: { branch: "release" }, service: { env: ENV } });
+
+  it("does not bring back a deployment removed while its status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, store } = setup({ provider: { status: deferred.status } });
+    const deployment = await deployOnce(useCases);
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    const removing = useCases.remove(ALICE, deployment.id);
+    await settle();
+
+    deferred.release("live");
+    await Promise.all([listing, removing]);
+
+    expect(await store.countByOwner(ALICE.userId)).toEqual({ ok: true, value: 0 });
+    expect(await store.listByFlow(ALICE.userId, "flow-1")).toEqual({ ok: true, value: [] });
+  });
+
+  it("keeps the spec saved by an update applied while the status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, flows, store } = setup({ provider: { status: deferred.status } });
+    await deployOnce(useCases);
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    flows.set(ALICE, "flow-1", EDITED_FLOW);
+    const applying = useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash: hashSpec(specOfFlow(EDITED_FLOW)),
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("live");
+    const [, applied] = await Promise.all([listing, applying]);
+
+    expect(applied.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { spec: specOfFlow(EDITED_FLOW), specHash: hashSpec(specOfFlow(EDITED_FLOW)) },
+    });
+  });
+});
+
+describe("apply — reporting orphan services", () => {
+  const saveDown = () => Promise.resolve(err({ message: "Supabase down" }));
+
+  it("reports the created service as an orphan when it cannot be removed after the save failed", async () => {
+    const orphans: string[] = [];
+    const { useCases } = setup({
+      provider: {
+        create: () => Promise.resolve(ok({ serviceId: "srv-orphan-42" })),
+        remove: () => Promise.resolve(err({ message: "Render is down" })),
+      },
+      store: { save: saveDown },
+      reportOrphan: (serviceId) => orphans.push(serviceId),
+    });
+
+    const result = await applyCreate(useCases, "flow-1");
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(orphans).toEqual(["srv-orphan-42"]);
+  });
+
+  it("reports no orphan when the created service is removed after the save failed", async () => {
+    const orphans: string[] = [];
+    const { useCases } = setup({
+      store: { save: saveDown },
+      reportOrphan: (serviceId) => orphans.push(serviceId),
+    });
+
+    const result = await applyCreate(useCases, "flow-1");
+
+    expect(codeOf(result)).toBe("UNAVAILABLE");
+    expect(orphans).toEqual([]);
+  });
+});
+
+describe("stored urls", () => {
+  const seededSpec = () => specOfFlow(FLOW);
+  const seededRecord = (url: string) =>
+    recordOf({
+      flowId: "flow-1",
+      nodeId: "web",
+      url,
+      spec: seededSpec(),
+      specHash: hashSpec(seededSpec()),
+    });
+  const SEEDED_DEPLOYMENT = {
+    id: "seed",
+    flowId: "flow-1",
+    nodeId: "web",
+    status: "live",
+    updatedAt: "2026-11-01T00:00:00.000Z",
+  };
+  const updateOk = () => Promise.resolve(ok(undefined));
+
+  it.each(["http://old.onrender.com", "javascript:alert(1)"])(
+    "lists a deployment stored with the url %s without its url",
+    async (url) => {
+      const { useCases, store } = setup();
+      await store.save(seededRecord(url));
+
+      const result = await useCases.list(ALICE, "flow-1");
+
+      expect(result).toEqual({ ok: true, value: [SEEDED_DEPLOYMENT] });
+    },
+  );
+
+  it("lists a deployment stored with an https url with that url", async () => {
+    const { useCases, store } = setup();
+    await store.save(seededRecord("https://seed.onrender.com"));
+
+    const result = await useCases.list(ALICE, "flow-1");
+
+    expect(result).toEqual({
+      ok: true,
+      value: [{ ...SEEDED_DEPLOYMENT, url: "https://seed.onrender.com" }],
+    });
+  });
+
+  it.each(["http://old.onrender.com", "javascript:alert(1)"])(
+    "redeploys a deployment stored with the url %s returning it without its url",
+    async (url) => {
+      const { useCases, store } = setup({ provider: { update: updateOk } });
+      await store.save(seededRecord(url));
+
+      const result = await useCases.redeploy(ALICE, {
+        flowId: "flow-1",
+        nodeId: "web",
+        secrets: SECRETS,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.ok ? result.value : undefined).not.toHaveProperty("url");
+    },
+  );
+
+  it("redeploys a deployment stored with an https url returning that url", async () => {
+    const { useCases, store } = setup({ provider: { update: updateOk } });
+    await store.save(seededRecord("https://seed.onrender.com"));
+
+    const result = await useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+
+    expect(result).toMatchObject({ ok: true, value: { url: "https://seed.onrender.com" } });
   });
 });

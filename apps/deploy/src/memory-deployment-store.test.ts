@@ -153,4 +153,26 @@ describe("createMemoryDeploymentStore", () => {
     expect(await store.get("alice", "dep-1")).toEqual({ ok: true, value: undefined });
     expect(await store.countAll()).toEqual({ ok: true, value: 1 });
   });
+
+  it("updates only the status and the time of an existing record", async () => {
+    const store = await storeWith([recordOf()]);
+
+    const result = await store.updateStatus("dep-1", "live", "2026-11-22T11:00:00.000Z");
+
+    expect(result.ok).toBe(true);
+    expect(await store.get("alice", "dep-1")).toEqual({
+      ok: true,
+      value: recordOf({ status: "live", updatedAt: "2026-11-22T11:00:00.000Z" }),
+    });
+  });
+
+  it("does not create a record when updating the status of a missing id", async () => {
+    const store = await storeWith([recordOf()]);
+
+    const result = await store.updateStatus("dep-404", "live", "2026-11-22T11:00:00.000Z");
+
+    expect(result.ok).toBe(true);
+    expect(await store.countAll()).toEqual({ ok: true, value: 1 });
+    expect(await store.get("alice", "dep-404")).toEqual({ ok: true, value: undefined });
+  });
 });
