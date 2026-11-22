@@ -52,12 +52,30 @@ export const FeedErrorReplySchema = Type.Object({
 });
 export type FeedErrorReply = Static<typeof FeedErrorReplySchema>;
 
+export const MAX_REGISTRATION_IMAGES = 4;
+export const REGISTRATION_IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+/** A photo the person took: their shop, a business card, a flyer (ADR 0034 §1). */
+export const RegistrationImageSchema = Type.Object(
+  {
+    mediaType: Type.Union(REGISTRATION_IMAGE_MEDIA_TYPES.map((type) => Type.Literal(type))),
+    base64: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type RegistrationImage = Static<typeof RegistrationImageSchema>;
+
 /** Sources the registration agent reads; at least one must be present. Nothing is stored. */
 export const RegistrationRequestSchema = Type.Object(
   {
     pdfBase64: Type.Optional(Type.String({ minLength: 1 })),
     text: Type.Optional(Type.String({ minLength: 1 })),
     githubLogin: Type.Optional(Type.String({ pattern: "^[A-Za-z0-9-]{1,39}$" })),
+    images: Type.Optional(
+      Type.Array(RegistrationImageSchema, { minItems: 1, maxItems: MAX_REGISTRATION_IMAGES }),
+    ),
+    /** The web lookup result the person confirmed as their business (ADR 0034 §3). */
+    lookupSummary: Type.Optional(Type.String({ minLength: 1 })),
   },
   { additionalProperties: false },
 );

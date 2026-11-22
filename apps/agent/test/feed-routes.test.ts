@@ -8,6 +8,11 @@ import type {
   ExtractionSource,
   ProfileExtractorPort,
 } from "../src/feed/profile-extractor.ts";
+import {
+  MAX_IMAGE_BYTES,
+  MAX_TEXT_LENGTH,
+  REGISTRATION_MAX_BODY_BYTES,
+} from "../src/feed/registration-route.ts";
 import type { Route, RouteReply, RouteRequest } from "../src/http/route.ts";
 import type { UserIdentity } from "../src/mcp/mcp-port.ts";
 import {
@@ -84,6 +89,17 @@ const call = (routes: readonly Route[], options: CallOptions): Promise<RouteRepl
   find(routes, options.method, options.path).handle(request(options.overrides));
 
 const json = (value: unknown): string => JSON.stringify(value);
+
+const PNG_IMAGE = { mediaType: "image/png", base64: "iVBORw0KGgo=" } as const;
+const JPEG_IMAGE = { mediaType: "image/jpeg", base64: "/9j/4AAQ" } as const;
+const WEBP_IMAGE = { mediaType: "image/webp", base64: "UklGRg==" } as const;
+
+const BASE64_GROUP = "AAAA";
+const BASE64_TAIL_FOR_REMAINDER = ["", "AA==", "AAA="] as const;
+
+/** A correctly padded base64 string that decodes to exactly `bytes` bytes. */
+const base64OfDecodedSize = (bytes: number): string =>
+  BASE64_GROUP.repeat(Math.floor(bytes / 3)) + (BASE64_TAIL_FOR_REMAINDER[bytes % 3] ?? "");
 
 describe("POST /feed/profile", () => {
   const post = (routes: readonly Route[], rawBody: string) =>
@@ -397,5 +413,140 @@ describe("POST /feed/registration", () => {
 
     expect(reply).toEqual({ status: 502, body: { error: "upstream_unavailable" } });
     expect(sources).toEqual([]);
+  });
+
+  it("accepts a request whose only source is one image", async () => {
+    const { routes, sources } = setup();
+
+    const reply = await register(routes, { images: [PNG_IMAGE] });
+
+    expect(reply.status).toBe(200);
+    expect(sources).toHaveLength(1);
+  });
+
+  it("accepts a request whose only source is a lookup summary", async () => {
+    const { routes, sources } = setup();
+
+    const reply = await register(routes, { lookupSummary: "Corner grocery store" });
+
+    expect(reply.status).toBe(200);
+    expect(sources).toHaveLength(1);
+  });
+
+  it("passes the images to the extractor in the same order", async () => {
+    const { routes, sources } = setup();
+    const images = [PNG_IMAGE, JPEG_IMAGE, WEBP_IMAGE];
+
+    await register(routes, { images });
+
+    expect(sources[0]?.images).toEqual(images);
+  });
+
+  it("passes the lookup summary to the extractor unchanged", async () => {
+    const { routes, sources } = setup();
+    const lookupSummary = "  Almacén Don Pepe — groceries, Valparaíso.\nOpen 9-21.  ";
+
+    await register(routes, { lookupSummary, text: "I sell bread" });
+
+    expect(sources[0]?.lookupSummary).toBe(lookupSummary);
+    expect(sources[0]?.text).toBe("I sell bread");
+  });
+
+  it("does not pass images or a lookup summary when the request has none", async () => {
+    const { routes, sources } = setup();
+
+    await register(routes, { text: "I study cows" });
+
+    expect(sources[0]).not.toHaveProperty("images");
+    expect(sources[0]).not.toHaveProperty("lookupSummary");
+  });
+
+  it("accepts exactly the maximum number of images", async () => {
+    const { routes } = setup();
+
+    const reply = await register(routes, { images: [PNG_IMAGE, PNG_IMAGE, PNG_IMAGE, PNG_IMAGE] });
+
+    expect(reply.status).toBe(200);
+  });
+
+  it("accepts an image whose decoded size is exactly MAX_IMAGE_BYTES", async () => {
+    const { routes } = setup();
+    const image = { mediaType: "image/png", base64: base64OfDecodedSize(MAX_IMAGE_BYTES) };
+
+    const reply = await register(routes, { images: [image] });
+
+    expect(reply.status).toBe(200);
+  });
+
+  it("accepts a lookup summary of exactly MAX_TEXT_LENGTH chars", async () => {
+    const { routes } = setup();
+
+    const reply = await register(routes, { lookupSummary: "a".repeat(MAX_TEXT_LENGTH) });
+
+    expect(reply.status).toBe(200);
+  });
+
+  it.each([
+    ["more than 4 images", { images: Array.from({ length: 5 }, () => PNG_IMAGE) }],
+    ["an empty images array", { images: [] }],
+    ["an image of an unsupported type", { images: [{ mediaType: "image/gif", base64: "R0lG" }] }],
+    ["an image with empty base64", { images: [{ mediaType: "image/png", base64: "" }] }],
+    ["an image with unknown fields", { images: [{ ...PNG_IMAGE, name: "store.png" }] }],
+    [
+      "an image over MAX_IMAGE_BYTES",
+      { images: [{ mediaType: "image/png", base64: base64OfDecodedSize(MAX_IMAGE_BYTES + 1) }] },
+    ],
+    ["an empty lookup summary", { lookupSummary: "" }],
+    ["a lookup summary over MAX_TEXT_LENGTH", { lookupSummary: "a".repeat(MAX_TEXT_LENGTH + 1) }],
+  ])("replies 400 invalid_input for %s", async (_name, body) => {
+    const { routes, sources } = setup();
+
+    const reply = await register(routes, body);
+
+    expect(reply).toEqual({ status: 400, body: { error: "invalid_input" } });
+    expect(sources).toEqual([]);
+  });
+
+  it.each([
+    ["a length that is not a multiple of 4", "iVBORw0KGgo"],
+    ["characters outside the base64 alphabet", "@@@@!!!!"],
+    ["url-safe base64 characters", "ab-_"],
+    ["more than two padding characters", "A==="],
+    ["padding in the middle", "QQ==QUJD"],
+    ["whitespace inside", "iVBO Rw0K"],
+  ])("replies 400 invalid_input for an image with %s", async (_name, base64) => {
+    const { routes, sources } = setup();
+
+    const reply = await register(routes, { images: [{ mediaType: "image/png", base64 }] });
+
+    expect(reply).toEqual({ status: 400, body: { error: "invalid_input" } });
+    expect(sources).toEqual([]);
+  });
+
+  it("rejects the whole request when only one of several images is invalid", async () => {
+    const { routes, sources } = setup();
+    const images = [PNG_IMAGE, { mediaType: "image/png", base64: "not base64!" }];
+
+    const reply = await register(routes, { images });
+
+    expect(reply).toEqual({ status: 400, body: { error: "invalid_input" } });
+    expect(sources).toEqual([]);
+  });
+
+  it("declares the registration body limit on the route", () => {
+    const { routes } = setup();
+
+    const route = find(routes, "POST", "/feed/registration");
+
+    expect(REGISTRATION_MAX_BODY_BYTES).toEqual(expect.any(Number));
+    expect(route.maxBodyBytes).toBe(REGISTRATION_MAX_BODY_BYTES);
+  });
+
+  it("sets the registration body limit to 30 MB", () => {
+    expect(REGISTRATION_MAX_BODY_BYTES).toBe(30 * 1024 * 1024);
+  });
+
+  it("sets the per-image limit to 5 MB of decoded bytes", () => {
+    expect(MAX_IMAGE_BYTES).toBe(5 * 1024 * 1024);
   });
 });

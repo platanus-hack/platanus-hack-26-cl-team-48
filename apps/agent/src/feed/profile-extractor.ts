@@ -1,3 +1,4 @@
+import type { RegistrationImage } from "@nodomics/profile";
 import type { Result } from "@nodomics/protocol";
 
 /** What the registration agent reads. Nothing here is ever stored or logged. */
@@ -5,6 +6,8 @@ export type ExtractionSource = {
   readonly pdfBase64?: string;
   readonly text?: string;
   readonly githubSummary?: string;
+  readonly images?: readonly RegistrationImage[];
+  readonly lookupSummary?: string;
 };
 
 export type ExtractError = {

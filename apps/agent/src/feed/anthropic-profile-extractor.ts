@@ -10,23 +10,23 @@ const DEFAULT_INSTRUCTION = "Propose the profile card.";
 
 const SYSTEM_PROMPT = `You build a profile card for Nodomics, a place where people who work with data meet people who can help them.
 
-Read the sources (a CV, pasted text, a GitHub summary) and propose one card:
+Many people have no CV. They may run a small business, like a corner shop, and send what they have at hand: a photo of their shop, a photo of a business card or flyer, a few spoken or written words, or a web summary of their business they confirmed. From a photo, read only what it shows: the kind of business, what it sells, the names and links printed on a card.
+
+Read the sources (a CV, pasted text, a GitHub summary, photos, a confirmed business summary) and propose one card:
 - about: who the person is, a few sentences.
-- technical: how they work with code. "uses" means they use tools without writing code, "builds" means they build with low-code or occasional scripts, "codes" means they program regularly.
+- technical: how they work with code. "uses" means they use tools without writing code, "builds" means they build with low-code or occasional scripts, "codes" means they program regularly. Choose "uses" when the sources show no sign of building or programming.
 - domains: the fields they know, each with a depth: curious, practitioner or expert.
 - offers: concrete things they can help others with.
 - seeks: concrete things they need help with. Offers and seeks are different axes: offers is what they give, seeks is what they look for. Leave seeks empty when the sources do not say.
 - links: only the linkedin, github and website URLs that appear in the sources.
 
-Write the card in the language of the CV (or of the main source when there is no CV).
+Write the card in the language of the CV (or of the main source when there is no CV), in plain everyday words: the person may not be technical.
 Never invent facts: if the sources do not support a field, leave it out or empty.`;
 
 /** TypeBox keeps symbol keys in its schemas; a JSON round trip leaves plain JSON for the API. */
 const CARD_JSON_SCHEMA = JSON.parse(JSON.stringify(ProfileCardSchema)) as { type: "object" };
 
-type ContentBlock =
-  | { type: "text"; text: string }
-  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
+type ContentBlock = Anthropic.ContentBlockParam;
 
 export function createAnthropicProfileExtractor(
   client: Pick<Anthropic, "messages">,
@@ -63,13 +63,20 @@ function contentOf(source: ExtractionSource): ContentBlock[] {
         },
       ]
     : [];
-  return [...pdf, { type: "text", text: instructionOf(source) }];
+  const images: ContentBlock[] = (source.images ?? []).map(({ mediaType, base64 }) => ({
+    type: "image",
+    source: { type: "base64", media_type: mediaType, data: base64 },
+  }));
+  return [...pdf, ...images, { type: "text", text: instructionOf(source) }];
 }
 
 function instructionOf(source: ExtractionSource): string {
   const sections = [
     source.text === undefined ? undefined : `Pasted text:\n${source.text}`,
     source.githubSummary === undefined ? undefined : `GitHub summary:\n${source.githubSummary}`,
+    source.lookupSummary === undefined
+      ? undefined
+      : `Business summary the person confirmed:\n${source.lookupSummary}`,
   ].filter((section) => section !== undefined);
   return sections.length === 0 ? DEFAULT_INSTRUCTION : sections.join("\n\n");
 }

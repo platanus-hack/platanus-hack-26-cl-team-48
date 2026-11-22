@@ -1,4 +1,9 @@
-import { FEED_PATHS, parseProfileCard, RegistrationRequestSchema } from "@nodomics/profile";
+import {
+  FEED_PATHS,
+  parseProfileCard,
+  RegistrationRequestSchema,
+  type RegistrationRequest,
+} from "@nodomics/profile";
 import { parse } from "@nodomics/protocol";
 import type { Route, RouteReply, RouteRequest } from "../http/route.ts";
 import type { GithubSummaryPort } from "./github-summary.ts";
@@ -12,6 +17,9 @@ export type RegistrationRouteDeps = {
 
 export const MAX_TEXT_LENGTH = 20000;
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Keeps a whole request under the 32 MB the Claude API accepts. */
+export const REGISTRATION_MAX_BODY_BYTES = 30 * 1024 * 1024;
 // A flat pattern: a grouped one overflows the regex stack on multi-megabyte payloads.
 const BASE64_SHAPE_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 const BASE64_QUARTET = 4;
@@ -27,11 +35,12 @@ export function createRegistrationRoute(deps: RegistrationRouteDeps): Route {
   return {
     method: "POST",
     path: FEED_PATHS.registration,
+    maxBodyBytes: REGISTRATION_MAX_BODY_BYTES,
     handle: (request) => handleRegistration(deps, request),
   };
 }
 
-type Input = { readonly pdfBase64?: string; readonly text?: string; readonly githubLogin?: string };
+type Input = RegistrationRequest;
 
 function decodedBytes(base64: string): number {
   const padding = base64.endsWith(PADDING_CHAR.repeat(2))
@@ -45,14 +54,22 @@ function decodedBytes(base64: string): number {
 const isStrictBase64 = (value: string): boolean =>
   value.length % BASE64_QUARTET === 0 && BASE64_SHAPE_PATTERN.test(value);
 
-const isValidPdf = (base64: string): boolean =>
-  isStrictBase64(base64) && decodedBytes(base64) > 0 && decodedBytes(base64) <= MAX_PDF_BYTES;
+const isValidFile = (base64: string, maxBytes: number): boolean =>
+  isStrictBase64(base64) && decodedBytes(base64) > 0 && decodedBytes(base64) <= maxBytes;
+
+const isShortText = (value: string | undefined): boolean =>
+  value === undefined || value.length <= MAX_TEXT_LENGTH;
+
+const hasAnySource = ({ pdfBase64, text, githubLogin, images, lookupSummary }: Input): boolean =>
+  [pdfBase64, text, githubLogin, images, lookupSummary].some((source) => source !== undefined);
 
 function isWithinLimits(input: Input): boolean {
-  const { pdfBase64, text, githubLogin } = input;
-  if (pdfBase64 === undefined && text === undefined && githubLogin === undefined) return false;
-  if (text !== undefined && text.length > MAX_TEXT_LENGTH) return false;
-  return pdfBase64 === undefined || isValidPdf(pdfBase64);
+  if (!hasAnySource(input) || !isShortText(input.text) || !isShortText(input.lookupSummary))
+    return false;
+  const isPdfValid = input.pdfBase64 === undefined || isValidFile(input.pdfBase64, MAX_PDF_BYTES);
+  return (
+    isPdfValid && (input.images ?? []).every(({ base64 }) => isValidFile(base64, MAX_IMAGE_BYTES))
+  );
 }
 
 async function handleRegistration(
@@ -81,6 +98,8 @@ async function readSources(github: GithubSummaryPort, input: Input): Promise<Sou
   const base: ExtractionSource = {
     ...(input.pdfBase64 === undefined ? {} : { pdfBase64: input.pdfBase64 }),
     ...(input.text === undefined ? {} : { text: input.text }),
+    ...(input.images === undefined ? {} : { images: input.images }),
+    ...(input.lookupSummary === undefined ? {} : { lookupSummary: input.lookupSummary }),
   };
   if (input.githubLogin === undefined) return { ok: true, value: base };
   const summary = await github.summarize(input.githubLogin);
