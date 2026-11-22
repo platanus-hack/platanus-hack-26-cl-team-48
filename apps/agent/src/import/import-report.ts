@@ -27,6 +27,7 @@ export const VerificationCaseSchema = Type.Object({
   name: Type.String(),
   input: Type.Array(RowSchema),
   expected: Type.Array(RowSchema),
+  observed: Type.Optional(Type.Array(RowSchema)),
   expectedBy: Type.Union([
     Type.Object({ command: Type.String(), path: Type.String() }),
     Type.Object({ kind: Type.Literal("user") }),
