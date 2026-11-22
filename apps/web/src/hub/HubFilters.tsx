@@ -2,7 +2,7 @@ import { useId } from "react";
 import { MESSAGES } from "../messages.ts";
 import { ALL_KINDS, type KindFilter } from "./hub-filters.ts";
 
-const KIND_OPTIONS = ([ALL_KINDS, "flow", "node"] as const).map((value) => ({
+const KIND_OPTIONS = ([ALL_KINDS, "app", "flow", "node"] as const).map((value) => ({
   value,
   label: MESSAGES.hub.kinds[value],
 }));

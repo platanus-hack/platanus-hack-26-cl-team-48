@@ -69,7 +69,11 @@ function PublicationView({ detail, ...actions }: { readonly detail: PublicationD
               <VersionActions detail={detail} version={version.value} {...actions} />
             )}
             <p className="web-hub-muted">
-              {detail.kind === "node" ? MESSAGES.hub.nodeHint : MESSAGES.hub.flowHint}
+              {detail.kind === "node"
+                ? MESSAGES.hub.nodeHint
+                : detail.kind === "app"
+                  ? MESSAGES.hub.appHint
+                  : MESSAGES.hub.flowHint}
             </p>
           </section>
           <PublicationFacts detail={detail} selected={selected} />
@@ -171,7 +175,7 @@ function VersionActions({
         />
       ) : (
         <Button
-          variant={kind === "flow" ? "primary" : "secondary"}
+          variant={kind === "node" ? "secondary" : "primary"}
           icon="copy"
           onClick={() => {
             account.request("copy");

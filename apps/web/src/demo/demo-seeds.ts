@@ -10,6 +10,9 @@ import {
   type NodeManifest,
 } from "@nodomics/protocol";
 import type { Hub, HubProfile, PublicationDraft } from "@nodomics/hub";
+import { AREA_APP_SPECS, AREA_MODULE_SPECS } from "./demo-pipeline-specs-areas.ts";
+import { COMMUNITY_APP_SPECS } from "./demo-pipeline-specs-community.ts";
+import { enrichDraft, type PipelineSpec } from "./demo-pipelines.ts";
 import { SNAPSHOT_FORMAT, type Snapshot, type SnapshotState } from "@nodomics/hub";
 
 /* ----------------------------------------------------------------------------------
@@ -978,7 +981,7 @@ export const DRAFT_AGRO_APP: PublicationDraft = {
   kind: "flow",
   title: "Cadena de Frío y Cosecha de Berries (Maule 🇨🇱 vs Michoacán 🇲🇽)",
   description:
-    "Monitoreo continuo de temperatura, humedad y punto de rocío en cámaras frigoríficas y transporte refrigerado de arándanos y frambuesas entre el Valle del Maule y Michoacán. Detecta quiebres térmicos y heladas tardías.",
+    "Para exportadores y packings de berries que necesitan saber, a tiempo, cuándo una cámara o un camión refrigerado se sale de rango. Toma la telemetría de temperatura y humedad, limpia las lecturas caídas, calcula el punto de rocío y marca quiebres térmicos y riesgo de helada; termina en un gráfico que compara Maule con Michoacán. Úsala como base cambiando la fuente de sensores y los umbrales de tu fruta.",
   tags: ["agronomia", "berries", "cadena-de-frio", "iot", "maule", "michoacan"],
   version: "1.0.0",
   flow: flowGraph(
@@ -1065,7 +1068,7 @@ export const DRAFT_AGRO_NODE: PublicationDraft = {
   kind: "node",
   title: "Filtro de Sensores Resiliente",
   description:
-    "Filtro tolerante a fallas para telemetría de frío. Permite ignorar nulos, imputar con cero o interpolar en series continuas (ej. [18.2, 22.1, null, 25.0]) sin quebrar el pipeline.",
+    "Para cualquier flujo que lea sensores con huecos. Recibe una serie con lecturas nulas y la entrega limpia, con la estrategia que elijas: ignorar los nulos, rellenarlos con cero o interpolar entre los vecinos (por ejemplo, [18.2, 22.1, null, 25.0]). Ponlo justo después de la fuente para que un sensor caído no rompa el resto del flujo.",
   tags: ["agronomia", "iot", "calidad-de-datos", "sensores", "resiliencia"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1082,7 +1085,7 @@ export const DRAFT_AGRO_MODULE: PublicationDraft = {
   kind: "node",
   title: "Alerta de Heladas Tardías y Punto de Rocío",
   description:
-    "Módulo compuesto para estaciones meteorológicas agrícolas. Calcula la temperatura de punto de rocío y emite semáforo de riesgo de helada por radiación y helada negra en huertos.",
+    "Para agricultores con estación meteorológica que quieren adelantarse a una helada. A partir de temperatura y humedad relativa calcula el punto de rocío y entrega un semáforo de riesgo que distingue helada blanca (por radiación) de helada negra. Ajusta los umbrales del semáforo a tu cultivo y a tu zona.",
   tags: ["agronomia", "clima", "heladas", "punto-de-rocio", "modulo"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1238,7 +1241,7 @@ export const DRAFT_HEALTH_APP: PublicationDraft = {
   kind: "flow",
   title: "Scribe Clínico & Traspaso de Guardia SOAP",
   description:
-    "Estructura notas de entrega de turno médico y enfermería bajo formato SOAP (Subjetivo, Objetivo, Análisis, Plan), calcula scores de deterioro fisiológico NEWS2 y valida dosis pediátricas por Mosteller.",
+    "Para equipos de urgencia y enfermería que entregan turno con poco tiempo. Ordena la nota de traspaso en formato SOAP (Subjetivo, Objetivo, Análisis, Plan), calcula el puntaje NEWS2 con los signos vitales y revisa dosis pediátricas por superficie corporal; termina en una vista que prioriza a los pacientes que más se deterioran. Es un apoyo a la entrega de turno: no reemplaza el criterio clínico.",
   tags: ["salud", "soap", "urgencias", "clinical-notes", "traspaso-de-guardia"],
   version: "1.0.0",
   flow: flowGraph(
@@ -1372,7 +1375,7 @@ export const DRAFT_HEALTH_MODULE: PublicationDraft = {
   kind: "node",
   title: "Triage NEWS2 / Deterioro Fisiológico",
   description:
-    "Módulo compuesto que implementa el score NEWS2 evaluando signos vitales para alertar oportunamente sobre sepsis y paro cardiorrespiratorio inminente.",
+    "Para servicios de urgencia y hospitalización que quieren detectar antes el deterioro de un paciente. Recibe frecuencia respiratoria, saturación, presión, pulso, conciencia y temperatura, y entrega el puntaje NEWS2 con su nivel de alerta. Sirve como señal temprana: la decisión clínica sigue siendo del equipo.",
   tags: ["salud", "urgencias", "news2", "triage", "fisiologia"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1389,7 +1392,7 @@ export const DRAFT_HEALTH_NODE: PublicationDraft = {
   kind: "node",
   title: "Dosis Pediátrica por Superficie Corporal (Mosteller)",
   description:
-    "Cálculo exacto de superficie corporal (BSA en m²) según fórmula de Mosteller, garantizando seguridad en quimioterapia y antibióticos infantiles.",
+    "Para farmacia clínica y pediatría. Recibe peso y talla, calcula la superficie corporal (m²) con la fórmula de Mosteller y la usa para escalar una dosis indicada por m². Úsalo como verificación de cálculo; la dosis final siempre la valida un profesional.",
   tags: ["salud", "pediatria", "farmacologia", "mosteller", "dosificacion"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1503,7 +1506,7 @@ export const DRAFT_EDU_APP: PublicationDraft = {
   kind: "flow",
   title: "Laboratorio Escolar de Consumo Eléctrico",
   description:
-    "Secuencia pedagógica de ciencia de datos escolar. Analiza medidores inteligentes de colegios, detecta consumos vampiro nocturnos con MAD y agrupa por bloques lectivos.",
+    "Para profesores de ciencias que quieren enseñar análisis de datos con datos reales de su colegio. Toma las lecturas del medidor eléctrico, las agrupa por bloque de clases y recreos, detecta consumos fuera de lo normal (como equipos encendidos de noche) con el método MAD y termina en un gráfico pensado para la sala. Cambia la fuente por el medidor de tu establecimiento.",
   tags: ["educacion", "stem", "energia", "colegios", "ciencia-de-datos"],
   version: "1.0.0",
   flow: flowGraph(
@@ -1610,7 +1613,7 @@ export const DRAFT_EDU_MODULE: PublicationDraft = {
   kind: "node",
   title: "Agrupador Temporal por Bloques Académicos (45 min vs 60 min)",
   description:
-    "Discretiza series de tiempo en jornadas escolares oficiales para identificar consumos y patrones según actividades curriculares y recreos.",
+    "Para analizar cualquier serie de tiempo escolar. Recibe registros con fecha y hora y los asigna al bloque de la jornada que corresponde (de 45 o 60 minutos, recreos incluidos), para comparar consumo o actividad por bloque. Ajusta el horario a la jornada de tu colegio.",
   tags: ["educacion", "horarios", "bloques-academicos", "analitica-escolar"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1627,7 +1630,7 @@ export const DRAFT_EDU_NODE: PublicationDraft = {
   kind: "node",
   title: "Detector de Outliers MAD para Alumnos",
   description:
-    "Algoritmo transparente y robusto de detección de anomalías con Median Absolute Deviation, pensado para proyectos escolares STEM.",
+    "Para proyectos escolares de STEM que necesitan encontrar valores raros sin estadística avanzada. Recibe una columna numérica y marca los datos que se alejan de la mediana según la desviación absoluta mediana (MAD), un método robusto y fácil de explicar en clases. Puedes ajustar la sensibilidad con un solo parámetro.",
   tags: ["educacion", "estadistica", "mad", "outliers", "didactico"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1758,7 +1761,7 @@ export const DRAFT_PYMES_APP: PublicationDraft = {
   kind: "flow",
   title: "Radar de Demanda y Compras Agrupadas para Almacenes",
   description:
-    "Inteligencia colectiva para almacenes de barrio y minimarkets: proyecta demanda de abarrotes de alta rotación, calcula puntos de reorden y consolida compras a escala directa con distribuidoras.",
+    "Para almacenes de barrio y minimarkets que quieren comprar en conjunto y conseguir mejor precio. Junta los pedidos de varios almacenes, revisa el margen real de cada producto sin IVA, calcula cuándo reponer y entrega un resumen consolidado para negociar con la distribuidora. Úsala como base cambiando la lista de almacenes y productos.",
   tags: ["pymes", "almacenes", "compras-colectivas", "inventario", "abastecimiento"],
   version: "1.0.0",
   flow: flowGraph(
@@ -1897,7 +1900,7 @@ export const DRAFT_PYMES_MODULE: PublicationDraft = {
   kind: "node",
   title: "Punto de Reorden con Stock de Seguridad",
   description:
-    "Cálculo estandarizado de Reorder Point (ROP) con variabilidad de plazos de entrega y factor de seguridad para minoristas.",
+    "Para minoristas que se quedan sin stock o compran de más. Recibe la venta diaria, su variación y el plazo de entrega del proveedor, y entrega el punto de reorden con su stock de seguridad. Ajusta el nivel de servicio según cuánto te cuesta quedarte sin un producto.",
   tags: ["pymes", "logistica", "inventario", "stock-seguridad", "reorden"],
   version: "0.1.0",
   flow: flowGraph(
@@ -1914,7 +1917,7 @@ export const DRAFT_PYMES_NODE: PublicationDraft = {
   kind: "node",
   title: "Validador de Margen Neto con IVA Descontado",
   description:
-    "Módulo SQL que limpia el IVA de los precios de venta a público y calcula el margen de contribución real por SKU.",
+    "Para negocios que fijan precios con IVA incluido y no saben cuánto ganan realmente. Recibe el precio de venta y el costo de cada producto, descuenta el IVA y entrega el margen de contribución real por producto. Cambia la tasa si tu país usa otra.",
   tags: ["pymes", "precios", "iva", "margen", "contabilidad"],
   version: "0.1.0",
   flow: flowGraph(
@@ -2016,7 +2019,7 @@ export const DRAFT_PUBLIC_APP: PublicationDraft = {
   kind: "flow",
   title: "Observatorio Comunal de Calidad del Aire (SINCA Chile / Censo H3)",
   description:
-    "Datos abiertos oficiales del Ministerio del Medio Ambiente (SINCA): agrega concentraciones horarias de MP2.5/MP10 en hexágonos Uber H3 y cruza con población vulnerable del Censo.",
+    "Para municipios y equipos de salud pública que quieren saber dónde el aire hace más daño. Toma los datos abiertos de calidad del aire del SINCA (MP2,5 y MP10 por hora), los agrega en hexágonos H3, los cruza con la población vulnerable del Censo y termina en un mapa de riesgo por barrio. Cambia la comuna o la fuente de datos para usarla en otra ciudad.",
   tags: ["datos-publicos", "sinca", "medio-ambiente", "h3", "chile", "salud-publica"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2145,7 +2148,7 @@ export const DRAFT_PUBLIC_MODULE: PublicationDraft = {
   kind: "node",
   title: "Indexador Hexagonal Uber H3",
   description:
-    "Módulo de indexación geoespacial para transformar puntos en hexágonos Uber H3 a resoluciones 7, 8 o 9 sin cargar geometrías vectoriales pesadas.",
+    "Para cualquier flujo con coordenadas. Recibe puntos con latitud y longitud y les asigna su hexágono H3 en resolución 7, 8 u 9, para agregar y comparar zonas sin cargar mapas pesados. Elige la resolución según el tamaño de barrio que te interesa.",
   tags: ["datos-publicos", "geoespacial", "h3", "uber-h3", "gis"],
   version: "0.1.0",
   flow: flowGraph(
@@ -2162,7 +2165,7 @@ export const DRAFT_PUBLIC_NODE: PublicationDraft = {
   kind: "node",
   title: "Índice de Calor Urbano Normalizado",
   description:
-    "Cálculo satelital del índice de isla de calor urbana (UHI) para identificar inequidad ambiental en barrios con poco arbolado urbano.",
+    "Para equipos de urbanismo y medio ambiente. Recibe temperatura de superficie por zona y calcula un índice de isla de calor normalizado, para ver qué barrios se calientan más que el resto de la ciudad y dónde falta arbolado.",
   tags: ["datos-publicos", "clima-urbano", "uhi", "isla-de-calor", "gis"],
   version: "0.1.0",
   flow: flowGraph(
@@ -2292,7 +2295,7 @@ export const DRAFT_FINANCE_APP: PublicationDraft = {
   kind: "flow",
   title: "Centinela de Flujo de Caja y Cobranza Preventiva",
   description:
-    "Supervisa cuentas por cobrar de facturación electrónica DTE, calcula intereses penales moratorios legales (Ley 18.010 y Pago a 30 Días) y proyecta liquidez a 90 días.",
+    "Para pymes que facturan electrónicamente y sufren por pagos atrasados. Toma las facturas emitidas, clasifica a los clientes según cómo pagan, calcula el interés por mora según la Ley 18.010 y la ley de Pago a 30 Días, y proyecta la caja de los próximos 90 días. Cambia la fuente por la exportación de facturas de tu empresa.",
   tags: ["finanzas", "flujo-de-caja", "cobranza", "facturacion", "scoring-b2b"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2431,7 +2434,7 @@ export const DRAFT_FINANCE_MODULE: PublicationDraft = {
   kind: "node",
   title: "Scoring de Cumplimiento de Clientes",
   description:
-    "Clasificación cuantitativa del comportamiento de pago B2B por DSO y días de mora acumulados.",
+    "Para empresas que venden con crédito a otras empresas. Recibe el historial de pagos y entrega un puntaje por cliente según días promedio de cobro (DSO) y días de mora acumulados, para decidir a quién seguir dando crédito.",
   tags: ["finanzas", "credito", "scoring", "riesgo", "clientes"],
   version: "0.1.0",
   flow: flowGraph(
@@ -2448,7 +2451,7 @@ export const DRAFT_FINANCE_NODE: PublicationDraft = {
   kind: "node",
   title: "Calculador de Interés Penal Diario Legal",
   description:
-    "Fórmula automatizada para aplicar el interés corriente legal de la Ley 18.010 sobre deudas mercantiles vencidas.",
+    "Para administración y cobranza en Chile. Recibe el monto, la fecha de vencimiento y la fecha de pago, y calcula el interés por mora con la tasa de interés corriente de la Ley 18.010. Actualiza la tasa cada mes con la que publica la CMF.",
   tags: ["finanzas", "legal", "interes-moratorio", "ley-18010", "chile"],
   version: "0.1.0",
   flow: flowGraph(
@@ -2470,7 +2473,7 @@ export const SOLAR_APP_DRAFT: PublicationDraft = {
   kind: "flow",
   title: "Predictor de Generación Fotovoltaica y Degradación de Paneles",
   description:
-    "Modela la generación diaria esperada en plantas solares fotovoltaicas del Desierto de Atacama considerando irradiancia en plano inclinado (GTI) y pérdidas por suciedad/soiling.",
+    "Para operadores y desarrolladores de plantas fotovoltaicas. Toma la radiación medida por el piranómetro, calcula la irradiancia sobre el plano inclinado de los paneles (GTI), descuenta las pérdidas por suciedad y termina en un gráfico de generación diaria esperada en MWh. Ajusta la inclinación y la tasa de suciedad a tu planta.",
   tags: ["energia", "solar", "fotovoltaica", "atacama", "irradiancia"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2511,7 +2514,7 @@ export const CIVIL_APP_DRAFT: PublicationDraft = {
   kind: "flow",
   title: "Espectro de Diseño Sísmico NCh433 & Verificación de Deriva",
   description:
-    "Generación automática del espectro elástico de aceleraciones y cálculo del esfuerzo de corte basal mínimo según la norma chilena sismorresistente NCh433 Of.96 Mod 2009.",
+    "Para ingenieros estructurales en Chile. A partir de la zona sísmica, el tipo de suelo y la categoría del edificio, genera el espectro elástico de diseño y calcula el corte basal mínimo según la NCh433 Of.96 Mod. 2009, y lo muestra en un gráfico. Es una ayuda de cálculo: la memoria estructural la firma el profesional responsable.",
   tags: ["ingenieria-civil", "sismica", "nch433", "estructuras", "chile"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2552,7 +2555,7 @@ export const DON_PEPE_APP_DRAFT: PublicationDraft = {
   kind: "flow",
   title: "Cuadre de Caja Diario y Punto de Equilibrio de Abarrotes",
   description:
-    "Herramienta sencilla diseñada para comerciantes de barrio: compara ventas en efectivo, tarjetas Transbank y fiados, determinando las ventas mínimas para cubrir costos fijos de arriendo y luz.",
+    "Para el almacén de barrio que cierra la caja a mano. Junta las ventas del día en efectivo, tarjeta y fiado, y calcula cuánto hay que vender para cubrir arriendo, luz y demás costos fijos. Cambia los costos fijos por los de tu local.",
   tags: ["abarrotes", "caja-diaria", "punto-equilibrio", "almacen"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2583,7 +2586,7 @@ export const DENTAL_APP_DRAFT: PublicationDraft = {
   kind: "flow",
   title: "Control de Insumos Clínicos y Trazabilidad de Esterilización",
   description:
-    "Gestión integral para clínicas odontológicas: control de stock de resinas, anestubos y arcos de ortodoncia, con registro de lotes de esterilización por autoclave.",
+    "Para clínicas dentales que quieren dejar de perder insumos vencidos. Lleva el stock de resinas, anestubos y arcos de ortodoncia, filtra los que vencen pronto y registra los lotes que pasaron por el autoclave. Cambia la lista de insumos por la de tu clínica.",
   tags: ["odontologia", "insumos-dentales", "esterilizacion", "clinica"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2614,7 +2617,7 @@ export const GANADO_APP_DRAFT: PublicationDraft = {
   kind: "flow",
   title: "Monitoreo de Rebaño Lechero y Curvas de Lactancia",
   description:
-    "Seguimiento de producción lechera diaria por vaca en praderas del sur de Chile: proyecta curvas de lactancia Wood y detecta caídas bruscas asociadas a mastitis subclínica.",
+    "Para lecherías del sur de Chile. Toma el control lechero diario por vaca, proyecta su curva de lactancia (modelo de Wood) y avisa cuando la producción cae de golpe, una señal temprana de mastitis subclínica. Ajusta el umbral de caída a tu rebaño.",
   tags: ["veterinaria", "ganaderia", "leche", "bovinos", "los-lagos"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2645,7 +2648,7 @@ export const FERRETERIA_APP_DRAFT: PublicationDraft = {
   kind: "flow",
   title: "Matriz ABC y Reposición de Inventario Ferretero",
   description:
-    "Segmentación ABC de más de 8.000 artículos ferreteros (fijaciones, tuberías, herramientas) por volumen monetario y rotación, automatizando pedidos de reposición quincenal.",
+    "Para ferreterías con miles de productos. Clasifica cada artículo en A, B o C según cuánto dinero mueve y cuánto rota, filtra los clase A y prepara la reposición quincenal. Cambia la frecuencia de reposición según tus proveedores.",
   tags: ["ferreteria", "inventario-abc", "materiales", "sku"],
   version: "1.0.0",
   flow: flowGraph(
@@ -2687,7 +2690,7 @@ export const DRAFT_HILO_CRONICOS: PublicationDraft = {
   kind: "flow",
   title: "Controles crónicos atrasados",
   description:
-    "Identifica pacientes diabéticos e hipertensos que llevan más de 6 meses sin control, cruzando retiro de fármacos en farmacia con la agenda médica del CESFAM Padre Las Casas.",
+    "Para equipos de CESFAM que quieren recuperar a pacientes crónicos que dejaron de venir. Cruza los retiros de medicamentos en farmacia con la agenda médica, encuentra a los pacientes con diabetes o hipertensión que llevan más de 6 meses sin control y entrega la lista para contactarlos. Se probó en el CESFAM Padre Las Casas con 214 fichas.",
   tags: ["salud", "cesfam", "cronicos", "se-trenza", "probada-con-214-fichas"],
   version: "1.2.0",
   flow: flowGraph(
@@ -2735,7 +2738,7 @@ export const DRAFT_HILO_CENSO: PublicationDraft = {
   kind: "flow",
   title: "Limpieza del censo comunal",
   description:
-    "Normaliza direcciones irregulares y tomas de terreno en grillas censales de Coquimbo. Fue adaptada por otros municipios; al fallar con direcciones rurales, un geógrafo la empalmó y ahora corre validada.",
+    "Para municipios que trabajan con direcciones desordenadas. Normaliza direcciones irregulares, incluidas tomas de terreno y sectores rurales, y las ubica en la grilla censal. Nació en Coquimbo; cuando otros municipios la usaron y falló con direcciones rurales, un geógrafo de la comunidad la reparó y hoy corre validada.",
   tags: ["datos-publicos", "censo", "coquimbo", "se-empalma", "reparada-y-probada-de-nuevo"],
   version: "2.0.1",
   flow: flowGraph(
@@ -2776,7 +2779,7 @@ export const DRAFT_HILO_ASISTENCIA: PublicationDraft = {
   kind: "flow",
   title: "Asistencia escolar por curso",
   description:
-    "Alerta ausentismo crónico temprano correlacionando clima lluvioso y aislamiento geográfico en Ancud para activar apoyo psicosocial en 6 colegios de Chiloé.",
+    "Para colegios que quieren detectar el ausentismo crónico antes de que sea deserción. Toma el libro de asistencia, cruza las ausencias con días de lluvia y el aislamiento de cada estudiante, y avisa qué cursos y alumnos necesitan apoyo psicosocial. Se probó en 6 colegios de Ancud, en Chiloé.",
   tags: ["educacion", "asistencia", "chiloe", "se-trenza", "probada-en-6-colegios"],
   version: "1.3.0",
   flow: flowGraph(
@@ -2817,7 +2820,7 @@ export const DRAFT_HILO_CHURN: PublicationDraft = {
   kind: "flow",
   title: "Churn mensual de suscriptores",
   description:
-    "Modela bajas de clientes recurrentes en Valparaíso. Una adaptación para clientes corporativos chocó con la regla de clientes personas naturales; el agente propuso un desempate que espera validación humana.",
+    "Para negocios con suscripciones que quieren entender por qué se van sus clientes. Toma las suscripciones activas, filtra las bajas del mes y las muestra por cohorte. Nació en Valparaíso para clientes personas; una adaptación para empresas chocó con esa regla y el agente propuso una solución que todavía espera revisión humana.",
   tags: ["ventas", "churn", "saas", "se-enreda", "propuesta-agente-sin-revisar"],
   version: "1.1.0-conflict",
   flow: flowGraph(
@@ -2858,7 +2861,7 @@ export const DRAFT_HILO_BODEGA: PublicationDraft = {
   kind: "flow",
   title: "Quiebres de stock en bodega",
   description:
-    "Diseñada para rotación de abarrotes secos en Osorno. Al probarse en una bodega frigorífica de lácteos, la fórmula de reposición falló por no considerar la caducidad corta. Espera un empalme de la comunidad.",
+    "Para bodegas que quieren enterarse de los quiebres de stock antes que el cliente. Revisa el inventario, detecta los productos por debajo del mínimo y avisa a compras. Se diseñó para abarrotes secos en Osorno; al probarla en una bodega de lácteos falló, porque no considera vencimientos cortos. Espera que alguien de la comunidad la adapte.",
   tags: ["ventas", "bodega", "mermas", "se-triza", "fallo-datos-otra-bodega"],
   version: "1.0.1-broken",
   flow: flowGraph(
@@ -2931,7 +2934,7 @@ export const DRAFT_HILO_QPCR: PublicationDraft = {
   kind: "node",
   title: "Normalización de qPCR",
   description:
-    "Nodo atómico que normaliza ciclos umbral (Cq) contra genes de referencia (GAPDH/Actina) en la Universidad de Concepción. Un bloque puro esperando su primer cruce o trenzado.",
+    "Para laboratorios de biología molecular. Recibe los ciclos umbral (Cq) de una placa de qPCR y los normaliza contra genes de referencia como GAPDH o actina, para comparar expresión entre muestras. Viene de la Universidad de Concepción y todavía no se ha probado fuera de ese laboratorio: es una buena primera pieza para adaptar.",
   tags: [
     "laboratorio",
     "qpcr",
@@ -3168,7 +3171,7 @@ export const DRAFT_GLOBAL_HEATMAP: PublicationDraft = {
   kind: "flow",
   title: "Mitigación de Islas de Calor y Corredores Verdes Urbanos",
   description:
-    "Plantilla global de justicia climática urbana: cruza imágenes satelitales abiertas (Landsat/Sentinel) en grilla hexagonal con densidad de adultos mayores para trazar la reforestación de mayor impacto térmico (Sevilla, Phoenix, Monterrey, Santiago).",
+    "Para ciudades que quieren plantar árboles donde más se necesitan. Cruza imágenes satelitales abiertas (Landsat o Sentinel) en una grilla hexagonal con la densidad de adultos mayores, y prioriza las calles donde reforestar baja más la temperatura para las personas más expuestas. Pensada para adaptarse a Sevilla, Phoenix, Monterrey o Santiago.",
   tags: ["global", "clima", "ciudades", "arboles", "islas-de-calor", "urbanismo"],
   version: "0.1.0",
   flow: flowGraph(
@@ -3201,7 +3204,7 @@ export const DRAFT_GLOBAL_DRILLING: PublicationDraft = {
   kind: "flow",
   title: "Optimización de Sondajes y Valor de la Información",
   description:
-    "Modelo universal de decisión bayesiana: estima el volumen de recursos en 3D (minerales o agua) y computa el costo exacto de la incertidumbre para decidir la coordenada del próximo pozo con menor riesgo financiero (Nevada, Zacatecas, Mendoza, Antofagasta).",
+    "Para equipos de exploración minera o hídrica que deben decidir dónde perforar el próximo pozo. Estima el recurso en 3D a partir de los sondajes existentes, calcula cuánto cuesta la incertidumbre que queda y sugiere la ubicación que más la reduce por cada peso invertido. Pensada para adaptarse a Nevada, Zacatecas, Mendoza o Antofagasta.",
   tags: ["global", "geologia", "mineria", "agua", "sondajes", "bayesian"],
   version: "0.1.0",
   flow: flowGraph(
@@ -3240,7 +3243,7 @@ export const DRAFT_GLOBAL_BIOMECHANICS: PublicationDraft = {
   kind: "flow",
   title: "Análisis Biomecánico y Cinemática Deportiva por Video",
   description:
-    "Visión computacional anclada a la física: detecta y proyecta trayectorias de atletas sobre planos métricos oficiales (pistas de 400m, velódromos o piscinas) para calcular metros de más en curvas y generar relatos sin alucinaciones.",
+    "Para entrenadores y analistas deportivos. Toma el video de una carrera, sigue a cada atleta y proyecta su trayectoria sobre las medidas reales de la pista, el velódromo o la piscina, para calcular cuántos metros de más recorrió en las curvas. Como los cálculos salen de la geometría de la pista, el relato que genera se apoya en medidas y no en suposiciones.",
   tags: ["global", "deporte", "atletismo", "video", "cinematica", "biomecanica"],
   version: "0.1.0",
   flow: flowGraph(
@@ -3279,7 +3282,7 @@ export const DRAFT_GLOBAL_RESOURCES: PublicationDraft = {
   kind: "flow",
   title: "Capacidad de Carga y Estrés de Recursos para Megaproyectos",
   description:
-    "Evaluación de viabilidad socio-ambiental: proyecta el consumo masivo de agua y energía de centros de datos de IA o plantas industriales frente a la recarga ecológica de la cuenca (Querétaro, Frankfurt, Virginia, Santiago).",
+    "Para comunidades, autoridades y empresas que evalúan un centro de datos o una planta industrial. Proyecta cuánta agua y energía consumirá el proyecto y lo compara con lo que la cuenca puede recargar, para saber si el territorio lo soporta. Pensada para adaptarse a Querétaro, Frankfurt, Virginia o Santiago.",
   tags: ["global", "medio-ambiente", "datacenters", "agua", "energia", "sostenibilidad"],
   version: "0.1.0",
   flow: flowGraph(
@@ -3318,7 +3321,7 @@ export const DRAFT_GLOBAL_DRAINAGE: PublicationDraft = {
   kind: "flow",
   title: "Gestión Preventiva de Drenaje e Inundaciones Pluviales",
   description:
-    "Resiliencia hidráulica urbana: cruza pronóstico pluviométrico horario con topografía y capacidad de sumideros para priorizar y despachar cuadrillas de limpieza antes de que se inunden las calles (Guayaquil, Buenos Aires, Miami, Manila).",
+    "Para municipios que quieren limpiar los sumideros antes de la lluvia, no después. Cruza el pronóstico de lluvia por hora con la topografía y la capacidad de los sumideros, y prioriza a dónde mandar las cuadrillas antes de que se inunden las calles. Pensada para adaptarse a Guayaquil, Buenos Aires, Miami o Manila.",
   tags: ["global", "hidrologia", "ciudades", "drenaje", "inundaciones", "emergencias"],
   version: "0.1.0",
   flow: flowGraph(
@@ -3357,7 +3360,7 @@ export const DRAFT_GLOBAL_AI_AUDIT: PublicationDraft = {
   kind: "flow",
   title: "Sandbox de Confiabilidad y Auditoría Forense de Agentes",
   description:
-    "Caja de arena para agentes de IA autónomos: inyecta pruebas adversarias y credenciales señuelo en un entorno aislado con un testigo silencioso para contrastar lo que el agente dice contra lo que realmente hizo antes de darle permisos reales.",
+    "Para equipos que van a darle permisos reales a un agente de IA. Lo pone en un entorno aislado, le presenta pruebas adversarias y credenciales señuelo, y compara lo que el agente dice que hizo con lo que realmente hizo. Así se sabe si es confiable antes de conectarlo a sistemas reales.",
   tags: ["global", "seguridad", "agentes", "sandbox", "red-teaming", "alineacion"],
   version: "0.1.0",
   flow: flowGraph(
@@ -3400,7 +3403,7 @@ export type SeedEntry = {
   readonly draft: PublicationDraft;
 };
 
-export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = [
+const BASE_DRAFTS: ReadonlyArray<SeedEntry> = [
   // 1. Agronomía
   { handle: MATEO_PROFILE.handle, draft: DRAFT_AGRO_APP },
   { handle: MATEO_PROFILE.handle, draft: DRAFT_AGRO_NODE },
@@ -3455,6 +3458,20 @@ export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = [
   { handle: RODRIGO_PROFILE.handle, draft: DRAFT_GLOBAL_DRAINAGE },
   { handle: VALENTINA_PROFILE.handle, draft: DRAFT_GLOBAL_AI_AUDIT },
 ];
+
+const PIPELINE_SPECS: Readonly<Record<string, PipelineSpec>> = {
+  ...AREA_APP_SPECS,
+  ...AREA_MODULE_SPECS,
+  ...COMMUNITY_APP_SPECS,
+};
+
+/** Apps and flows grown into full pipelines (demo-pipelines.ts); nodes stay the minimal unit. */
+export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = BASE_DRAFTS.map(
+  ({ handle, draft }) => ({
+    handle,
+    draft: enrichDraft(draft, PIPELINE_SPECS[draft.slug]),
+  }),
+);
 
 /* ----------------------------------------------------------------------------------
  * Feed Hits for the Feed/Match Service

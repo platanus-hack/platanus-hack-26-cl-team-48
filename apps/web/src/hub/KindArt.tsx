@@ -2,12 +2,28 @@ import type { PublicationKind } from "@nodomics/hub";
 
 const VIEW_BOX = "0 0 240 96";
 
-/** The cover of a card: a small graph for a flow, a single node with its ports for a node. */
+/** The cover of a card: an app layout for an app, a small graph for a flow, a single node with its ports for a node. */
 export function KindArt({ kind }: { readonly kind: PublicationKind }) {
   return (
     <svg className="web-kind-art" viewBox={VIEW_BOX} aria-hidden="true">
-      {kind === "flow" ? <FlowArt /> : <NodeArt />}
+      {kind === "app" ? <AppArt /> : kind === "flow" ? <FlowArt /> : <NodeArt />}
     </svg>
+  );
+}
+
+function AppArt() {
+  return (
+    <>
+      <rect x="24" y="16" width="192" height="64" rx="6" />
+      <line x1="24" y1="32" x2="216" y2="32" />
+      <circle cx="36" cy="24" r="2.5" />
+      <circle cx="44" cy="24" r="2.5" />
+      <circle cx="52" cy="24" r="2.5" />
+      <line x1="72" y1="32" x2="72" y2="80" />
+      <rect x="82" y="38" width="56" height="34" rx="4" className="web-kind-art-accent" />
+      <rect x="146" y="38" width="60" height="15" rx="3" />
+      <rect x="146" y="57" width="60" height="15" rx="3" />
+    </>
   );
 }
 

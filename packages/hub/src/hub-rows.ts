@@ -22,7 +22,7 @@ const ProfileRow = Type.Object({
 const PublicationRow = Type.Object({
   id: Type.String(),
   slug: Type.String(),
-  kind: Type.Union([Type.Literal("flow"), Type.Literal("node")]),
+  kind: Type.Union([Type.Literal("app"), Type.Literal("flow"), Type.Literal("node")]),
   title: Type.String(),
   description: Type.String(),
   tags: Type.Array(Type.String()),
