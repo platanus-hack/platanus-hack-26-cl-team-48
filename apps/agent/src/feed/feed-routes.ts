@@ -43,9 +43,12 @@ export function createFeedRoutes(deps: FeedRoutesDeps): readonly Route[] {
     route("POST", FEED_PATHS.profile, (request) =>
       handleSave(serviceFor(request.identity), request),
     ),
-    route("GET", FEED_PATHS.card, (request) =>
-      handleCard(deps.storeFor(request.identity), request),
-    ),
+    {
+      ...route("GET", FEED_PATHS.card, (request) =>
+        handleCard(deps.storeFor(request.identity), request),
+      ),
+      isPublic: true,
+    },
     route("GET", FEED_PATHS.search, (request) =>
       handleSearch(serviceFor(request.identity), request),
     ),

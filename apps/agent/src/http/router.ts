@@ -1,3 +1,5 @@
+import { ok } from "@nodomics/protocol";
+import type { UserIdentity } from "../mcp/mcp-port.ts";
 import { parseBearer, type IdentityPort } from "../requests/identity.ts";
 import type { RateLimiter } from "./guards/rate-limit.ts";
 import { MAX_BODY_BYTES, UPLOAD_MAX_BODY_BYTES } from "./guards/body-limit.ts";
@@ -34,6 +36,9 @@ const HTTP_INTERNAL_ERROR = 500;
 const HTTP_BAD_GATEWAY = 502;
 
 const errorReply = (status: number, error: string): RouteReply => ({ status, body: { error } });
+
+/** A visitor without a session; every anonymous visitor shares one rate limit bucket. */
+export const ANONYMOUS_IDENTITY: UserIdentity = { userId: "anonymous", accessToken: "" };
 
 const segmentsOf = (path: string): readonly string[] => path.split("/").filter(Boolean);
 
@@ -74,8 +79,15 @@ function findMatch(routes: readonly Route[], input: RouterInput): Match | undefi
   return undefined;
 }
 
+function resolveIdentity(deps: RouterDeps, match: Match, input: RouterInput) {
+  const bearer = parseBearer(input.authorization);
+  return match.route.isPublic === true && bearer === undefined
+    ? Promise.resolve(ok(ANONYMOUS_IDENTITY))
+    : deps.identity.resolve(bearer);
+}
+
 async function run(deps: RouterDeps, match: Match, input: RouterInput): Promise<RouteReply> {
-  const identity = await deps.identity.resolve(parseBearer(input.authorization));
+  const identity = await resolveIdentity(deps, match, input);
   if (!identity.ok) {
     return identity.error.code === "UNAUTHORIZED"
       ? errorReply(HTTP_UNAUTHORIZED, "unauthorized")
