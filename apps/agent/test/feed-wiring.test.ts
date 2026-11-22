@@ -18,7 +18,7 @@ const CONFIG: AgentConfig = {
   memory: "fake",
 };
 
-it("buildFeedRoutes returns exactly the five feed routes", () => {
+it("buildFeedRoutes returns all six feed routes", () => {
   const routes = buildFeedRoutes(CONFIG, { fetch: () => Promise.reject(new Error("offline")) });
 
   expect(routes.map((route) => `${route.method} ${route.path}`).sort()).toEqual(
@@ -27,6 +27,7 @@ it("buildFeedRoutes returns exactly the five feed routes", () => {
       "GET /feed/cards/:handle",
       "GET /feed/search",
       "GET /feed/matches",
+      "GET /feed/map",
       "POST /feed/registration",
     ].sort(),
   );
@@ -50,36 +51,39 @@ it("assembleServer serves the extra routes passed as third argument", async () =
   expect(await response.json()).toEqual({ pong: true });
 });
 
-it("feed routes reject an identity with an empty access token without touching Supabase", async () => {
-  const jwt = (role: string): string =>
-    `${btoa(JSON.stringify({ alg: "HS256" }))}.${btoa(JSON.stringify({ role }))}.sig`;
-  const factoryCalls: string[] = [];
-  const fetchCalls: string[] = [];
-  const routes = buildFeedRoutes(
-    { ...CONFIG, supabaseAnonKey: jwt("anon") },
-    {
-      fetch: (input) => {
-        fetchCalls.push(
-          input instanceof URL ? input.href : typeof input === "string" ? input : input.url,
-        );
-        return Promise.reject(new Error("offline"));
+it.each(["/feed/search", "/feed/map"])(
+  "%s rejects an empty access token without touching Supabase",
+  async (path) => {
+    const jwt = (role: string): string =>
+      `${btoa(JSON.stringify({ alg: "HS256" }))}.${btoa(JSON.stringify({ role }))}.sig`;
+    const factoryCalls: string[] = [];
+    const fetchCalls: string[] = [];
+    const routes = buildFeedRoutes(
+      { ...CONFIG, supabaseAnonKey: jwt("anon") },
+      {
+        fetch: (input) => {
+          fetchCalls.push(
+            input instanceof URL ? input.href : typeof input === "string" ? input : input.url,
+          );
+          return Promise.reject(new Error("offline"));
+        },
+        clientFactory: (url) => {
+          factoryCalls.push(url);
+          return {} as unknown as SupabaseClient;
+        },
       },
-      clientFactory: (url) => {
-        factoryCalls.push(url);
-        return {} as unknown as SupabaseClient;
-      },
-    },
-  );
-  const search = routes.find((route) => route.path === "/feed/search");
+    );
+    const route = routes.find((candidate) => candidate.path === path);
 
-  const reply = await search?.handle({
-    params: {},
-    query: { q: "epidemiology" },
-    identity: { userId: "u1", accessToken: "" },
-    rawBody: "",
-  });
+    const reply = await route?.handle({
+      params: {},
+      query: { q: "epidemiology" },
+      identity: { userId: "u1", accessToken: "" },
+      rawBody: "",
+    });
 
-  expect(reply).toEqual({ status: 401, body: { error: "unauthorized" } });
-  expect(factoryCalls).toEqual([]);
-  expect(fetchCalls).toEqual([]);
-});
+    expect(reply).toEqual({ status: 401, body: { error: "unauthorized" } });
+    expect(factoryCalls).toEqual([]);
+    expect(fetchCalls).toEqual([]);
+  },
+);

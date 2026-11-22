@@ -70,7 +70,7 @@ export function HubPage({ text, onOpenEditor }: HubPageProps) {
           <MyFlowsSection onOpenEditor={onOpenEditor} />
         ) : (
           <>
-            <PeopleSection text={text} />
+            <PeopleSection text={text} browse={!isAccountView(filters.view)} />
             <PublicationsSection
               heading={listHeading(filters, text)}
               listed={listed}

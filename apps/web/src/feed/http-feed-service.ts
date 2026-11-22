@@ -2,6 +2,7 @@ import {
   FEED_PATHS,
   FeedCardReplySchema,
   FeedErrorReplySchema,
+  FeedMapReplySchema,
   FeedResultsReplySchema,
   parseProfileCard,
   type FeedHit,
@@ -34,6 +35,12 @@ const CODES_BY_ERROR: Readonly<Record<string, FeedErrorCode>> = {
 export function createHttpFeedService(deps: HttpFeedDeps): FeedService {
   const send = createSender(deps);
   return {
+    mapPeople: async (text) => {
+      const reply = await send({ path: `${FEED_PATHS.map}?q=${encodeURIComponent(text)}` });
+      if (!reply.ok) return reply;
+      const parsed = parse(FeedMapReplySchema, reply.value);
+      return parsed.ok ? ok(parsed.value.people) : feedFailure("UNAVAILABLE");
+    },
     search: async (text) =>
       hitsOf(await send({ path: `${FEED_PATHS.search}?q=${encodeURIComponent(text)}` })),
     matches: async () => hitsOf(await send({ path: FEED_PATHS.matches })),

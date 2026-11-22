@@ -57,6 +57,7 @@ export function fakeStore(options: FakeStoreOptions = {}): FakeStore {
     options.failWith ? { ok: false, error: options.failWith } : ok(value);
   return {
     upserts,
+    mapProfiles: () => Promise.resolve(reply([])),
     matchCalls,
     ownCardReads,
     getOwnCard: (profileId) => {
