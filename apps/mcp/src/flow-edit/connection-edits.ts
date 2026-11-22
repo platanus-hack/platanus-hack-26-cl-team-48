@@ -7,9 +7,11 @@ import {
   type NodeManifest,
   type Result,
   type PortRef,
+  type PortSpec,
 } from "@nodomics/protocol";
 import type { EditError } from "./edit-types.ts";
 import { manifestOf } from "./node-edits.ts";
+import { typeMismatch, withoutPreviousInput } from "./port-contract.ts";
 import { revisionOf } from "./revision.ts";
 
 export const edgeTarget = (edge: FlowEdge): string =>
@@ -24,17 +26,20 @@ export function resolvePort({
   reference: string;
   side: "inputs" | "outputs";
   catalog: readonly NodeManifest[];
-}): Result<PortRef, EditError> {
+}): Result<{ readonly ref: PortRef; readonly spec: PortSpec }, EditError> {
   const node = [...flow.nodes]
     .sort((a, b) => b.id.length - a.id.length)
     .find((node) => reference.startsWith(`${node.id}.`));
   if (node === undefined) return err({ message: `Unknown node or port: ${reference}` });
   const port = reference.slice(node.id.length + 1);
   const manifest = manifestOf(flow, node.type, catalog);
-  return manifest !== undefined &&
-    nodePorts(manifest, node.params)[side].some((candidate) => candidate.id === port)
-    ? ok({ node: node.id, port })
-    : err({ message: `Unknown ${side} port: ${reference}` });
+  const spec =
+    manifest === undefined
+      ? undefined
+      : nodePorts(manifest, node.params)[side].find((candidate) => candidate.id === port);
+  return spec === undefined
+    ? err({ message: `Unknown ${side} port: ${reference}` })
+    : ok({ ref: { node: node.id, port }, spec });
 }
 export function connectNodes(
   flow: Flow,
@@ -45,14 +50,18 @@ export function connectNodes(
   if (!from.ok) return from;
   const to = resolvePort({ flow, reference: args.to, side: "inputs", catalog });
   if (!to.ok) return to;
-  if (flow.edges.some((edge) => edgeTarget(edge) === `${args.from}->${args.to}`)) return ok(flow);
-  if (isReachable(flow, to.value.node, from.value.node))
+  const target = `${args.from}->${args.to}`;
+  if (flow.edges.some((edge) => edgeTarget(edge) === target)) return ok(flow);
+  const mismatch = typeMismatch(from.value.spec, to.value.spec, target);
+  if (mismatch !== undefined) return err({ message: mismatch });
+  if (isReachable(flow, to.value.ref.node, from.value.ref.node))
     return err({ message: "Connection creates a cycle" });
-  const edge = { id: "", from: from.value, to: to.value };
+  const edge = { id: "", from: from.value.ref, to: to.value.ref };
+  const available = withoutPreviousInput(flow, edge.to, to.value.spec);
   return ok({
-    ...flow,
+    ...available,
     edges: [
-      ...flow.edges,
+      ...available.edges,
       {
         ...edge,
         id: `edge_${revisionOf({ format: "nodomics/flow@0", nodes: [], edges: [edge] })}`,
@@ -74,7 +83,7 @@ export function disconnectNodes(
     ? err({ message: `Unknown connection: ${args.from}->${args.to}` })
     : ok({ ...flow, edges });
 }
-function isReachable(flow: Flow, from: string, to: string): boolean {
+export function isReachable(flow: Flow, from: string, to: string): boolean {
   const visited = new Set<string>();
   const visit = (current: string): boolean => {
     if (current === to) return true;

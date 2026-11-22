@@ -1,7 +1,14 @@
 import { validateParams } from "@nodomics/coordinator";
-import { nodePorts, type Flow, type FlowNode, type NodeManifest } from "@nodomics/protocol";
-import { resolvePort } from "./connection-edits.ts";
+import {
+  nodePorts,
+  type Flow,
+  type FlowEdge,
+  type FlowNode,
+  type NodeManifest,
+} from "@nodomics/protocol";
+import { edgeTarget, resolvePort } from "./connection-edits.ts";
 import type { ValidationIssue } from "./edit-types.ts";
+import { crowdedInputs, crowdedMessage, typeMismatch } from "./port-contract.ts";
 import { manifestOf } from "./node-edits.ts";
 
 export function validateFlow(
@@ -40,7 +47,7 @@ function connectionIssues(
   flow: Flow,
   catalog: readonly NodeManifest[],
 ): readonly ValidationIssue[] {
-  return flow.edges.flatMap((edge) => {
+  const issues = flow.edges.flatMap((edge) => {
     const from = resolvePort({
       flow,
       reference: `${edge.from.node}.${edge.from.port}`,
@@ -53,9 +60,31 @@ function connectionIssues(
       side: "inputs",
       catalog,
     });
+    const mismatch =
+      from.ok && to.ok ? typeMismatch(from.value.spec, to.value.spec, edgeTarget(edge)) : undefined;
     return [
       ...(from.ok ? [] : [{ nodeId: edge.from.node, message: from.error.message }]),
       ...(to.ok ? [] : [{ nodeId: edge.to.node, message: to.error.message }]),
+      ...(mismatch === undefined ? [] : [{ nodeId: edge.to.node, message: mismatch }]),
     ];
   });
+  return [...issues, ...crowdedInputIssues(flow, catalog)];
+}
+function crowdedInputIssues(
+  flow: Flow,
+  catalog: readonly NodeManifest[],
+): readonly ValidationIssue[] {
+  const isMulti = (edge: FlowEdge) => {
+    const to = resolvePort({
+      flow,
+      reference: `${edge.to.node}.${edge.to.port}`,
+      side: "inputs",
+      catalog,
+    });
+    return !to.ok || to.value.spec.multi === true;
+  };
+  return crowdedInputs(flow, isMulti).map((edge) => ({
+    nodeId: edge.to.node,
+    message: crowdedMessage(edge),
+  }));
 }

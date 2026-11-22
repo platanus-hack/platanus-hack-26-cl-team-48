@@ -1,4 +1,4 @@
-import type { Flow, FlowNode } from "@nodomics/protocol";
+import type { Flow, FlowEdge, FlowNode } from "@nodomics/protocol";
 import { edgeTarget } from "./connection-edits.ts";
 import type { Change, ChangeKind } from "./edit-types.ts";
 import { canonicalJson } from "./revision.ts";
@@ -14,14 +14,31 @@ const change = (
   target: string,
   values: { before?: unknown; after?: unknown },
 ): Change => ({ id: `${kind}:${target}`, kind, target, ...values });
+/** Same id with another type or version: it is a different node, so it is removed and added. */
+function replacedIds(base: Flow, draft: Flow): ReadonlySet<string> {
+  return new Set(
+    draft.nodes
+      .filter((node) => {
+        const before = base.nodes.find((other) => other.id === node.id);
+        return (
+          before !== undefined && (before.type !== node.type || before.version !== node.version)
+        );
+      })
+      .map((node) => node.id),
+  );
+}
+const isAbsentFrom = (flow: Flow, replaced: ReadonlySet<string>) => (node: FlowNode) =>
+  replaced.has(node.id) || !flow.nodes.some((other) => other.id === node.id);
+// Removals come first so a replacement removes the old node before adding the new one.
 function nodeChanges(base: Flow, draft: Flow): Change[] {
+  const replaced = replacedIds(base, draft);
   return [
-    ...draft.nodes
-      .filter((node) => !base.nodes.some((other) => other.id === node.id))
-      .map((node) => change("add_node", node.id, { after: node })),
     ...base.nodes
-      .filter((node) => !draft.nodes.some((other) => other.id === node.id))
+      .filter(isAbsentFrom(draft, replaced))
       .map((node) => change("remove_node", node.id, { before: node })),
+    ...draft.nodes
+      .filter(isAbsentFrom(base, replaced))
+      .map((node) => change("add_node", node.id, { after: node })),
   ];
 }
 function codeChanges(base: Flow, draft: Flow): Change[] {
@@ -39,9 +56,10 @@ function codeChanges(base: Flow, draft: Flow): Change[] {
   });
 }
 function paramChanges(base: Flow, draft: Flow): Change[] {
+  const replaced = replacedIds(base, draft);
   return draft.nodes.flatMap((node) => {
     const before = base.nodes.find((other) => other.id === node.id);
-    return before === undefined ? [] : changedParams(before, node);
+    return before === undefined || replaced.has(node.id) ? [] : changedParams(before, node);
   });
 }
 function changedParams(base: FlowNode, draft: FlowNode): Change[] {
@@ -57,13 +75,19 @@ function changedParams(base: FlowNode, draft: FlowNode): Change[] {
           ],
   );
 }
+/** A connection of a replaced node is reconnected: removing the old node drops it. Disconnections go first. */
 function edgeChanges(base: Flow, draft: Flow): Change[] {
+  const replaced = replacedIds(base, draft);
+  const isNew = (flow: Flow) => (edge: FlowEdge) =>
+    replaced.has(edge.from.node) ||
+    replaced.has(edge.to.node) ||
+    !flow.edges.some((other) => edgeTarget(edge) === edgeTarget(other));
   return [
-    ...draft.edges
-      .filter((edge) => !base.edges.some((other) => edgeTarget(edge) === edgeTarget(other)))
-      .map((edge) => change("connect", edgeTarget(edge), { after: edge })),
     ...base.edges
-      .filter((edge) => !draft.edges.some((other) => edgeTarget(edge) === edgeTarget(other)))
+      .filter(isNew(draft))
       .map((edge) => change("disconnect", edgeTarget(edge), { before: edge })),
+    ...draft.edges
+      .filter(isNew(base))
+      .map((edge) => change("connect", edgeTarget(edge), { after: edge })),
   ];
 }

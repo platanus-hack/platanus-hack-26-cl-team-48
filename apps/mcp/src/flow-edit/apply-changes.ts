@@ -1,5 +1,5 @@
-import { err, ok, type Flow, type Result } from "@nodomics/protocol";
-import { edgeTarget } from "./connection-edits.ts";
+import { err, nodePorts, ok, type Flow, type PortRef, type Result } from "@nodomics/protocol";
+import { edgeTarget, isReachable } from "./connection-edits.ts";
 import { diffFlows } from "./diff.ts";
 import type { Change, EditError } from "./edit-types.ts";
 
@@ -13,9 +13,21 @@ export function applyChanges(
   if (unknown !== undefined) return err({ message: `Unknown change: ${unknown}` });
   const result = changes
     .filter((change) => changeIds.includes(change.id))
-    .reduce((flow, change) => applyChange({ flow, draft, change }), base);
-  const issue = consistencyIssue(result);
-  return issue === undefined ? ok(result) : err({ message: issue });
+    .reduce<Result<Flow, EditError>>(
+      (flow, change) => (flow.ok ? applyChecked({ flow: flow.value, draft, change }) : flow),
+      ok(base),
+    );
+  if (!result.ok) return result;
+  const issue = consistencyIssue(result.value);
+  return issue === undefined ? result : err({ message: issue });
+}
+function applyChecked(step: { flow: Flow; draft: Flow; change: Change }): Result<Flow, EditError> {
+  const isDuplicate =
+    step.change.kind === "add_node" &&
+    step.flow.nodes.some((node) => node.id === step.change.target);
+  return isDuplicate
+    ? err({ message: `Node ${step.change.target} already exists: remove it first` })
+    : ok(applyChange(step));
 }
 function applyChange({ flow, draft, change }: { flow: Flow; draft: Flow; change: Change }): Flow {
   switch (change.kind) {
@@ -97,5 +109,22 @@ function consistencyIssue(flow: Flow): string | undefined {
       node.type.startsWith("code.") &&
       !flow.customNodes?.some((manifest) => manifest.id === node.type),
   );
-  return missingCode === undefined ? undefined : `Missing custom manifest: ${missingCode.type}`;
+  if (missingCode !== undefined) return `Missing custom manifest: ${missingCode.type}`;
+  const invalidPort = flow.edges.find(
+    (edge) => !hasCustomPort(flow, edge.from, "outputs") || !hasCustomPort(flow, edge.to, "inputs"),
+  );
+  if (invalidPort !== undefined)
+    return `Connection uses a missing custom port: ${edgeTarget(invalidPort)}`;
+  return flow.edges.some((edge) => isReachable(flow, edge.to.node, edge.from.node))
+    ? "Selected changes create a cycle"
+    : undefined;
+}
+function hasCustomPort(flow: Flow, ref: PortRef, side: "inputs" | "outputs"): boolean {
+  const node = flow.nodes.find((node) => node.id === ref.node);
+  const manifest = flow.customNodes?.find((manifest) => manifest.id === node?.type);
+  return (
+    node === undefined ||
+    manifest === undefined ||
+    nodePorts(manifest, node.params)[side].some((port) => port.id === ref.port)
+  );
 }
