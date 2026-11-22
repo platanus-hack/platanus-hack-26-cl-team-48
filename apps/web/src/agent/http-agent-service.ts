@@ -1,5 +1,11 @@
 import { err, ok } from "@nodomics/protocol";
-import type { AgentAnswer, AgentErrorCode, AgentResult, AgentService } from "./agent-service.ts";
+import type {
+  AgentAnswer,
+  AgentErrorCode,
+  AgentProgress,
+  AgentResult,
+  AgentService,
+} from "./agent-service.ts";
 import { AGENT_STREAM_TYPE, isAgentStream, readAgentStream } from "./read-agent-stream.ts";
 import {
   parseDecisionReply,

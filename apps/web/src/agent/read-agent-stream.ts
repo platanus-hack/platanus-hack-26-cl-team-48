@@ -47,8 +47,9 @@ function readLine(
     state.isBroken = true;
     return;
   }
-  if (event.type === "done" && typeof event.status === "number")
-    state.reply = { status: event.status, body: event.body };
+  const status = event["status"];
+  if (event["type"] === "done" && typeof status === "number")
+    state.reply = { status, body: event["body"] };
   const progress = progressOf(event);
   if (progress !== undefined) onProgress(progress);
 }
