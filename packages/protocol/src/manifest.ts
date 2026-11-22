@@ -38,7 +38,21 @@ export const BuiltinImpl = Type.Object({
   ]),
 });
 
-export const NodeImpl = Type.Union([SqlImpl, PythonImpl, ViewImpl, FlowImpl, BuiltinImpl]);
+/** Something a node describes and that is deployed, not executed: the engine skips it (ADR 0027). */
+export const ResourceImpl = Type.Object({
+  kind: Type.Literal("resource"),
+  resource: Type.Union([Type.Literal("repo"), Type.Literal("service")]),
+});
+export type ResourceImpl = Static<typeof ResourceImpl>;
+
+export const NodeImpl = Type.Union([
+  SqlImpl,
+  PythonImpl,
+  ViewImpl,
+  FlowImpl,
+  BuiltinImpl,
+  ResourceImpl,
+]);
 export type NodeImpl = Static<typeof NodeImpl>;
 
 export const Requirements = Type.Object({

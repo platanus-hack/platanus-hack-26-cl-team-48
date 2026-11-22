@@ -14,6 +14,8 @@ export const DataType = Type.Union([
   Type.Literal("image"),
   Type.Literal("model"),
   Type.Literal("chart"),
+  Type.Literal("repo"),
+  Type.Literal("service"),
   Type.Literal("any"),
 ]);
 export type DataType = Static<typeof DataType>;
