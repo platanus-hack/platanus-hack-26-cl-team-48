@@ -18,6 +18,10 @@ export type AgentConfig = {
   readonly port: number;
   readonly devIdentity: boolean;
   readonly memory: MemoryMode;
+  readonly renderSandboxApiKey?: string | undefined;
+  readonly renderWorkspaceId?: string | undefined;
+  readonly sandboxAnthropicApiKey?: string | undefined;
+  readonly agentUrl?: string | undefined;
 };
 
 export type MemoryMode = "fake" | "supabase";
@@ -38,6 +42,10 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
   const port = readPort(env["PORT"]);
   const memory = readMemoryMode(env["AGENT_MEMORY"], strict);
   const devIdentity = readDevIdentity(env);
+  const renderSandboxApiKey = env["RENDER_SANDBOX_API_KEY"]?.trim() || undefined;
+  const renderWorkspaceId = env["RENDER_WORKSPACE_ID"]?.trim() || undefined;
+  const sandboxAnthropicApiKey = env["SANDBOX_ANTHROPIC_API_KEY"]?.trim() || undefined;
+  const agentUrl = env["AGENT_URL"]?.trim() || env["RENDER_EXTERNAL_URL"]?.trim() || undefined;
 
   if (
     anthropic.ok &&
@@ -58,6 +66,10 @@ export function loadConfig(env: Env): Result<AgentConfig, ConfigError> {
       port: port.value,
       devIdentity: devIdentity.value,
       memory: memory.value,
+      ...(renderSandboxApiKey ? { renderSandboxApiKey } : {}),
+      ...(renderWorkspaceId ? { renderWorkspaceId } : {}),
+      ...(sandboxAnthropicApiKey ? { sandboxAnthropicApiKey } : {}),
+      ...(agentUrl ? { agentUrl } : {}),
     });
   }
   return err({

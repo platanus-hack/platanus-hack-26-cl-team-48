@@ -39,6 +39,13 @@ import type { ProposalStorePort } from "../proposals/proposal-store-port.ts";
 import { createFakeMcp } from "../mcp/fake-mcp.ts";
 import { createMcpClient } from "../mcp/mcp-client.ts";
 import type { McpPort, UserIdentity } from "../mcp/mcp-port.ts";
+import type { RouteReply } from "../http/route.ts";
+import type { SandboxMcpInput } from "../sandbox/mcp-proxy-route.ts";
+import { handleSandboxMcp } from "../sandbox/mcp-proxy-route.ts";
+import { PROXY_ALLOWLIST } from "../sandbox/proxy-allowlist.ts";
+import { createJobTokens } from "../sandbox/job-tokens.ts";
+import { createRenderSandbox } from "../sandbox/render-sandbox.ts";
+import { createImportTool, withLocalTools } from "../import/import-tool.ts";
 import { createHandleRequest, type RequestDeps } from "./handle-request.ts";
 import { createDevIdentity, createSupabaseIdentity, type IdentityPort } from "./identity.ts";
 
@@ -123,7 +130,32 @@ const selectMemoryForUser = (
   };
 };
 
-export function buildRequestDeps(config: AgentConfig): RequestDeps {
+function setupSandboxIntegration(config: AgentConfig, baseMcp: McpPort) {
+  if (!config.renderSandboxApiKey || !config.renderWorkspaceId || !config.sandboxAnthropicApiKey) {
+    return { mcp: baseMcp, sandboxMcp: undefined };
+  }
+  const tokens = createJobTokens();
+  const sandbox = createRenderSandbox({
+    renderApiKey: config.renderSandboxApiKey,
+    ownerId: config.renderWorkspaceId,
+  });
+  const importTool = createImportTool({
+    sandbox,
+    jobTokens: tokens,
+    sandboxApiKey: config.sandboxAnthropicApiKey,
+    ...(config.agentUrl ? { agentUrl: config.agentUrl } : {}),
+  });
+  const mcp = withLocalTools(baseMcp, [importTool]);
+  const sandboxMcp = (input: SandboxMcpInput): Promise<RouteReply> =>
+    handleSandboxMcp({ tokens, mcpUrl: config.mcpUrl, fetch, allowlist: PROXY_ALLOWLIST }, input);
+  return { mcp, sandboxMcp };
+}
+
+export function buildRequestDepsWithMcp(
+  config: AgentConfig,
+  mcp: McpPort,
+  sandboxMcp?: (input: SandboxMcpInput) => Promise<RouteReply>,
+): RequestDeps {
   const memoryForUser = selectMemoryForUser(config);
   const proposalsForUser = selectProposalsForUser(config);
   const searchForUser = selectSearchForUser(config);
@@ -131,14 +163,21 @@ export function buildRequestDeps(config: AgentConfig): RequestDeps {
     identity: selectIdentity(config),
     llm: createAnthropicLlm({ apiKey: config.anthropicApiKey }),
     logger: createStructuredLogger(),
-    mcp: selectMcp(config.mcpUrl),
+    mcp,
     proposals: selectProposalStore(config),
     search: selectSearch(config),
     documentEmbeddings: selectEmbeddings(config.voyageApiKey, "document"),
     ...(memoryForUser ? { memoryForUser } : {}),
     ...(proposalsForUser ? { proposalsForUser } : {}),
     ...(searchForUser ? { searchForUser } : {}),
+    ...(sandboxMcp ? { sandboxMcp } : {}),
   };
+}
+
+export function buildRequestDeps(config: AgentConfig): RequestDeps {
+  const baseMcp = selectMcp(config.mcpUrl);
+  const { mcp, sandboxMcp } = setupSandboxIntegration(config, baseMcp);
+  return buildRequestDepsWithMcp(config, mcp, sandboxMcp);
 }
 
 const defaultSearch = (): { embeddings: EmbeddingsPort; index: SearchIndexPort } => ({
@@ -231,11 +270,13 @@ export function assembleServer(
     rateLimiter: createRateLimiter({ perMinute: ROUTES_PER_MINUTE }),
   });
   const rateLimiter = createRateLimiter({ perMinute: REQUESTS_PER_MINUTE });
-  return createServer({
+  const serverDeps: Record<string, unknown> = {
     handleRequest: createHandleRequest({ ...recorded, rateLimiter }),
     router,
     ...(deps.logger ? { logger: deps.logger } : {}),
-  });
+  };
+  if (deps.sandboxMcp) serverDeps["sandboxMcp"] = deps.sandboxMcp;
+  return createServer(serverDeps as unknown as Parameters<typeof createServer>[0]);
 }
 
 /** The LLM, identity and memory are created once and shared by /agent/requests and the router. */

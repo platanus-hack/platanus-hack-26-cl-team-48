@@ -19,6 +19,7 @@ export const REQUEST_ALLOWLIST: ToolAllowlist = [
   "flows.batch",
   "flows.diff",
   "flows.discard",
+  "import.from_github",
   "run.flow",
   "run.sample",
   "run.logs",

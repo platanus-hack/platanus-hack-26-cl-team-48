@@ -15,6 +15,9 @@ import type { EmbeddingsPort } from "../memory/embeddings.ts";
 import type { SearchIndexPort } from "../memory/search.ts";
 import type { RateLimiter } from "../http/guards/rate-limit.ts";
 import type { StructuredLogger } from "../http/guards/logger.ts";
+import type { ImportReport } from "../import/import-report.ts";
+import type { RouteReply } from "../http/route.ts";
+import type { SandboxMcpInput } from "../sandbox/mcp-proxy-route.ts";
 import { SYSTEM_PROMPT } from "../prompts/system.ts";
 import { REQUEST_ALLOWLIST } from "./allowlists.ts";
 import { recordDrafts } from "./draft-recorder.ts";
@@ -34,6 +37,7 @@ export type RequestDeps = {
   readonly documentEmbeddings?: EmbeddingsPort;
   readonly rateLimiter?: RateLimiter;
   readonly logger?: StructuredLogger;
+  readonly sandboxMcp?: (input: SandboxMcpInput) => Promise<RouteReply>;
 };
 
 export type RequestInput = {
@@ -69,16 +73,21 @@ type ProposalPayload = {
   readonly cards: readonly unknown[];
 };
 
-function success(
-  outcome: LoopOutcome,
-  draftId: string | undefined,
-  proposalData: ProposalPayload | null,
-): HttpReply {
+type SuccessDetails = {
+  readonly draftId?: string;
+  readonly proposalData?: ProposalPayload | null;
+  readonly importReport?: ImportReport;
+};
+
+function success(outcome: LoopOutcome, details: SuccessDetails = {}): HttpReply {
   const body = {
     summary: outcome.text,
     steps: outcome.steps,
-    ...(draftId ? { draftId } : {}),
-    ...(proposalData ? { proposalId: proposalData.proposalId, cards: proposalData.cards } : {}),
+    ...(details.draftId ? { draftId: details.draftId } : {}),
+    ...(details.proposalData
+      ? { proposalId: details.proposalData.proposalId, cards: details.proposalData.cards }
+      : {}),
+    ...(details.importReport ? { importReport: details.importReport } : {}),
   };
   return { status: HTTP_OK, body };
 }
@@ -90,7 +99,11 @@ const withSystemPrompt = (llm: LlmPort): LlmPort => ({
 async function buildProposalData(
   deps: RequestDeps,
   identity: UserIdentity,
-  input: { readonly draftId: string; readonly flowId: string },
+  input: {
+    readonly draftId: string;
+    readonly flowId: string;
+    readonly importReport?: ImportReport | undefined;
+  },
 ): Promise<ProposalPayload | null> {
   const store = deps.proposalsForUser?.(identity) ?? deps.proposals;
   if (!store) return null;
@@ -110,7 +123,12 @@ async function buildProposalData(
   }
   if (!outcome.value) return null;
   const { proposal, cards } = outcome.value;
-  await store.save({ proposal, cards, ownerId: identity.userId });
+  await store.save({
+    proposal,
+    cards,
+    ownerId: identity.userId,
+    ...(input.importReport ? { importReport: input.importReport } : {}),
+  });
   return { proposalId: proposal.id, cards };
 }
 
@@ -144,9 +162,16 @@ async function runRequest(
   }
   const draftId = recorder.lastDraftId();
   const flowId = request.flowId ?? recorder.lastFlowId() ?? draftId;
+  const importReport = recorder.lastImportReport();
   const proposal =
-    draftId && flowId ? await buildProposalData(deps, identity, { draftId, flowId }) : null;
-  return success(outcome.value, draftId, proposal);
+    draftId && flowId
+      ? await buildProposalData(deps, identity, { draftId, flowId, importReport })
+      : null;
+  return success(outcome.value, {
+    ...(draftId ? { draftId } : {}),
+    ...(proposal ? { proposalData: proposal } : {}),
+    ...(importReport ? { importReport } : {}),
+  });
 }
 
 export function createHandleRequest(deps: RequestDeps) {

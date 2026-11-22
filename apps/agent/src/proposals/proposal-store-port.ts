@@ -1,11 +1,13 @@
 import type { Result } from "@nodomics/protocol";
 import type { Proposal } from "../contracts/proposal.ts";
 import type { DomainCard } from "../contracts/domain-card.ts";
+import type { ImportReport } from "../import/import-report.ts";
 
 export type StoredProposal = {
   readonly proposal: Proposal;
   readonly cards: readonly DomainCard[];
   readonly ownerId: string;
+  readonly importReport?: ImportReport | null | undefined;
 };
 
 export type ProposalStoreErrorCode = "NOT_FOUND" | "VERSION_CONFLICT" | "STORE_FAILED";

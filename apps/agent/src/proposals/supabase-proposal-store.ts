@@ -48,6 +48,7 @@ type ProposalRow = {
   readonly status: StoredProposal["proposal"]["status"];
   readonly changes: StoredProposal["proposal"]["changes"];
   readonly cards: StoredProposal["cards"];
+  readonly import_report?: StoredProposal["importReport"] | null | undefined;
 };
 
 export function createSupabaseProposalStore(client: SupabaseClient): ProposalStorePort {
@@ -62,6 +63,7 @@ export function createSupabaseProposalStore(client: SupabaseClient): ProposalSto
       status: stored.proposal.status,
       changes: stored.proposal.changes,
       cards: stored.cards,
+      import_report: stored.importReport ?? null,
     };
     const { error } = await client.from("agent_proposals").insert(row);
     if (error) return err({ code: "STORE_FAILED", message: error.message });
@@ -93,6 +95,7 @@ export function createSupabaseProposalStore(client: SupabaseClient): ProposalSto
       },
       cards: row.cards,
       ownerId: row.owner_id,
+      importReport: row.import_report ?? null,
     });
   };
 
