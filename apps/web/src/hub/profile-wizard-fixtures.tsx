@@ -10,6 +10,9 @@ import { ProfilePage } from "./ProfilePage.tsx";
 
 export const WIZARD_NAME = "Arma tu perfil";
 
+/** Runs that walk every wizard step take longer than Vitest's default when the whole suite runs. */
+export const FULL_RUN_TIMEOUT_MS = 20_000;
+
 /** Renders Ana's own profile page, signed in as Ana; by default she has no card yet. */
 export async function renderOwnProfile(overrides: Partial<FeedService> = {}) {
   const user = userEvent.setup();
@@ -51,6 +54,12 @@ export async function clickInWizard(user: UserEvent, name: string): Promise<void
 
 export async function clickNext(user: UserEvent, times = 1): Promise<void> {
   for (let step = 0; step < times; step += 1) await clickInWizard(user, "Siguiente");
+}
+
+/** Fills a field in one go where the keystrokes themselves do not matter. */
+export async function pasteInto(user: UserEvent, field: HTMLElement, text: string): Promise<void> {
+  await user.click(field);
+  await user.paste(text);
 }
 
 export const textbox = (name: string) =>

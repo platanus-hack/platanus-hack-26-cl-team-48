@@ -6,6 +6,7 @@ import {
   clickInWizard,
   clickNext,
   editCard,
+  FULL_RUN_TIMEOUT_MS,
   startNewCard,
   textbox,
   wizard,
@@ -162,40 +163,48 @@ describe("ProfilePage wizard with repeated topic names", () => {
     expect(statisticsGroups()).toHaveLength(1);
   });
 
-  it("saves exactly the remaining topic after removing one", async () => {
-    const { user, saveProfile } = await editTopicsTwice();
-    const [firstRemove] = within(wizard()).getAllByRole("button", { name: "Quitar estadística" });
-    if (firstRemove === undefined) throw new Error("No Quitar button for estadística");
-    await user.click(firstRemove);
-    await clickNext(user, 2);
+  it(
+    "saves exactly the remaining topic after removing one",
+    async () => {
+      const { user, saveProfile } = await editTopicsTwice();
+      const [firstRemove] = within(wizard()).getAllByRole("button", { name: "Quitar estadística" });
+      if (firstRemove === undefined) throw new Error("No Quitar button for estadística");
+      await user.click(firstRemove);
+      await clickNext(user, 2);
 
-    await clickInWizard(user, "Guardar perfil");
+      await clickInWizard(user, "Guardar perfil");
 
-    await waitFor(() => {
-      expect(saveProfile).toHaveBeenCalledWith({
-        ...MINIMAL_CARD,
-        domains: [{ name: "estadística", depth: "expert" }],
+      await waitFor(() => {
+        expect(saveProfile).toHaveBeenCalledWith({
+          ...MINIMAL_CARD,
+          domains: [{ name: "estadística", depth: "expert" }],
+        });
       });
-    });
-  });
+    },
+    FULL_RUN_TIMEOUT_MS,
+  );
 });
 
 describe("ProfilePage wizard with repeated offers", () => {
-  it("saves one offer after removing one of two repeated ones", async () => {
-    const { user, saveProfile } = await editCard({
-      ...MINIMAL_CARD,
-      offers: ["modelos", "modelos"],
-    });
-    await clickNext(user);
-    const [firstRemove] = within(wizard()).getAllByRole("button", { name: "Quitar modelos" });
-    if (firstRemove === undefined) throw new Error("No Quitar button for modelos");
-    await user.click(firstRemove);
-    await clickNext(user, 2);
+  it(
+    "saves one offer after removing one of two repeated ones",
+    async () => {
+      const { user, saveProfile } = await editCard({
+        ...MINIMAL_CARD,
+        offers: ["modelos", "modelos"],
+      });
+      await clickNext(user);
+      const [firstRemove] = within(wizard()).getAllByRole("button", { name: "Quitar modelos" });
+      if (firstRemove === undefined) throw new Error("No Quitar button for modelos");
+      await user.click(firstRemove);
+      await clickNext(user, 2);
 
-    await clickInWizard(user, "Guardar perfil");
+      await clickInWizard(user, "Guardar perfil");
 
-    await waitFor(() => {
-      expect(saveProfile).toHaveBeenCalledWith({ ...MINIMAL_CARD, offers: ["modelos"] });
-    });
-  });
+      await waitFor(() => {
+        expect(saveProfile).toHaveBeenCalledWith({ ...MINIMAL_CARD, offers: ["modelos"] });
+      });
+    },
+    FULL_RUN_TIMEOUT_MS,
+  );
 });
