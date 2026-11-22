@@ -14,4 +14,6 @@ export type Route = {
   readonly path: string;
   readonly handle: (request: RouteRequest) => Promise<RouteReply>;
   readonly maxBodyBytes?: number;
+  /** Guests (anonymous sessions) are rejected unless the route opts in (ADR 0034 §5). */
+  readonly allowsGuest?: boolean;
 };

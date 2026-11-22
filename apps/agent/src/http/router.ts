@@ -29,6 +29,7 @@ type Match = {
 
 const BASE_URL = "http://localhost";
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
 const HTTP_RATE_LIMITED = 429;
 const HTTP_INTERNAL_ERROR = 500;
 const HTTP_BAD_GATEWAY = 502;
@@ -80,6 +81,9 @@ async function run(deps: RouterDeps, match: Match, input: RouterInput): Promise<
     return identity.error.code === "UNAUTHORIZED"
       ? errorReply(HTTP_UNAUTHORIZED, "unauthorized")
       : errorReply(HTTP_BAD_GATEWAY, "upstream_unavailable");
+  }
+  if (identity.value.isGuest === true && match.route.allowsGuest !== true) {
+    return errorReply(HTTP_FORBIDDEN, "guest_not_allowed");
   }
   if (deps.rateLimiter && !deps.rateLimiter.check(identity.value.userId)) {
     return errorReply(HTTP_RATE_LIMITED, "rate_limit_exceeded");

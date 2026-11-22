@@ -46,9 +46,13 @@ export function createFeedRoutes(deps: FeedRoutesDeps): readonly Route[] {
     route("GET", FEED_PATHS.card, (request) =>
       handleCard(deps.storeFor(request.identity), request),
     ),
-    route("GET", FEED_PATHS.search, (request) =>
-      handleSearch(serviceFor(request.identity), request),
-    ),
+    // Onboarding guests see suggested nodes and flows before they have an account (ADR 0034 §6).
+    {
+      ...route("GET", FEED_PATHS.search, (request) =>
+        handleSearch(serviceFor(request.identity), request),
+      ),
+      allowsGuest: true,
+    },
     route("GET", FEED_PATHS.matches, (request) =>
       handleMatches(serviceFor(request.identity), request),
     ),

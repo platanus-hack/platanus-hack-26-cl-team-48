@@ -1,4 +1,5 @@
 import type { AddressInfo } from "node:net";
+import { FEED_PATHS } from "@nodomics/profile";
 import { expect, it } from "vitest";
 import type { AgentConfig } from "../src/config.ts";
 import { buildFeedRoutes } from "../src/feed/feed-wiring.ts";
@@ -87,3 +88,26 @@ it.each(["/feed/search", "/feed/map"])(
     expect(fetchCalls).toEqual([]);
   },
 );
+
+const GUEST_ROUTES = [`POST ${FEED_PATHS.registration}`, `GET ${FEED_PATHS.search}`];
+
+function describeRoute(route: Route): string {
+  return `${route.method} ${route.path}`;
+}
+
+it("only the registration and search feed routes allow guests", () => {
+  const routes = buildFeedRoutes(CONFIG, { fetch: () => Promise.reject(new Error("offline")) });
+
+  const allowingGuests = routes.filter((route) => route.allowsGuest === true).map(describeRoute);
+
+  expect(allowingGuests.sort()).toEqual([...GUEST_ROUTES].sort());
+});
+
+it("every other feed route does not allow guests", () => {
+  const routes = buildFeedRoutes(CONFIG, { fetch: () => Promise.reject(new Error("offline")) });
+
+  const closed = routes.filter((route) => !GUEST_ROUTES.includes(describeRoute(route)));
+
+  expect(closed.length).toBeGreaterThan(0);
+  expect(closed.every((route) => route.allowsGuest !== true)).toBe(true);
+});

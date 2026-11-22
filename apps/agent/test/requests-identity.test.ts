@@ -99,6 +99,37 @@ describe("supabase identity", () => {
     });
   });
 
+  it("an anonymous supabase user yields a guest identity", async () => {
+    const { identity } = fetchReplying(Response.json({ id: "guest-1", is_anonymous: true }));
+
+    const result = await identity.resolve("anon-jwt");
+
+    expect(result).toEqual({
+      ok: true,
+      value: { userId: "guest-1", accessToken: "anon-jwt", isGuest: true },
+    });
+  });
+
+  it("a user marked as not anonymous is not a guest", async () => {
+    const { identity } = fetchReplying(
+      Response.json({ id: "user-1", email: "a@b.c", is_anonymous: false }),
+    );
+
+    const result = await identity.resolve("good-jwt");
+
+    expect(result).toMatchObject({ ok: true, value: { userId: "user-1" } });
+    expect(result.ok && result.value.isGuest !== true).toBe(true);
+  });
+
+  it("a user without the anonymous flag is not a guest", async () => {
+    const { identity } = fetchReplying(Response.json({ id: "user-1", email: "a@b.c" }));
+
+    const result = await identity.resolve("good-jwt");
+
+    expect(result).toMatchObject({ ok: true, value: { userId: "user-1" } });
+    expect(result.ok && result.value.isGuest !== true).toBe(true);
+  });
+
   it("a failing auth service is unavailable", async () => {
     const { identity } = fetchReplying(new Response("{}", { status: 500 }));
 

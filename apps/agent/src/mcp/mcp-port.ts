@@ -3,6 +3,8 @@ import type { Result } from "@nodomics/protocol";
 export type UserIdentity = {
   readonly userId: string;
   readonly accessToken: string;
+  /** An anonymous Supabase session (ADR 0034 §5): only routes that allow guests accept it. */
+  readonly isGuest?: boolean;
 };
 
 export type ToolDescriptor = {

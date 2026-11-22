@@ -74,6 +74,8 @@ export function createMemoryHub({
       setCurrent(profile);
       return Promise.resolve(ok(undefined));
     },
+    // A guest has no profile and memory has no tokens, so there is nothing to change.
+    startGuestSession: () => Promise.resolve(ok(undefined)),
     signOut: () => {
       setCurrent(undefined);
       return Promise.resolve();

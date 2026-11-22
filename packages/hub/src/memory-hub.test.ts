@@ -538,3 +538,80 @@ describe("createMemoryHub: ownPublication", () => {
     expect(result).toEqual({ ok: true, value: undefined });
   });
 });
+
+describe("createMemoryHub: guest session", () => {
+  it("starts a guest session successfully", async () => {
+    const hub = newHub();
+
+    const result = await hub.startGuestSession();
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("has no current profile during a guest session", async () => {
+    const hub = newHub();
+
+    await hub.startGuestSession();
+
+    expect(await hub.currentProfile()).toBeUndefined();
+  });
+
+  it("does not notify profile listeners when a guest session starts", async () => {
+    const hub = newHub();
+    const seen: Array<HubProfile | undefined> = [];
+    hub.onProfileChange((profile) => seen.push(profile));
+
+    await hub.startGuestSession();
+
+    expect(seen).toEqual([]);
+  });
+
+  it("signs in normally after a guest session", async () => {
+    const hub = newHub();
+    await hub.startGuestSession();
+
+    const result = await hub.signIn({ kind: "email", email: "beto" });
+
+    expect(result.ok).toBe(true);
+    expect(await hub.currentProfile()).toEqual(beto);
+  });
+
+  it("notifies listeners of the sign in that follows a guest session", async () => {
+    const hub = newHub();
+    const seen: Array<HubProfile | undefined> = [];
+    hub.onProfileChange((profile) => seen.push(profile));
+    await hub.startGuestSession();
+
+    await hub.signIn({ kind: "email", email: "ana" });
+
+    expect(seen).toEqual([ana]);
+  });
+
+  it("keeps the current profile when a guest session starts while signed in", async () => {
+    const hub = await signedInAs(ana);
+
+    await hub.startGuestSession();
+
+    expect(await hub.currentProfile()).toEqual(ana);
+  });
+
+  it("does not notify listeners when a guest session starts while signed in", async () => {
+    const hub = await signedInAs(ana);
+    const seen: Array<HubProfile | undefined> = [];
+    hub.onProfileChange((profile) => seen.push(profile));
+
+    await hub.startGuestSession();
+
+    expect(seen).toEqual([]);
+  });
+
+  it("refuses to publish during a guest session", async () => {
+    const hub = newHub();
+    await hub.startGuestSession();
+
+    const result = await hub.publish(draft());
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.kind).toBe("signed-out");
+  });
+});

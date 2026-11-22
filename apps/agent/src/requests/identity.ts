@@ -20,7 +20,10 @@ export type SupabaseIdentityOptions = {
 
 const BEARER_PATTERN = /^bearer\s+(\S+)$/i;
 const HTTP_UNAUTHORIZED = [401, 403];
-const SupabaseUser = Type.Object({ id: Type.String({ minLength: 1 }) });
+const SupabaseUser = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  is_anonymous: Type.Optional(Type.Boolean()),
+});
 const DEV_IDENTITY: UserIdentity = { userId: "dev-user", accessToken: "dev-token" };
 
 const fail = (code: AuthError["code"], message: string): Result<never, AuthError> =>
@@ -42,7 +45,11 @@ async function fetchUser(
   if (!response.ok) return fail("UNAVAILABLE", "The auth service failed");
   const body: unknown = await response.json();
   return Value.Check(SupabaseUser, body)
-    ? ok({ userId: body.id, accessToken: bearer })
+    ? ok({
+        userId: body.id,
+        accessToken: bearer,
+        ...(body.is_anonymous === true ? { isGuest: true } : {}),
+      })
     : fail("UNAUTHORIZED", "Invalid token");
 }
 

@@ -74,6 +74,11 @@ export interface Hub {
   currentProfile(): Promise<HubProfile | undefined>;
   onProfileChange(listener: (profile: HubProfile | undefined) => void): () => void;
   signIn(method: SignInMethod): Promise<HubResult<void>>;
+  /**
+   * An anonymous session for onboarding (ADR 0034 §5): it carries a token for the agent but no
+   * profile, so the person still counts as signed out. Does nothing when a session exists.
+   */
+  startGuestSession(): Promise<HubResult<void>>;
   signOut(): Promise<void>;
   profile(handle: string): Promise<HubResult<HubProfile | undefined>>;
   search(query: SearchQuery): Promise<HubResult<ReadonlyArray<PublicationSummary>>>;

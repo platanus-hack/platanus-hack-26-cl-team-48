@@ -36,6 +36,7 @@ export function createRegistrationRoute(deps: RegistrationRouteDeps): Route {
     method: "POST",
     path: FEED_PATHS.registration,
     maxBodyBytes: REGISTRATION_MAX_BODY_BYTES,
+    allowsGuest: true,
     handle: (request) => handleRegistration(deps, request),
   };
 }

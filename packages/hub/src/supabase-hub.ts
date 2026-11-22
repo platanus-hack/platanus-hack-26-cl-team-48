@@ -64,6 +64,7 @@ export function createHubOnClient(
       };
     },
     signIn: (method) => signIn(client, method, redirectTo()),
+    startGuestSession: () => startGuestSession(client),
     signOut: async () => {
       await client.auth.signOut();
     },
@@ -125,6 +126,12 @@ async function signIn(
           options: { emailRedirectTo: redirectTo },
         })
       : await client.auth.signInWithOAuth({ provider: method.provider, options: { redirectTo } });
+  return error === null ? ok(undefined) : err({ kind: "unavailable", detail: error.message });
+}
+
+async function startGuestSession(client: HubClient): Promise<HubResult<void>> {
+  if ((await client.auth.getSession()).data.session !== null) return ok(undefined);
+  const { error } = await client.auth.signInAnonymously();
   return error === null ? ok(undefined) : err({ kind: "unavailable", detail: error.message });
 }
 
