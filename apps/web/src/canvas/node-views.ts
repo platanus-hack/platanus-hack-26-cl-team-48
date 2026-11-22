@@ -105,7 +105,7 @@ function describeNode(
     variant: manifest === undefined ? "transform" : variantOf(manifest, node.params),
     inputs: describePorts(sources.flow, node, ports.inputs),
     outputs: describePorts(sources.flow, node, ports.outputs),
-    ...describeRun(sources.engine.nodes[node.id], isResourceManifest(manifest)),
+    ...describeRun(runShownFor(manifest, sources.engine.nodes[node.id])),
     ...describeIssues(sources.engine, node, manifest),
     ...describeResult(sources.engine, node),
     ...describeEngine(sources.engine, node.id),
@@ -155,9 +155,16 @@ function describePorts(flow: Flow, node: FlowNode, ports: ReadonlyArray<PortSpec
   }));
 }
 
-function describeRun(run: NodeRun | undefined, isResource: boolean): Partial<NodeProps> {
+/** A resource node has no results to go stale: a stale one shows as not run (ADR 0027). */
+const runShownFor = (
+  manifest: NodeManifest | undefined,
+  run: NodeRun | undefined,
+): NodeRun | undefined =>
+  isResourceManifest(manifest) && resourceState(run?.state) === undefined ? undefined : run;
+
+function describeRun(run: NodeRun | undefined): Partial<NodeProps> {
   return {
-    state: toUiExecState(isResource ? resourceState(run?.state) : run?.state),
+    state: toUiExecState(run?.state),
     ...(run?.progress === undefined ? {} : { progress: run.progress }),
     ...(run?.error === undefined ? {} : { errorMessage: run.error.message }),
   };
