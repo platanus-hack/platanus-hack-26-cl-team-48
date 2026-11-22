@@ -59,15 +59,44 @@ const entriesOf = (entries: ReadonlyArray<string>): string[] =>
 
 function linksOf(draft: CardDraft): ProfileLinks {
   return Object.fromEntries(
-    LINK_KEYS.map((key) => [key, draft[key].trim()] as const)
-      .filter(([, url]) => url !== "")
-      .map(([key, url]) => [key, withScheme(url)] as const),
+    LINK_KEYS.flatMap((key) => {
+      const link = checkLink(draft[key]);
+      return link.kind === "valid" ? [[key, link.url] as const] : [];
+    }),
   );
 }
 
-const URL_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
-const DEFAULT_SCHEME = "https://";
+export type LinkCheck =
+  | { readonly kind: "empty" }
+  | { readonly kind: "invalid" }
+  | { readonly kind: "valid"; readonly url: string };
 
-/** People type "github.com/ana"; the card stores a full address so the link opens. */
-const withScheme = (url: string): string =>
-  URL_SCHEME.test(url) ? url : `${DEFAULT_SCHEME}${url}`;
+const ANY_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
+const HTTP_SCHEME = /^http:\/\//i;
+const HTTPS_SCHEME = "https://";
+const WHITESPACE = /\s/;
+
+/**
+ * People type "github.com/ana" or "http://…"; the card only takes https addresses (ADR 0022),
+ * so a link gets https and must then be a web address with a dotted host.
+ */
+export function checkLink(text: string): LinkCheck {
+  const typed = text.trim();
+  if (typed === "") return { kind: "empty" };
+  const url = withHttps(typed);
+  return isWebAddress(url) ? { kind: "valid", url } : { kind: "invalid" };
+}
+
+export const hasInvalidLinks = (draft: CardDraft): boolean =>
+  LINK_KEYS.some((key) => checkLink(draft[key]).kind === "invalid");
+
+const withHttps = (url: string): string => {
+  if (HTTP_SCHEME.test(url)) return url.replace(HTTP_SCHEME, HTTPS_SCHEME);
+  return ANY_SCHEME.test(url) ? url : `${HTTPS_SCHEME}${url}`;
+};
+
+const isWebAddress = (url: string): boolean =>
+  url.startsWith(HTTPS_SCHEME) &&
+  !WHITESPACE.test(url) &&
+  URL.canParse(url) &&
+  new URL(url).hostname.includes(".");

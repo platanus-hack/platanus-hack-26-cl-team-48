@@ -164,6 +164,7 @@ export const MESSAGES = {
         linkedin: "LinkedIn",
         github: "GitHub",
         website: "Sitio web",
+        invalidLink: "Revisa este enlace. Por ejemplo: github.com/tu-usuario",
       },
       preview: {
         title: "Así te verán",
