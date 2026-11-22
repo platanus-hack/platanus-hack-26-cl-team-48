@@ -12,18 +12,18 @@ Frase síntesis: *"Análisis de datos que se arma con nodos como LEGO, se compar
 - **Brecha de herramientas:** Las suites existentes son de escritorio y con curvas de aprendizaje prohibitivas (KNIME, Orange), costosas y orientadas a enterprise (Alteryx, Dataiku), o chats con IA cuyos resultados no son reproducibles ni auditables paso a paso (ChatGPT, Claude en chat plano).
 - **Reinvención continua del trabajo:** La lógica específica de cada sector ("cómo normalizar mediciones de riego", "cómo depurar un registro escolar con valores cero", "cómo calcular el balance de carga") se reinventa desde cero porque no existía un espacio donde inspeccionar la regla exacta, probarla con datos propios y adoptarla con confianza.
 
-## 3. Identidad: Lenguaje de diseño Minga y del Nudo (Musubi)
+## 3. Identidad: Lenguaje del Nudo
 
-Nodomics no utiliza conceptos genéricos ni depende de metáforas prestadas de herramientas de diseño. Posee su propio sistema de diseño documentado (**Minga**) y una narrativa visual basada en la tradición comunitaria y el anudado:
+Nodomics no utiliza conceptos genéricos ni depende de maquetas estáticas. Posee su propio sistema de diseño documentado y una narrativa visual basada en el anudado y la colaboración técnica:
 
-- **Símbolo:** Dos aros entrelazados (el nudo), que representan la unión entre personas de oficio y herramientas compartidas.
+- **Símbolo:** Dos aros entrelazados (el nudo de Nodomics), que representan la unión entre personas de oficio y herramientas compartidas.
 - **Estados del flujo en el lenguaje del hilo:**
   - *El hilo se cruza:* conexiones y flujo de datos entre nodos.
   - *El hilo se empalma:* unión, fusión y enriquecimiento de fuentes.
   - *El hilo se desenreda:* limpieza, normalización y simplificación de datos.
   - *El hilo se trenza:* composición de flujos dentro de otros flujos.
   - *El hilo se enreda / triza:* advertencias, errores de tipos o discrepancias de validación.
-- **Filosofía colaborativa (Minga):** El trabajo compartido no es una transacción abstracta de código, sino una jornada comunitaria donde el conocimiento de uno alivia el trabajo de otro.
+- **Colaboración entre pares:** El trabajo compartido en Nodomics permite que el conocimiento empaquetado por un profesional resuelva directamente el problema de otro en cualquier parte del mundo.
 
 ## 4. Pilares de la solución
 
@@ -59,7 +59,7 @@ Nodomics está estructurado alrededor de problemas concretos de dominio document
 
 ```mermaid
 flowchart TD
-    UI["Web · Hub, perfiles y editor (React + Minga Design)"] -->|sesión, flujos y publicaciones| DB["Supabase · Auth, Postgres y RLS"]
+    UI["Web · Hub, perfiles y editor (React + Sistema de Diseño Nodomics)"] -->|sesión, flujos y publicaciones| DB["Supabase · Auth, Postgres y RLS"]
     UI -->|NEP sobre JSON-RPC| B["Worker · coordinador y ejecutores (DuckDB / Pyodide)"]
     B -->|opcional vía WebSocket| P["Ejecutor Python local"]
     UI -->|HTTP| A["Agente · solicitudes, feed y memoria"]
@@ -83,5 +83,5 @@ flowchart TD
 Para revisar la implementación detallada, contratos de código y pruebas automatizadas:
 - [Guía técnica de Nodomics](engineering/guia-tecnica.md)
 - [Arquitectura del sistema](engineering/arquitectura.md)
-- [Sistema de diseño Minga](design-system/README.md)
+- [Sistema de diseño de Nodomics](design-system/README.md)
 - [README principal del proyecto](../README.md)

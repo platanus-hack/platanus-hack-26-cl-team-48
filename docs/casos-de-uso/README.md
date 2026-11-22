@@ -1,6 +1,6 @@
-# Catálogo de Casos de Uso — Ecosistema Minga
+# Catálogo de Casos de Uso — Ecosistema Nodomics
 ### Especificación Oficial de Casos de Uso para Jurado, Pitch y Arquitectura Técnica
-> **Hackathon Platanus Hack 26 — Proyecto Minga (Team 48)**  
+> **Hackathon Platanus Hack 26 — Proyecto Nodomics (Team 48)**  
 > *"Análisis de datos y automatización que se arma como LEGO, se habla en tu propio oficio y se comparte como una Minga comunitaria."*
 
 ---
@@ -22,18 +22,18 @@ En el mundo moderno, el conocimiento más valioso de la sociedad reside en perso
 2. **Software corporativo inaccesible (Alteryx, Dataiku, KNIME):** Costoso, con curvas de aprendizaje de meses, diseñado para ejércitos de ingenieros de datos en Silicon Valley.
 3. **Chatbots de IA aislados (ChatGPT, Claude web):** Respuestas opacas en texto plano, "cajas negras" no reproducibles, alucinaciones silenciosas y silos donde lo que inventa uno nunca beneficia al vecino.
 
-**La Solución Minga:**  
-Minga es la plataforma visual colaborativa donde el usuario diseña flujos lógicos arrastrando bloques, asistido por un agente inteligente local que habla su misma jerga profesional. Lo que un profesional crea o mejora, queda encapsulado en un artefacto ejecutable determinista, reutilizable y gobernable, que puede compartirse con el resto de la red.
+**La Solución Nodomics:**  
+Nodomics es la plataforma visual colaborativa donde el usuario diseña flujos lógicos arrastrando bloques, asistido por un agente inteligente local que habla su misma jerga profesional. Lo que un profesional crea o mejora, queda encapsulado en un artefacto ejecutable determinista, reutilizable y gobernable, que puede compartirse con el resto de la red.
 
 ```
        ┌────────────────────────────────────────────────────────┐
-       │                 EL VUELO DE MINGA                      │
+       │                 EL VUELO DE NODOMICS                      │
        │                                                        │
        │    Profesional de Oficio (Agrónomo, Médico, Profe)     │
        │                         │                              │
        │               Habla en su propia jerga                 │
        │                         ▼                              │
-       │           Agente Local de Minga (LLM)                  │
+       │           Agente Local de Nodomics (LLM)                  │
        │                         │                              │
        │              Crea/Modifica Nodos Visuales              │
        │                         ▼                              │
@@ -46,7 +46,7 @@ Minga es la plataforma visual colaborativa donde el usuario diseña flujos lógi
 
 ---
 
-## 2. Taxonomía de Tres Niveles en Minga
+## 2. Taxonomía de Tres Niveles en Nodomics
 
 Cada caso de uso en este catálogo está modelado en tres niveles arquitectónicos de granularidad:
 
@@ -90,12 +90,12 @@ flowchart TD
 
 ## 3. Los Dos Pilares Revolucionarios: Diff de Dominio & Smart Merge
 
-Minga no es sólo un editor de nodos; es el primer sistema de control de versiones y colaboración **semántico para no programadores**.
+Nodomics no es sólo un editor de nodos; es el primer sistema de control de versiones y colaboración **semántico para no programadores**.
 
 ### A. Diff de Dominio (Domain-Specific Visual Diff)
 Cuando un profesional clona o adapta una herramienta existente, no ve un galimatías de líneas de código `+` y `-`. Su agente local analiza las alteraciones del grafo y le presenta una tarjeta en el vocabulario exacto de su oficio:
 
-| Nivel Técnico (Git / JSON diff) | Diff de Dominio en Minga (Lo que ve el usuario) |
+| Nivel Técnico (Git / JSON diff) | Diff de Dominio en Nodomics (Lo que ve el usuario) |
 |---|---|
 | `param.cooling_hours: 4 -> 2` | *"Se redujo la ventana crítica de enfriamiento de 4h (arándano) a 2h porque la fresa tiene pared celular más blanda."* |
 | `node_replace: enel_chile_rate -> cfe_mx_rate` | *"Se actualizaron los cargos por kWh de Enel Distribución (Chile) a la tarifa doméstica DAC de CFE (México)."* |
@@ -104,7 +104,7 @@ Cuando un profesional clona o adapta una herramienta existente, no ve un galimat
 ### B. Smart Merge (Fusión Semántica Comunitaria)
 ¿Qué ocurre cuando la comunidad en el Hub mejora un nodo (por ejemplo, corrigiendo cómo maneja sensores desconectados), pero 500 agrónomos locales ya han personalizado sus propios umbrales de temperatura y tiempos de cosecha?
 * **En el software tradicional:** O se congela la versión y nadie recibe mejoras, o una actualización sobreescribe las personalizaciones locales, arruinando el trabajo.
-* **En Minga con Smart Merge:** El motor de grafos desacopla la **lógica estructural del nodo** de los **parámetros de contexto local**. Cuando el nodo base se actualiza en el Hub, el agente evalúa la compatibilidad semántica, aplica el parche algorítmico y preserva intactas las variables locales del profesional, notificándole en lenguaje natural:
+* **En Nodomics con Smart Merge:** El motor de grafos desacopla la **lógica estructural del nodo** de los **parámetros de contexto local**. Cuando el nodo base se actualiza en el Hub, el agente evalúa la compatibilidad semántica, aplica el parche algorítmico y preserva intactas las variables locales del profesional, notificándole en lenguaje natural:
   > *"Tu vecino transportista añadió una verificación para camiones con aislamiento térmico. Se ha integrado a tu flujo sin tocar tus horas de corte ni tus umbrales de fruta."*
 
 ---
@@ -126,22 +126,22 @@ Cuando un profesional clona o adapta una herramienta existente, no ve un galimat
 | [11-veterinarias.md](file:///Users/gabriels/Proyectos/Jules/platanus-hack-26-cl-team-48/docs/casos-de-uso/11-veterinarias.md) | **Veterinaria & Pecuaria** | Dr. Felipe Arancibia (Médico Veterinario) | Los Lagos, Chile ➔ Boyacá, Colombia | Calculador Farmacológico Multiespecie & Retiro | Monitoreo de Curva Sanitaria y Reproductiva | Dosificador Seguro de AINEs y Alerta Felina |
 | [12-ferreterias.md](file:///Users/gabriels/Proyectos/Jules/platanus-hack-26-cl-team-48/docs/casos-de-uso/12-ferreterias.md) | **Ferretería & Obra** | Don Hernán Poblete (Ferretero de Barrio) | San Bernardo, Chile ➔ Guadalajara, México | Asistente Técnico Ferretero de Cubicación de Obra | Punto de Reorden Predictivo de Fijaciones | Cubicador Metalcom Estructural (Montantes 40/60) |
 | [13-arquetipos-globales.md](file:///Users/gabriels/Proyectos/Jules/platanus-hack-26-cl-team-48/docs/casos-de-uso/13-arquetipos-globales.md) | **Meta-Arquetipos Globales** | Red de Especialistas Internacionales | Sevilla, Monterrey, Nevada, Phoenix, Guayaquil | Plantillas Universales de Dominio (Calor Urbano, Sondajes, Deporte, Megaproyectos, Drenaje, Seguridad IA) | Módulos Espaciales, Kriging y Sandbox Forense | Adaptación Transnacional con Diff de Dominio |
-| [VOCABULARIO-HILO.md](file:///Users/gabriels/Proyectos/Jules/platanus-hack-26-cl-team-48/docs/casos-de-uso/VOCABULARIO-HILO.md) | **Gramática del Hilo** | Comunidad Minga | Transversal | Las 6 Conexiones: Se cruza, Se trenza, Se enreda, Se desenreda, Se triza, Se empalma | Feed y Genealogía de Soluciones | Estado y Validación Comunitaria |
+| [VOCABULARIO-HILO.md](file:///Users/gabriels/Proyectos/Jules/platanus-hack-26-cl-team-48/docs/casos-de-uso/VOCABULARIO-HILO.md) | **Gramática del Hilo** | Comunidad Nodomics | Transversal | Las 6 Conexiones: Se cruza, Se trenza, Se enreda, Se desenreda, Se triza, Se empalma | Feed y Genealogía de Soluciones | Estado y Validación Comunitaria |
 
 ---
 
 ## 5. Guía Estratégica para el Jurado de Platanus Hack 26
 
-Cuando los jueces evalúen el proyecto Minga, deben buscar los siguientes factores de diferenciación radical:
+Cuando los jueces evalúen el proyecto Nodomics, deben buscar los siguientes factores de diferenciación radical:
 
 1. **Determinismo vs Alucinación:**  
-   Minga no genera texto libre para tomar decisiones críticas de negocio; genera **grafos de ejecución deterministas**. Si el médico o el agrónomo ejecutan el flujo 100 veces con los mismos datos, obtendrán exactamente el mismo resultado numérico auditado.
+   Nodomics no genera texto libre para tomar decisiones críticas de negocio; genera **grafos de ejecución deterministas**. Si el médico o el agrónomo ejecutan el flujo 100 veces con los mismos datos, obtendrán exactamente el mismo resultado numérico auditado.
 2. **El Agente como Constructor, no como Caja Negra:**  
    El agente de IA actúa como el arquitecto de software de cabecera: traduce necesidades verbales en nodos gráficos y explica cambios técnicos en lenguaje de campo.
 3. **Composición Modular Real (Lego):**  
    Cualquier flujo puede convertirse en un nodo con un clic (ADR 0016). Esto democratiza la ingeniería de datos: los no programadores no sólo consumen, sino que producen componentes que otros reutilizan.
 4. **Resistencia de Red y Efecto Flywheel:**  
-   Cuantos más profesionales usan Minga en su rubro, más rica se vuelve la biblioteca comunitaria de nodos validados. Una mejora en Maule beneficia de inmediato a un productor en Michoacán.
+   Cuantos más profesionales usan Nodomics en su rubro, más rica se vuelve la biblioteca comunitaria de nodos validados. Una mejora en Maule beneficia de inmediato a un productor en Michoacán.
 
 ---
 
@@ -149,9 +149,9 @@ Cuando los jueces evalúen el proyecto Minga, deben buscar los siguientes factor
 
 * **Minuto 0:00 - 0:45 (El Dolor):**  
   Presentar a Camila en el Maule con 10 toneladas de arándanos cosechados bajo el sol. Mostrar la planilla de Excel que colapsó y la pérdida de $15.000 USD por fruta que se pudrió en el camión.
-* **Minuto 0:45 - 1:30 (La Solución Minga en Vivo):**  
-  Camila abre Minga y le dice a su agente: *"Necesito calcular la ventana de frío antes de que se me ablande la fruta con el calor de hoy"*. El agente genera el flujo visual al instante. Mostramos el nodo estrella: **Filtro de Sensores Resiliente (Null vs 0)**. Demostramos cómo los sensores con batería baja que envían `null` romperían un promedio en Excel arrojando 0°C (falsa alerta de congelamiento), mientras que el nodo Minga detecta la anomalía y preserva el cálculo real.
+* **Minuto 0:45 - 1:30 (La Solución Nodomics en Vivo):**  
+  Camila abre Nodomics y le dice a su agente: *"Necesito calcular la ventana de frío antes de que se me ablande la fruta con el calor de hoy"*. El agente genera el flujo visual al instante. Mostramos el nodo estrella: **Filtro de Sensores Resiliente (Null vs 0)**. Demostramos cómo los sensores con batería baja que envían `null` romperían un promedio en Excel arrojando 0°C (falsa alerta de congelamiento), mientras que el nodo de Nodomics detecta la anomalía y preserva el cálculo real.
 * **Minuto 1:30 - 2:15 (El Fork y el Diff de Dominio):**  
-  Valeria en Zamora (México) encuentra el flujo de Camila en el Hub de Minga. Lo clona para sus fresas. El agente le muestra el **Diff de Dominio**: *"Adaptamos la ventana de 4 a 2 horas y ajustamos la temperatura a 18°C para fresa"*. Un clic y listo.
+  Valeria en Zamora (México) encuentra el flujo de Camila en el Hub de Nodomics. Lo clona para sus fresas. El agente le muestra el **Diff de Dominio**: *"Adaptamos la ventana de 4 a 2 horas y ajustamos la temperatura a 18°C para fresa"*. Un clic y listo.
 * **Minuto 2:15 - 3:00 (La Comunidad y el Cierre):**  
-  Un transportista de Jalisco aporta el nodo de aislamiento térmico de camiones. A través de **Smart Merge**, tanto Camila en Chile como Valeria en México reciben la actualización sin perder sus parámetros locales. Cierre: *"Minga transforma a cada profesional de América Latina en un desarrollador de software para su propio oficio."*
+  Un transportista de Jalisco aporta el nodo de aislamiento térmico de camiones. A través de **Smart Merge**, tanto Camila en Chile como Valeria en México reciben la actualización sin perder sus parámetros locales. Cierre: *"Nodomics transforma a cada profesional de América Latina en un desarrollador de software para su propio oficio."*
