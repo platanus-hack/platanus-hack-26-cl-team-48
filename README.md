@@ -30,3 +30,5 @@ Abre la URL que indique Vite. Puedes explorar el editor y el hub en memoria. Par
 El equipo desarrolla el motor de nodos, el editor visual y las herramientas con las que el agente trabaja sobre los flujos. La [arquitectura](docs/engineering/arquitectura.md) describe cómo se conectan. El símbolo de los dos aros pertenece al [sistema de diseño del proyecto](docs/design-system/README.md).
 
 **Equipo 48:** [Jesus Gabriel Gudiño Lara](https://github.com/Gabriels114), [Diego Sebastian Cruz Cervantes](https://github.com/SebasCrucer) y [Arturo Cantú Olivarez](https://github.com/Cantuuuu).
+
+Para revisar el repositorio en profundidad, la [guía técnica de Nodomics](docs/engineering/guia-tecnica.md) recorre el editor, el motor, la colaboración, el agente, el importador de GitHub y el despliegue, con enlaces al código y a las pruebas.
