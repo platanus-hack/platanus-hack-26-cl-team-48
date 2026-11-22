@@ -82,6 +82,27 @@ Los nodos `core.deploy.repo` y `core.deploy.service` describen recursos. El serv
 
 El equipo documentó una prueba contra Render y Supabase con un sitio estático: creación, actualización, redespliegue y borrado. En ese mismo informe dejó pendientes la prueba con repositorios reales para Docker y runtime nativo y la del panel web con una cuenta real. Esa es la cobertura reportada, no una comprobación actual de disponibilidad. [Informe del equipo](../anuncios/2026-11-22-1530-hosteo-activo.md)
 
+## Arquitectura de seguridad por entorno
+
+| Operación | Qué la contiene | Alcance de la protección |
+| --- | --- | --- |
+| Proponer cambios | Borrador privado asociado al usuario y a la revisión de origen | Aísla el estado de edición. Aplicar la selección requiere una decisión del usuario. El borrador es una copia lógica, no un entorno de ejecución. |
+| Probar un flujo vía MCP | Worker de Node terminable a los 60 segundos, con Python deshabilitado en el arranque de producción | Los mensajes de ejecución llevan el flujo y sus argumentos. El worker comparte proceso con el servicio; por sí solo no establece una frontera de máquina virtual para código arbitrario. [Worker](../../apps/mcp/src/worker-runner.ts) |
+| Importar código externo | Render Sandbox efímero con duración predeterminada de diez minutos | Recibe un token temporal de trabajo y una clave dedicada para el modelo. El proxy conserva el JWT del usuario del lado del servidor y restringe las herramientas disponibles. Aplicar, publicar o declarar un flujo como nodo quedan fuera de esa lista. El importador revoca el token al terminar e intenta cerrar el sandbox. [Proxy](../../apps/agent/src/sandbox/mcp-proxy-route.ts) · [Permisos](../../apps/agent/src/sandbox/proxy-allowlist.ts) · [Ciclo de vida](../../apps/agent/src/import/import-tool.ts) |
+| Desplegar una aplicación | Servicio de despliegue autenticado que opera sobre el flujo guardado y el proveedor de hosteo | Antes de aplicar, vuelve a calcular el plan y compara su huella. Comprueba permisos de acceso, secretos requeridos y cuotas. El servicio desplegado tiene su propio ciclo de vida y puede seguir activo cuando termina la sesión del usuario. [Implementación](../../apps/deploy/src/deploy-use-cases.ts) |
+
+Para evaluar una garantía de seguridad, identifica el entorno y la identidad que la hacen cumplir. La prueba de sitio estático citada arriba acredita el recorrido funcional de hosteo. La revisión del código del sandbox acredita el diseño y los controles implementados. Una auditoría de aislamiento en producción requeriría evidencia adicional.
+
+## Cómo se explica una decisión al profesional
+
+Hay tres preguntas con fuentes de evidencia distintas:
+
+1. **¿Qué hace este paso?** El manifiesto describe el nodo, los puertos y los parámetros; la instancia conserva sus valores y las conexiones muestran qué pasos alimenta. El usuario puede seguir un dato desde la entrada hasta la salida e inspeccionar una muestra del resultado. Para un nodo de código, entender su propósito y comprobar su comportamiento siguen siendo tareas distintas. [Manifiestos](../../packages/protocol/src/manifest.ts) · [Catálogo](../../packages/nodes-core/nodes)
+2. **¿Qué quiere cambiar el agente y por qué?** La propuesta parte del diff del borrador. Cada tarjeta identifica el cambio, conserva los valores anterior y propuesto cuando existen y muestra una razón redactada por el agente o un texto de respaldo. La persona selecciona cambios o descarta la propuesta. Las etiquetas de dominio y unidades dependen de los manifiestos: en la revisión examinada, el recorrido habitual de solicitudes construye la propuesta sin pasar ese catálogo y puede mostrar etiquetas genéricas. [Tarjetas](../../apps/agent/src/proposals/domain-cards.ts) · [Razones](../../apps/agent/src/proposals/reasons.ts) · [Panel de decisión](../../apps/web/src/agent/AgentProposal.tsx)
+3. **¿Por qué se hizo así anteriormente?** La ruta de explicación de componentes recupera episodios del actor y relaciones vigentes. Filtra el texto generado para conservar frases con referencias a episodios disponibles. Si faltan episodios responde que carece de historial. Una explicación histórica describe decisiones registradas; la corrección del resultado se comprueba ejecutando casos representativos. [Explicación histórica](../../apps/agent/src/memory/story.ts)
+
+Por ejemplo, ante un filtro que descarta mediciones vacías, el grafo permite localizar el paso, la tarjeta permite revisar la regla propuesta y una muestra con cero y un valor ausente permite comprobar si se conserva el cero. Cada evidencia responde una pregunta diferente.
+
 ## Cómo reproducir una revisión
 
 Desde la raíz, con Node.js 24 o superior y pnpm 10.28.1, ejecuta `pnpm install --frozen-lockfile` y `pnpm dev`. Este último inicia la web y el catálogo en desarrollo. Los procesos de agente, MCP y despliegue se configuran por separado. Para verificar el recorrido que te interesa, consulta los [valores públicos de la web](../../apps/web/.env.example), las guías de [agente](../../apps/agent/README.md), [MCP](../../apps/mcp/README.md) y [despliegue](../../apps/deploy/README.md), el [blueprint](../../render.yaml) y las [migraciones SQL](../../supabase/migrations). Para conocer las capacidades activas del proceso prevalece el código de arranque de esa revisión.
