@@ -39,6 +39,22 @@ describe("buildCatalog", () => {
     });
   });
 
+  it("accepts a resource node that has neither code nor template", () => {
+    const resourceNode = {
+      ...sqlNode,
+      id: "core.deploy.repo",
+      inputs: [],
+      outputs: [{ id: "repo", type: "repo" }],
+      impl: { kind: "resource", resource: "repo" },
+    };
+
+    const result = buildCatalog([
+      { name: "core.deploy.repo", nodeJson: JSON.stringify(resourceNode) },
+    ]);
+
+    expect(result).toEqual({ ok: true, value: [resourceNode] });
+  });
+
   it("sorts the manifests by id", () => {
     const result = buildCatalog([
       { name: "core.python.echo", nodeJson: JSON.stringify(pythonNode), mainPy: PYTHON_CODE },

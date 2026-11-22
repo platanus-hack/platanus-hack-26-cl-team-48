@@ -5,6 +5,8 @@ import { findUnsafeInterpolations } from "./template-safety.ts";
 
 const CORE_NODE_IDS = [
   "core.cast",
+  "core.deploy.repo",
+  "core.deploy.service",
   "core.filter",
   "core.formula",
   "core.group",
