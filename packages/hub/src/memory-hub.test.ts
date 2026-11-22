@@ -154,6 +154,40 @@ describe("createMemoryHub: session", () => {
   });
 });
 
+describe("createMemoryHub: password session", () => {
+  it("signs in with a password the profile whose handle matches the email", async () => {
+    const hub = newHub();
+
+    const result = await hub.signIn({ kind: "password", email: "beto", password: "lo-que-sea" });
+
+    expect(result.ok).toBe(true);
+    expect(await hub.currentProfile()).toEqual(beto);
+  });
+
+  it("rejects a password sign-in whose email matches no profile", async () => {
+    const hub = newHub();
+
+    const result = await hub.signIn({
+      kind: "password",
+      email: "nadie@example.com",
+      password: "lo-que-sea",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.kind).toBe("invalid");
+    expect(await hub.currentProfile()).toBeUndefined();
+  });
+
+  it("signs up into the profile whose handle matches the email", async () => {
+    const hub = newHub();
+
+    const result = await hub.signIn({ kind: "sign-up", email: "beto", password: "secreto" });
+
+    expect(result.ok).toBe(true);
+    expect(await hub.currentProfile()).toEqual(beto);
+  });
+});
+
 describe("createMemoryHub: profile", () => {
   it("returns a known profile by handle", async () => {
     const hub = newHub();

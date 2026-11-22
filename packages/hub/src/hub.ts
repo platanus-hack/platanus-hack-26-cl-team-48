@@ -6,7 +6,9 @@ export type OAuthProvider = "github" | "google";
 
 export type SignInMethod =
   | { readonly kind: "provider"; readonly provider: OAuthProvider }
-  | { readonly kind: "email"; readonly email: string };
+  | { readonly kind: "email"; readonly email: string }
+  | { readonly kind: "password"; readonly email: string; readonly password: string }
+  | { readonly kind: "sign-up"; readonly email: string; readonly password: string };
 
 export type HubProfile = {
   readonly id: string;
