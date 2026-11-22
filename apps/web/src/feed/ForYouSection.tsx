@@ -8,6 +8,7 @@ import { RouteLink } from "../routing/RouteLink.tsx";
 import { useOptionalFeed } from "./feed-context.ts";
 import type { FeedError, FeedService } from "./feed-service.ts";
 import { HitSummary } from "./HitSummary.tsx";
+import { ProfileInvite } from "./ProfileInvite.tsx";
 import { useQuery } from "../async/use-query.ts";
 
 /** The people, nodes and flows that complement the signed-in person (ADR 0022 §3). */
@@ -45,10 +46,11 @@ function MatchesFailure({ error, handle }: { readonly error: FeedError; readonly
   if (error.code !== "NO_PROFILE")
     return <Notice tone="error" title={MESSAGES.feed.forYouFailed} />;
   return (
-    <p className="web-hub-muted">
-      {MESSAGES.feed.forYouNoProfile}
-      <RouteLink route={{ page: "profile", handle }}>{MESSAGES.feed.completeProfile}</RouteLink>
-    </p>
+    <ProfileInvite>
+      <RouteLink route={{ page: "profile", handle }} className="web-feed-invite-link">
+        {MESSAGES.feed.invite.start}
+      </RouteLink>
+    </ProfileInvite>
   );
 }
 
