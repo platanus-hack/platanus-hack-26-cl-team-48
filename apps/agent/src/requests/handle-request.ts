@@ -14,6 +14,7 @@ import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
 import type { EmbeddingsPort } from "../memory/embeddings.ts";
 import type { SearchIndexPort } from "../memory/search.ts";
 import type { RateLimiter } from "../http/guards/rate-limit.ts";
+import type { StructuredLogger } from "../http/guards/logger.ts";
 import { SYSTEM_PROMPT } from "../prompts/system.ts";
 import { REQUEST_ALLOWLIST } from "./allowlists.ts";
 import { recordDrafts } from "./draft-recorder.ts";
@@ -32,6 +33,7 @@ export type RequestDeps = {
   readonly searchForUser?: (identity: UserIdentity) => SearchIndexPort | null;
   readonly documentEmbeddings?: EmbeddingsPort;
   readonly rateLimiter?: RateLimiter;
+  readonly logger?: StructuredLogger;
 };
 
 export type RequestInput = {
@@ -88,7 +90,7 @@ const withSystemPrompt = (llm: LlmPort): LlmPort => ({
 async function buildProposalData(
   deps: RequestDeps,
   identity: UserIdentity,
-  input: { readonly draftId: string; readonly flowId?: string | undefined },
+  input: { readonly draftId: string; readonly flowId: string },
 ): Promise<ProposalPayload | null> {
   const store = deps.proposalsForUser?.(identity) ?? deps.proposals;
   if (!store) return null;
@@ -97,9 +99,16 @@ async function buildProposalData(
     llm: deps.llm,
     identity,
     draftId: input.draftId,
-    flowId: input.flowId ?? input.draftId,
+    flowId: input.flowId,
   });
-  if (!outcome.ok || !outcome.value) return null;
+  if (!outcome.ok) {
+    deps.logger?.warn("proposal not built", {
+      code: outcome.error.code,
+      message: outcome.error.message,
+    });
+    return null;
+  }
+  if (!outcome.value) return null;
   const { proposal, cards } = outcome.value;
   await store.save({ proposal, cards, ownerId: identity.userId });
   return { proposalId: proposal.id, cards };
@@ -126,11 +135,17 @@ async function runRequest(
     ...(deps.limits ? { limits: deps.limits } : {}),
     ...(request.onEvent ? { onEvent: request.onEvent } : {}),
   });
-  if (!outcome.ok) return loopFailure(outcome.error);
+  if (!outcome.ok) {
+    deps.logger?.error("agent loop failed", {
+      code: outcome.error.code,
+      message: outcome.error.message,
+    });
+    return loopFailure(outcome.error);
+  }
   const draftId = recorder.lastDraftId();
-  const proposal = draftId
-    ? await buildProposalData(deps, identity, { draftId, flowId: request.flowId })
-    : null;
+  const flowId = request.flowId ?? recorder.lastFlowId() ?? draftId;
+  const proposal =
+    draftId && flowId ? await buildProposalData(deps, identity, { draftId, flowId }) : null;
   return success(outcome.value, draftId, proposal);
 }
 

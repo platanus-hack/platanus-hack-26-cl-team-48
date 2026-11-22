@@ -1,0 +1,50 @@
+{
+  "status": "verified",
+  "provenance": {
+    "repo": "pandas-dev/pandas",
+    "commit": "f538741432edf55c6b9fb5d0d496d2dd1d7c2457",
+    "paths": ["pandas/core/dtypes/missing.py"],
+    "license": "BSD-3-Clause"
+  },
+  "draftId": "draft-missing-vs-zero-correct",
+  "inputNode": {
+    "nodeId": "core",
+    "port": "input"
+  },
+  "outputNode": {
+    "nodeId": "core",
+    "port": "output"
+  },
+  "mapping": [
+    {
+      "sourcePath": "pandas/core/dtypes/missing.py",
+      "nodeIds": ["core"],
+      "decision": "adapted"
+    }
+  ],
+  "cases": [
+    {
+      "name": "contar mediciones con valores faltantes y ceros",
+      "input": [{ "medicion": 12 }, { "medicion": 0 }, { "medicion": null }, { "medicion": 7 }],
+      "expected": [{ "faltantes": 1 }],
+      "observed": [{ "faltantes": 1 }],
+      "expectedBy": {
+        "command": "python -c \"import pandas as pd; s = pd.Series([12, 0, None, 7]); print(int(s.isna().sum()))\"",
+        "path": "pandas/core/dtypes/missing.py"
+      }
+    },
+    {
+      "name": "contar mediciones con solo ceros",
+      "input": [{ "medicion": 0 }, { "medicion": 0 }],
+      "expected": [{ "faltantes": 0 }],
+      "observed": [{ "faltantes": 0 }],
+      "expectedBy": {
+        "command": "python -c \"import pandas as pd; s = pd.Series([0, 0]); print(int(s.isna().sum()))\"",
+        "path": "pandas/core/dtypes/missing.py"
+      }
+    }
+  ],
+  "outOfScope": [],
+  "missing": [],
+  "explanation": "Traducción a SQL para conteo de mediciones faltantes usando WHERE medicion IS NULL, distinguiendo nulos de ceros."
+}

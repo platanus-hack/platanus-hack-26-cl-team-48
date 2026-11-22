@@ -37,3 +37,13 @@ export { ColumnProfile, type ColumnProfileProps } from "./ColumnProfile.tsx";
 export { HubCard, type HubCardProps } from "./HubCard.tsx";
 export { Notice, type NoticeProps } from "./Notice.tsx";
 export { formatNumber } from "./format-number.ts";
+export { KnotMark, type KnotMarkProps } from "./KnotMark.tsx";
+export { LineageStrip, type LineageStripProps } from "./LineageStrip.tsx";
+export { ThreadGlyph, type ThreadGlyphProps, type ThreadGlyphKind } from "./ThreadGlyph.tsx";
+export {
+  segmentsFor,
+  glyphPaths,
+  wave,
+  type LineageEvent,
+  type LineageSegment,
+} from "./lineage.ts";
