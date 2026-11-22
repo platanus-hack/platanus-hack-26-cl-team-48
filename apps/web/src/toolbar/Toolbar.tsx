@@ -1,3 +1,4 @@
+import { KnotMark } from "@nodomics/ui";
 import { AccountButton } from "../hub/AccountButton.tsx";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
@@ -15,7 +16,7 @@ export function Toolbar(engine: EngineSelectorProps) {
       <div className="web-toolbar-start">
         <h1 className="web-toolbar-title">
           <RouteLink className="web-brand" route={{ page: "hub" }}>
-            <span className="web-brand-mark" aria-hidden="true" />
+            <KnotMark />
             {MESSAGES.app.title}
           </RouteLink>
         </h1>

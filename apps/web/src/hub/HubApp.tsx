@@ -1,6 +1,6 @@
 import type { Flow } from "@nodomics/protocol";
 import { useState } from "react";
-import { Input } from "@nodomics/ui";
+import { Input, KnotMark } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
@@ -35,7 +35,7 @@ export function HubApp(navigation: HubNavigation) {
       />
       <div className="web-hub-scroll">
         {route.page === "workspace" || route.page === "hub" ? (
-          <HubPage text={text} {...navigation} />
+          <HubPage text={text} onSearch={setText} {...navigation} />
         ) : (
           <HubRoutePage route={route} {...navigation} />
         )}
@@ -54,7 +54,7 @@ function HubBar({
   return (
     <header className="web-hub-bar">
       <RouteLink className="web-brand" route={{ page: "hub" }}>
-        <span className="web-brand-mark" aria-hidden="true" />
+        <KnotMark />
         {MESSAGES.app.title}
         <span className="web-hub-bar-section">{MESSAGES.hub.title}</span>
       </RouteLink>
