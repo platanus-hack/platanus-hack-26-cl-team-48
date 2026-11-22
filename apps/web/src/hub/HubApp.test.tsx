@@ -1,9 +1,11 @@
 import { SNAPSHOT_FORMAT, type Hub } from "@nodomics/hub";
-import type { Flow, FlowNode } from "@nodomics/protocol";
+import { ok, type Flow, type FlowNode } from "@nodomics/protocol";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { FILTER, edgeOf, flowOf, manifestOf, nodeOf } from "../canvas/canvas-fixtures.ts";
+import { FeedContext } from "../feed/feed-context.ts";
+import { componentHit, createFakeFeed } from "../feed/feed-fixtures.ts";
 import { cloudStores, createFlowsHub } from "../library/cloud-flow-fixtures.ts";
 import { pathOf, type EditorOpening, type Route } from "../routing/routes.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
@@ -129,6 +131,7 @@ const HUB_ROUTES: ReadonlyArray<{ readonly name: string; readonly route: HubRout
 ];
 
 const filtersSidebar = () => screen.queryByRole("complementary", { name: "Filtros del hub" });
+const filtersRegion = () => screen.queryByRole("region", { name: "Filtros del hub" });
 
 /** The version loads after the page, so pressing is retried until the expectation holds. */
 async function pressUntil(name: string, expectation: () => void) {
@@ -169,6 +172,22 @@ describe("HubApp header", () => {
       link: within(hubHeader()).queryByRole("link", { name: "Abrir el editor" }),
       button: within(hubHeader()).queryByRole("button", { name: "Abrir el editor" }),
     }).toEqual({ link: null, button: null });
+  });
+
+  it("offers Nuevo flujo as the primary action when signed out", async () => {
+    await renderHubApp({ page: "hub" });
+
+    const newFlow = within(hubHeader()).getByRole("button", { name: "Nuevo flujo" });
+
+    expect(newFlow.className).toContain("nd-btn-primary");
+  });
+
+  it("offers Nuevo flujo when signed in", async () => {
+    await renderSignedInHubApp({ page: "hub" });
+
+    await screen.findByRole("tab", { name: "Mi espacio" });
+
+    expect(within(hubHeader()).getByRole("button", { name: "Nuevo flujo" })).toBeTruthy();
   });
 
   it("offers to sign in when signed out", async () => {
@@ -326,15 +345,18 @@ describe("HubApp opening a flow", () => {
 });
 
 describe("HubApp opening the editor", () => {
-  it("hands a new flow to onOpenEditor from Nuevo flujo in Mis flujos", async () => {
+  it("hands a new flow to onOpenEditor from Nuevo flujo in the header when signed in", async () => {
     const { onOpenEditor } = await renderSignedInHubApp({ page: "hub" });
-    await userEvent.click(
-      await within(screen.getByRole("radiogroup", { name: "Explorar" })).findByRole("radio", {
-        name: "Mis flujos",
-      }),
-    );
 
-    await userEvent.click(await screen.findByRole("button", { name: "Nuevo flujo" }));
+    await userEvent.click(within(hubHeader()).getByRole("button", { name: "Nuevo flujo" }));
+
+    expect(onOpenEditor.mock.calls).toEqual([[{ kind: "new" }]]);
+  });
+
+  it("hands a new flow to onOpenEditor from Nuevo flujo in the header when signed out", async () => {
+    const { onOpenEditor } = await renderHubApp({ page: "hub" });
+
+    await userEvent.click(within(hubHeader()).getByRole("button", { name: "Nuevo flujo" }));
 
     expect(onOpenEditor.mock.calls).toEqual([[{ kind: "new" }]]);
   });
@@ -424,7 +446,7 @@ describe("HubApp search", () => {
   it("hints what can be searched", async () => {
     await renderHubApp({ page: "hub" });
 
-    expect(hubSearch().getAttribute("placeholder")).toBe("Buscar flujos, nodos o personas…");
+    expect(hubSearch().getAttribute("placeholder")).toBe("Busca un tema, flujo, nodo o persona…");
   });
 
   it("narrows the hub results as the user types", async () => {
@@ -482,26 +504,42 @@ describe("HubApp search", () => {
   );
 });
 
-describe("HubApp filters sidebar", () => {
-  it("shows the hub filters on the hub route", async () => {
+describe("HubApp hub filters", () => {
+  it("shows the hub filters as a region on the hub route", async () => {
     await renderHubApp({ page: "hub" });
 
-    expect(await screen.findByRole("complementary", { name: "Filtros del hub" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "Filtros del hub" })).toBeTruthy();
   });
 
-  it.each(["Explorar", "Tipo"])("groups the %s options in the hub filters", async (name) => {
+  it("no longer shows a filters sidebar", async () => {
     await renderHubApp({ page: "hub" });
 
-    const sidebar = await screen.findByRole("complementary", { name: "Filtros del hub" });
+    await screen.findByRole("heading", { level: 1, name: "Hub" });
 
-    expect(within(sidebar).getByRole("radiogroup", { name })).toBeTruthy();
+    expect(filtersSidebar()).toBeNull();
+  });
+
+  it("groups the Tipo options in the hub filters", async () => {
+    await renderHubApp({ page: "hub" });
+
+    const filters = await screen.findByRole("region", { name: "Filtros del hub" });
+
+    expect(within(filters).getByRole("radiogroup", { name: "Tipo" })).toBeTruthy();
+  });
+
+  it("no longer offers the Explorar options", async () => {
+    await renderHubApp({ page: "hub" });
+
+    await screen.findByRole("region", { name: "Filtros del hub" });
+
+    expect(screen.queryByRole("radiogroup", { name: "Explorar" })).toBeNull();
   });
 
   it("keeps the Etiquetas in the hub filters", async () => {
     await renderHubApp({ page: "hub" });
-    const sidebar = await screen.findByRole("complementary", { name: "Filtros del hub" });
+    const filters = await screen.findByRole("region", { name: "Filtros del hub" });
 
-    expect(await within(sidebar).findByRole("group", { name: "Etiquetas" })).toBeTruthy();
+    expect(await within(filters).findByRole("group", { name: "Etiquetas" })).toBeTruthy();
   });
 
   it("does not show the hub filters on a profile page", async () => {
@@ -509,7 +547,7 @@ describe("HubApp filters sidebar", () => {
 
     await screen.findByRole("heading", { level: 1, name: "Ana Pérez" });
 
-    expect(filtersSidebar()).toBeNull();
+    expect(filtersRegion()).toBeNull();
   });
 
   it("does not show the hub filters on a publication page", async () => {
@@ -517,6 +555,41 @@ describe("HubApp filters sidebar", () => {
 
     await screen.findByRole("heading", { level: 1, name: "Ventas por región" });
 
-    expect(filtersSidebar()).toBeNull();
+    expect(filtersRegion()).toBeNull();
+  });
+});
+
+describe("HubApp searching a recommendation", () => {
+  async function renderWithRecommendation() {
+    window.history.replaceState(null, "", pathOf({ page: "hub" }));
+    const hub = await seededHub();
+    await hub.signIn({ kind: "email", email: BETO.handle });
+    const { feed } = createFakeFeed({
+      matches: () => Promise.resolve(ok([componentHit("node", "n1", "Limpiar texto")])),
+    });
+    renderWithHub(
+      <FeedContext value={feed}>
+        <HubApp {...navigationSpies()} />
+      </FeedContext>,
+      hub,
+    );
+    const item = await screen.findByRole("article", { name: "Limpiar texto" });
+    return within(item).getByRole("button", { name: "Buscar «Limpiar texto» en el hub" });
+  }
+
+  it("puts the recommendation's title in the hub search", async () => {
+    const searchButton = await renderWithRecommendation();
+
+    await userEvent.click(searchButton);
+
+    expect(hubSearch()).toHaveProperty("value", "Limpiar texto");
+  });
+
+  it("heads the hub results Resultados after searching a recommendation", async () => {
+    const searchButton = await renderWithRecommendation();
+
+    await userEvent.click(searchButton);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Resultados" })).toBeTruthy();
   });
 });

@@ -175,7 +175,7 @@ function VersionActions({
         />
       ) : (
         <Button
-          variant={kind === "flow" ? "primary" : "secondary"}
+          variant={kind === "node" ? "secondary" : "primary"}
           icon="copy"
           onClick={() => {
             account.request("copy");

@@ -113,12 +113,19 @@ test("opens the hub at the home page in another tab with its own header", async 
   ]);
   await hub.waitForLoadState();
   expect(new URL(hub.url()).pathname).toBe("/");
-  await expect(hub.getByRole("heading", { name: "Para ti" })).toBeVisible();
-  await expect(hub.getByText("Entra para ver con quién puedes colaborar.")).toBeVisible();
+  await expect(
+    hub.getByRole("heading", {
+      level: 2,
+      name: "Analiza datos como LEGO, junto a quien sabe lo que tú no",
+    }),
+  ).toBeVisible();
   await expect(
     hub.getByRole("banner").getByRole("searchbox", { name: "Buscar en el hub" }),
   ).toBeVisible();
-  await expect(hub.getByRole("complementary", { name: "Filtros del hub" })).toBeVisible();
+  await expect(
+    hub.getByRole("banner").getByRole("button", { name: "Nuevo flujo", exact: true }),
+  ).toBeVisible();
+  await expect(hub.getByRole("region", { name: "Filtros del hub" })).toBeVisible();
   await expect(canvasOf(page)).toBeVisible();
 });
 
@@ -148,17 +155,8 @@ test("searches the hub from the header of a profile page", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 2, name: "Resultados" })).toBeVisible();
 });
 
-const exploreGroupOf = (page: Page) =>
-  page
-    .getByRole("complementary", { name: "Filtros del hub" })
-    .getByRole("radiogroup", { name: "Explorar" });
-
-const exploreViewOf = (page: Page, name: string) =>
-  exploreGroupOf(page).getByRole("radio", { name, exact: true });
-
-/** Picks a view by its label, as a user does: the styled label covers the radio itself. */
-const chooseExploreView = (page: Page, name: string) =>
-  exploreGroupOf(page).getByText(name, { exact: true }).click();
+const hubTabOf = (page: Page, name: string) =>
+  page.getByRole("tablist", { name: "Secciones del hub" }).getByRole("tab", { name, exact: true });
 
 /** Signs in to the local account from the hub's header; the hub keeps it until the page reloads. */
 async function signInOnTheHub(page: Page): Promise<void> {
@@ -169,39 +167,35 @@ async function signInOnTheHub(page: Page): Promise<void> {
     .click();
 }
 
-test("offers Mis flujos and Mis publicaciones in the hub only while signed in", async ({
-  page,
-}) => {
+test("offers Mi espacio in the hub only while signed in", async ({ page }) => {
   await page.goto("/");
-  await expect(exploreViewOf(page, "Para ti")).toBeVisible();
-  await expect(exploreViewOf(page, "Recientes")).toBeVisible();
-  await expect(exploreViewOf(page, "Mis flujos")).toHaveCount(0);
-  await expect(exploreViewOf(page, "Mis publicaciones")).toHaveCount(0);
+  await expect(hubTabOf(page, "Descubrir")).toBeVisible();
+  await expect(hubTabOf(page, "Mi espacio")).toHaveCount(0);
 
   await signInOnTheHub(page);
 
-  await expect(exploreViewOf(page, "Mis flujos")).toBeVisible();
-  await expect(exploreViewOf(page, "Mis publicaciones")).toBeVisible();
+  await expect(hubTabOf(page, "Mi espacio")).toBeVisible();
 });
 
-test("shows an empty Mis flujos in the hub for an account without saved flows", async ({
+test("shows an empty Mis flujos in Mi espacio for an account without saved flows", async ({
   page,
 }) => {
   await page.goto("/");
   await signInOnTheHub(page);
 
-  await chooseExploreView(page, "Mis flujos");
+  await hubTabOf(page, "Mi espacio").click();
 
   await expect(page.getByRole("heading", { level: 2, name: "Mis flujos" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Mis publicaciones" })).toBeVisible();
   await expect(page.getByText("Todavía no hay flujos guardados.")).toBeVisible();
 });
 
-test("opens an empty editor in the same tab from Nuevo flujo in Mis flujos", async ({ page }) => {
+test("opens an empty editor in the same tab from Nuevo flujo in the hub header", async ({
+  page,
+}) => {
   await page.goto("/");
-  await signInOnTheHub(page);
-  await chooseExploreView(page, "Mis flujos");
 
-  await page.getByRole("button", { name: "Nuevo flujo", exact: true }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Nuevo flujo", exact: true }).click();
 
   await expect(page).toHaveURL((url) => url.pathname === "/editor");
   await waitForEngineReady(page);
@@ -209,7 +203,6 @@ test("opens an empty editor in the same tab from Nuevo flujo in Mis flujos", asy
   await expect(canvasOf(page).locator(".web-node")).toHaveCount(0);
   expect(page.context().pages()).toHaveLength(1);
 });
-
 for (const path of ["/", "/hub"])
   test(`shows only the hub, without the editor, when visiting ${path}`, async ({ page }) => {
     await page.goto(path);

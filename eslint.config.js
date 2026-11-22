@@ -3,7 +3,17 @@ import importX from "eslint-plugin-import-x";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/coverage/**", "engines/**", "**/*.cjs", ".claude/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/coverage/**",
+      "engines/**",
+      "**/*.cjs",
+      ".claude/**",
+      ".worktrees/**",
+      ".pnpm-store/**",
+    ],
+  },
   ...tseslint.configs.strictTypeChecked,
   {
     languageOptions: {
