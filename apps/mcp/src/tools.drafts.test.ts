@@ -27,11 +27,12 @@ describe("flows.create_draft", () => {
 
     const created = await harness.callOk("flows.create_draft", { flowId: "ventas" });
 
-    expect(created).toEqual({
-      draftId: expect.any(String),
+    expect(created).toMatchObject({
       flowId: "ventas",
       baseRevision: revisionOf(SALES_FLOW),
     });
+    expect(typeof readField(created, "draftId")).toBe("string");
+    expect(readField(created, "draftId")).not.toBe("");
   });
 
   it("starts the draft as a copy of the saved flow", async () => {

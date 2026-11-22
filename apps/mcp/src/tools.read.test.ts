@@ -169,7 +169,8 @@ describe("flows.search", () => {
 
     const ids = await harness.callOk("flows.search", { query: "" });
 
-    expect(Array.isArray(ids) ? [...ids].sort() : ids).toEqual(["inventario", "ventas"]);
+    expect(ids).toEqual(expect.arrayContaining(["inventario", "ventas"]));
+    expect(ids).toHaveLength(2);
   });
 
   it("returns an empty list when nothing matches", async () => {
