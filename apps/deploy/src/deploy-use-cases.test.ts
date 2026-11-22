@@ -1166,6 +1166,68 @@ describe("list — refreshing the status never overwrites concurrent changes", (
       value: { spec: specOfFlow(EDITED_FLOW), specHash: hashSpec(specOfFlow(EDITED_FLOW)) },
     });
   });
+
+  const liveRecord = () =>
+    recordOf({
+      flowId: "flow-1",
+      nodeId: "web",
+      spec: specOfFlow(FLOW),
+      specHash: hashSpec(specOfFlow(FLOW)),
+      status: "live",
+    });
+  const updateOk = () => Promise.resolve(ok(undefined));
+
+  it("keeps the deploying status saved by a redeploy run while the status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, store } = setup({
+      provider: { status: deferred.status, update: updateOk },
+    });
+    await store.save(liveRecord());
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    const redeploying = useCases.redeploy(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("failed");
+    const [, redeployed] = await Promise.all([listing, redeploying]);
+
+    expect(redeployed.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "deploying" },
+    });
+  });
+
+  it("keeps the deploying status saved by an update applied while the status was being refreshed", async () => {
+    const deferred = deferredStatus();
+    const { useCases, flows, store } = setup({
+      provider: { status: deferred.status, update: updateOk },
+    });
+    await store.save(liveRecord());
+    const listing = useCases.list(ALICE, "flow-1");
+    await deferred.called;
+    flows.set(ALICE, "flow-1", EDITED_FLOW);
+    const applying = useCases.apply(ALICE, {
+      flowId: "flow-1",
+      nodeId: "web",
+      planHash: hashSpec(specOfFlow(EDITED_FLOW)),
+      secrets: SECRETS,
+    });
+    await settle();
+
+    deferred.release("failed");
+    const [, applied] = await Promise.all([listing, applying]);
+
+    expect(applied.ok).toBe(true);
+    expect(await store.findByNode(ALICE.userId, "flow-1", "web")).toMatchObject({
+      ok: true,
+      value: { status: "deploying", specHash: hashSpec(specOfFlow(EDITED_FLOW)) },
+    });
+  });
 });
 
 describe("apply — reporting orphan services", () => {
