@@ -6,7 +6,6 @@ import { AgentPanel } from "../agent/AgentPanel.tsx";
 import type { SideSection } from "../layout/workspace-preferences.ts";
 import { Credentials } from "../library/Credentials.tsx";
 import { LibraryPanel } from "../library/LibraryPanel.tsx";
-import { SavedFlowList } from "../library/SavedFlowList.tsx";
 import { SavedNodeList } from "../library/SavedNodeList.tsx";
 import { StoredFileList } from "../library/StoredFileList.tsx";
 import { MESSAGES } from "../messages.ts";
@@ -22,7 +21,6 @@ type SidePanelProps = {
 
 const CONTENTS: Record<SideSection, (onAdd: SidePanelProps["onAdd"]) => ReactNode> = {
   nodes: (onAdd) => <LibraryPanel onAdd={onAdd} />,
-  flows: () => <SavedFlowList />,
   "my-nodes": () => <SavedNodeList />,
   data: () => <StoredFileList />,
   secrets: () => <Credentials />,

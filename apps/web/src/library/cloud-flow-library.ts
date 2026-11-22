@@ -26,15 +26,10 @@ export function createCloudFlowLibrary({ flows, local }: CloudFlowLibraryDeps): 
   };
 }
 
-/** Without a visibility the hub keeps the flow's own, so a save never undoes "Hacer público". */
-function draftOf({ visibility, ...document }: SavedFlow): FlowDraft {
-  return { id: document.id, ...(visibility === undefined ? {} : { visibility }), document };
-}
+/** Saved flows stay private drafts; publishing is what makes something public (ADR 0024). */
+const draftOf = (saved: SavedFlow): FlowDraft => ({ id: saved.id, document: saved });
 
-function savedFlowOf(stored: StoredFlow): SavedFlow | undefined {
-  const saved = parseSavedFlow(stored.document);
-  return saved === undefined ? undefined : { ...saved, visibility: stored.visibility };
-}
+const savedFlowOf = (stored: StoredFlow): SavedFlow | undefined => parseSavedFlow(stored.document);
 
 function toSavedFlows(
   result: Result<ReadonlyArray<StoredFlow>, HubError>,

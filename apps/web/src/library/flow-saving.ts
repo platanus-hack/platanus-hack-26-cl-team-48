@@ -4,7 +4,9 @@ import { createFlowSync, type Timers } from "../engine/flow-sync.ts";
 import { MESSAGES } from "../messages.ts";
 import { nodeFromFlow } from "./flow-node.ts";
 import { nextNodeVersion } from "./node-version.ts";
-import type { LibraryIssue, SavedFlow } from "./flow-library.ts";
+import { withoutPrivateParams } from "../hub/hub-flow.ts";
+import { flowFingerprint } from "./flow-fingerprint.ts";
+import type { LibraryIssue, PublishedLink, SavedFlow } from "./flow-library.ts";
 import { isBlockedStatus, type SavedFlowStatus } from "./saved-flow-store.ts";
 
 export const AUTO_SAVE_DELAY_MS = 1000;
@@ -60,14 +62,24 @@ async function saveFlow(deps: SavingDeps, flow: Flow) {
   const id = currentId ?? deps.createId();
   store.setState({ currentId: id });
   const previous = report(await library.readFlow(id));
-  const node = savedNode({ id, flow, previous: previous?.node }, savingCatalog(deps.stores, flow));
-  const result = await library.saveFlow(
-    savedFlowRecord({ id, flow, files, node, updatedAt: deps.now() }),
-  );
+  const catalog = savingCatalog(deps.stores, flow);
+  const node = savedNode({ id, flow, previous: previous?.node }, catalog);
+  const published = withChanges(previous?.published, withoutPrivateParams(flow, catalog));
+  const result = await library.saveFlow({
+    ...savedFlowRecord({ id, flow, files, node, updatedAt: deps.now() }),
+    ...(published === undefined ? {} : { published }),
+  });
   report(result);
   if (store.getState().generation !== generation) return;
   store.setState({ status: savedStatus(result.issue) });
   await store.getState().refresh();
+}
+
+/** Compared without private params, as publishing does, so a reconnected file is no change. */
+function withChanges(published: PublishedLink | undefined, clean: Flow): PublishedLink | undefined {
+  return published === undefined
+    ? undefined
+    : { ...published, hasChanges: flowFingerprint(clean) !== published.fingerprint };
 }
 
 function savedStatus(issue: LibraryIssue | undefined): SavedFlowStatus {

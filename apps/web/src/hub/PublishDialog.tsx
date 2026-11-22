@@ -2,6 +2,7 @@ import { isValidSlug, type HubError, type Snapshot } from "@nodomics/hub";
 import type { Flow, NodeManifest } from "@nodomics/protocol";
 import { Button, Field, Input, Notice } from "@nodomics/ui";
 import { useId, useState } from "react";
+import type { PublishedFlow } from "../library/saved-flow-store.ts";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
 import { HubDialog } from "./HubDialog.tsx";
@@ -19,6 +20,8 @@ export type PublishSource = {
 type PublishDialogProps = {
   readonly source: PublishSource;
   readonly record: (includeState: boolean) => Promise<Snapshot>;
+  /** Links the open flow to what was published (ADR 0024). */
+  readonly onPublished?: (published: PublishedFlow) => Promise<void>;
   readonly onClose: () => void;
 };
 
@@ -28,9 +31,9 @@ type Outcome =
   | { readonly status: "published"; readonly handle: string; readonly slug: string };
 
 /** Publishes the open flow to the hub: as a flow, or as a node when it has a node entry (ADR 0018). */
-export function PublishDialog({ source, record, onClose }: PublishDialogProps) {
+export function PublishDialog({ source, record, onPublished, onClose }: PublishDialogProps) {
   const editor = usePublishForm(source.title);
-  const [outcome, publish] = usePublish(source, record);
+  const [outcome, publish] = usePublish(source, record, onPublished);
   return (
     <HubDialog title={MESSAGES.publish.title} onClose={onClose}>
       <div className="web-hub-form">
@@ -185,7 +188,11 @@ function OutcomeMessage({ outcome }: { readonly outcome: Outcome }) {
   );
 }
 
-function usePublish(source: PublishSource, record: PublishDialogProps["record"]) {
+function usePublish(
+  source: PublishSource,
+  record: PublishDialogProps["record"],
+  onPublished: PublishDialogProps["onPublished"] | undefined,
+) {
   const hub = useHub();
   const profile = useHubProfile();
   const [outcome, setOutcome] = useState<Outcome>({ status: "editing" });
@@ -221,6 +228,14 @@ function usePublish(source: PublishSource, record: PublishDialogProps["record"])
       fail(errorMessage(result.error));
       return;
     }
+    const { id: publicationId, owner, slug } = result.value;
+    await onPublished?.({
+      publicationId,
+      handle: owner.handle,
+      slug,
+      version,
+      flow: content.value.flow,
+    });
     setOutcome({ status: "published", handle: profile.handle, slug: form.slug });
   };
   return [

@@ -710,3 +710,14 @@
   color: var(--ink-muted);
   font-weight: var(--text-body-weight);
 }
+
+/* Mis flujos in the hub (ADR 0024): the heading with "Nuevo flujo", then its cards. */
+.web-hub-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.web-hub-grid .web-saved-card {
+  background: var(--surface-200);
+}

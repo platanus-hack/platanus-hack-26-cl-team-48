@@ -1,5 +1,5 @@
 import { Flow, NodeManifest, parse } from "@nodomics/protocol";
-import type { SavedFlow, StoredFile } from "./flow-library.ts";
+import type { PublishedLink, SavedFlow, StoredFile } from "./flow-library.ts";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -22,6 +22,8 @@ export function parseSavedFlow(value: unknown): SavedFlow | undefined {
   }
   const node = parseSavedNode(value["node"]);
   if (value["node"] !== undefined && node === undefined) return undefined;
+  const published = parsePublishedLink(value["published"]);
+  if (value["published"] !== undefined && published === undefined) return undefined;
   const flow = parse(Flow, value["flow"]);
   return flow.ok
     ? {
@@ -30,6 +32,7 @@ export function parseSavedFlow(value: unknown): SavedFlow | undefined {
         flow: flow.value,
         files,
         ...(node === undefined ? {} : { node }),
+        ...(published === undefined ? {} : { published }),
         updatedAt: value["updatedAt"],
       }
     : undefined;
@@ -84,3 +87,18 @@ function parseSavedNode(value: unknown): SavedFlow["node"] {
     ? { version: value["version"], fingerprint: value["fingerprint"], manifest: manifest.value }
     : undefined;
 }
+
+function parsePublishedLink(value: unknown): PublishedLink | undefined {
+  if (!isRecord(value)) return undefined;
+  const { publicationId, handle, slug, version, fingerprint, hasChanges } = value;
+  return isText(publicationId) &&
+    isText(handle) &&
+    isText(slug) &&
+    isText(version) &&
+    isText(fingerprint) &&
+    typeof hasChanges === "boolean"
+    ? { publicationId, handle, slug, version, fingerprint, hasChanges }
+    : undefined;
+}
+
+const isText = (value: unknown): value is string => typeof value === "string";

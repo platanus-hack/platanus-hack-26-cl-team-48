@@ -15,7 +15,7 @@ import { App } from "./App.tsx";
 import { AppStoresContext } from "./app-context.ts";
 import { createAppStores } from "./app-stores.ts";
 import { ENGINES } from "./engine-registry.ts";
-import { decodeSharedFlow } from "./flow/flow-file.ts";
+import { decodeSharedFlow, encodeSharedFlow } from "./flow/flow-file.ts";
 import { describeFlowFileError } from "./flow/use-flow-files.ts";
 import {
   createStorageWorkspacePreferences,
@@ -29,14 +29,22 @@ import {
   createStoragePersonalLibrary,
   PERSONAL_NODES_KEY,
 } from "./library/storage-personal-library.ts";
-import { routeOf } from "./routing/routes.ts";
+import {
+  editorOpeningOf,
+  editorUrl,
+  pathOf,
+  routeOfLocation,
+  type EditorOpening,
+} from "./routing/routes.ts";
+import type { Flow } from "@nodomics/protocol";
 import { applyTheme } from "./theme/ThemeControl.tsx";
 import { followStoredTheme } from "./theme/theme-sync.ts";
 
 // Composition root: the one place that reads the URL, creates the stores and picks the engines.
 const shared = decodeSharedFlow(window.location.hash);
-// The hub has its own tab; the editor tab owns the open flow and saves it.
-const isHubTab = routeOf(window.location.pathname).page !== "workspace";
+// The hub is the home page (ADR 0024); the editor owns the open flow and saves it.
+const isHubTab = routeOfLocation(window.location).page !== "workspace";
+const opening = editorOpeningOf(window.location.search);
 // What was left unsaved before signing in with a provider, which navigates away (ADR 0023).
 const pending = isHubTab ? undefined : takePendingFlow(window.sessionStorage);
 const hub = createAppHub(import.meta.env);
@@ -61,8 +69,10 @@ if (!isHubTab) await startEditorFlow();
 
 async function startEditorFlow() {
   const profile = await hub.currentProfile();
-  const hasOpenFlow = shared !== undefined || pending !== undefined;
-  await stores.savedFlowStore.getState().initialize(hasOpenFlow);
+  const hasGivenFlow = shared !== undefined || pending !== undefined;
+  await stores.savedFlowStore.getState().initialize({ opening, hasGivenFlow });
+  // Once open, a reload resumes it as the latest flow; an old `/#flow=` link moves to the editor.
+  window.history.replaceState(null, "", `${editorUrl({ kind: "latest" })}${window.location.hash}`);
   const saving = startFlowSaving({
     stores,
     timers: {
@@ -87,6 +97,15 @@ function keepUnsavedFlowOnLeave() {
   });
 }
 
+// Leaving the hub for the editor is a page load: each page builds what it needs.
+function openEditor(next: EditorOpening) {
+  window.location.assign(editorUrl(next));
+}
+
+function openCopy(flow: Flow) {
+  window.location.assign(`${pathOf({ page: "workspace" })}${encodeSharedFlow(flow)}`);
+}
+
 const preferenceStorage = createStorageWorkspacePreferences(() => window.localStorage);
 // The editor's theme menu applies it there; the hub tab follows the theme chosen in the editor.
 if (isHubTab) {
@@ -105,7 +124,7 @@ createRoot(root).render(
     <AppStoresContext value={stores}>
       <HubContext value={hub}>
         {isHubTab ? (
-          <HubApp />
+          <HubApp onOpenEditor={openEditor} onOpenCopy={openCopy} />
         ) : (
           <App
             preferenceStorage={preferenceStorage}

@@ -1,11 +1,18 @@
-import type { FlowVisibility } from "@nodomics/hub";
+import type { EditorOpening } from "../routing/routes.ts";
 import { FLOW_FORMAT, type Flow } from "@nodomics/protocol";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { Command } from "../flow/flow-commands.ts";
 import type { NoticeProps } from "@nodomics/ui";
 import { duplicateSavedFlow } from "./duplicate-saved-flow.ts";
 import { MESSAGES } from "../messages.ts";
-import type { FlowLibrary, LibraryResult, SavedFlow, StoredFile } from "./flow-library.ts";
+import { flowFingerprint } from "./flow-fingerprint.ts";
+import type {
+  FlowLibrary,
+  LibraryResult,
+  PublishedLink,
+  SavedFlow,
+  StoredFile,
+} from "./flow-library.ts";
 
 export type SavedFlowStatus = "unsaved" | "saving" | "saved" | "unavailable" | "signed-out";
 /** States an edit or a new flow does not clear: saving cannot work until they change. */
@@ -25,7 +32,7 @@ export type SavedFlowState = {
   readonly library: FlowLibrary;
   readonly report: <T>(result: LibraryResult<T>) => T;
   readonly refresh: () => Promise<void>;
-  readonly initialize: (hasSharedFlow: boolean) => Promise<void>;
+  readonly initialize: (start: EditorStart) => Promise<void>;
   readonly openFlow: (id: string) => Promise<void>;
   readonly newFlow: () => Promise<void>;
   readonly flushPending: () => Promise<void>;
@@ -36,8 +43,15 @@ export type SavedFlowState = {
   readonly duplicate: (id: string) => Promise<void>;
   readonly rename: (id: string, name: string) => Promise<void>;
   readonly remove: (id: string) => Promise<void>;
-  readonly setVisibility: (id: string, visibility: FlowVisibility) => Promise<void>;
+  readonly markPublished: (link: PublishedFlow) => Promise<void>;
   readonly removeFile: (key: string) => Promise<void>;
+};
+
+/** A given flow (shared, or kept across sign-in) opens unsaved, whatever the opening says. */
+export type EditorStart = { readonly opening: EditorOpening; readonly hasGivenFlow: boolean };
+/** What publishing tells the open flow; `flow` is the flow as published (ADR 0024). */
+export type PublishedFlow = Omit<PublishedLink, "fingerprint" | "hasChanges"> & {
+  readonly flow: Flow;
 };
 
 export type SavedFlowDeps = {
@@ -108,7 +122,7 @@ function savedFlowActions(context: Context) {
     duplicate: createDuplicate(context),
     rename: createRename(context),
     remove: createRemove(context),
-    setVisibility: createSetVisibility(context),
+    markPublished: createMarkPublished(context),
     removeFile: createRemoveFile(context),
   };
 }
@@ -124,12 +138,17 @@ function createRefresh({ deps, set, get }: Context): SavedFlowState["refresh"] {
 }
 
 function createInitialize({ get }: Context): SavedFlowState["initialize"] {
-  return async (hasSharedFlow) => {
+  return async ({ opening, hasGivenFlow }) => {
     await get().refresh();
-    const latest = get().flows[0];
-    if (!hasSharedFlow && latest !== undefined) await get().openFlow(latest.id);
-    else get().resetForLoad();
+    const id = hasGivenFlow ? undefined : openedFlowId(opening, get().flows);
+    if (id !== undefined) await get().openFlow(id);
+    if (id === undefined || get().currentId !== id) get().resetForLoad();
   };
+}
+
+function openedFlowId(opening: EditorOpening, flows: ReadonlyArray<SavedFlow>) {
+  if (opening.kind === "flow") return opening.id;
+  return opening.kind === "latest" ? flows[0]?.id : undefined;
 }
 
 function createOpenFlow({ deps, set, get }: Context): SavedFlowState["openFlow"] {
@@ -238,10 +257,15 @@ function createRemove({ deps, get }: Context): SavedFlowState["remove"] {
   };
 }
 
-function createSetVisibility({ deps, get }: Context): SavedFlowState["setVisibility"] {
-  return async (id, visibility) => {
+function createMarkPublished({ deps, get }: Context): SavedFlowState["markPublished"] {
+  return async ({ flow, ...link }) => {
+    const id = get().currentId;
+    if (id === undefined) return;
     const saved = get().report(await deps.library.readFlow(id));
-    if (saved !== undefined) get().report(await deps.library.saveFlow({ ...saved, visibility }));
+    if (saved !== undefined) {
+      const published = { ...link, fingerprint: flowFingerprint(flow), hasChanges: false };
+      get().report(await deps.library.saveFlow({ ...saved, published }));
+    }
     await get().refresh();
   };
 }

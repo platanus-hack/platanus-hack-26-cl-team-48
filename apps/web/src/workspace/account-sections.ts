@@ -1,7 +1,7 @@
 import { SIDE_SECTIONS, type SideSection } from "../layout/workspace-preferences.ts";
 
-/** Sections that only make sense with an account: saved flows (ADR 0023) and the agent. */
-const ACCOUNT_SECTIONS: ReadonlySet<SideSection> = new Set(["flows", "agent"]);
+/** Sections that only make sense with an account: the agent. */
+const ACCOUNT_SECTIONS: ReadonlySet<SideSection> = new Set(["agent"]);
 const FALLBACK_SECTION: SideSection = "nodes";
 
 const isReachable = (section: SideSection, isSignedIn: boolean) =>

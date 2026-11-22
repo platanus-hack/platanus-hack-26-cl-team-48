@@ -1,10 +1,9 @@
 import type { Flow } from "@nodomics/protocol";
 import { useState } from "react";
-import { ICON_SIZE, Icon, Input } from "@nodomics/ui";
+import { Input } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
-import { encodeSharedFlow } from "../flow/flow-file.ts";
 import { MESSAGES } from "../messages.ts";
-import { pathOf, type Route } from "../routing/routes.ts";
+import type { EditorOpening, Route } from "../routing/routes.ts";
 import { navigate, useRoute } from "../routing/use-route.ts";
 import { AccountButton } from "./AccountButton.tsx";
 import { HubPage } from "./HubPage.tsx";
@@ -14,8 +13,13 @@ import "./hub.css";
 
 type PageRoute = Exclude<Route, { readonly page: "workspace" | "hub" }>;
 
-/** The hub in its own browser tab (ADR 0018); flows open as a copy in a new editor tab. */
-export function HubApp() {
+export type HubNavigation = {
+  readonly onOpenEditor: (opening: EditorOpening) => void;
+  readonly onOpenCopy: (flow: Flow) => void;
+};
+
+/** The home page (ADR 0024); the composition root decides how to reach the editor. */
+export function HubApp(navigation: HubNavigation) {
   const route = useRoute();
   const [text, setText] = useState("");
   return (
@@ -29,9 +33,9 @@ export function HubApp() {
       />
       <div className="web-hub-scroll">
         {route.page === "workspace" || route.page === "hub" ? (
-          <HubPage text={text} />
+          <HubPage text={text} {...navigation} />
         ) : (
-          <HubRoutePage route={route} />
+          <HubRoutePage route={route} {...navigation} />
         )}
       </div>
     </div>
@@ -63,22 +67,13 @@ function HubBar({
         />
       </search>
       <div className="web-hub-bar-end">
-        <a
-          className="nd-btn nd-btn-secondary"
-          href={pathOf({ page: "workspace" })}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Icon name="workflow" size={ICON_SIZE.md} />
-          {MESSAGES.hub.openEditor}
-        </a>
         <AccountButton />
       </div>
     </header>
   );
 }
 
-function HubRoutePage({ route }: { readonly route: PageRoute }) {
+function HubRoutePage({ route, ...navigation }: { readonly route: PageRoute } & HubNavigation) {
   const { personalLibraryStore } = useAppStores();
   switch (route.page) {
     case "profile":
@@ -89,7 +84,7 @@ function HubRoutePage({ route }: { readonly route: PageRoute }) {
           key={`${route.handle}/${route.slug}`}
           handle={route.handle}
           slug={route.slug}
-          onOpenCopy={openCopyInEditorTab}
+          {...navigation}
           onInstall={(manifests) => {
             personalLibraryStore.getState().install(manifests);
           }}
@@ -97,7 +92,3 @@ function HubRoutePage({ route }: { readonly route: PageRoute }) {
       );
   }
 }
-
-const openCopyInEditorTab = (flow: Flow) => {
-  window.open(`/${encodeSharedFlow(flow)}`, "_blank", "noopener");
-};

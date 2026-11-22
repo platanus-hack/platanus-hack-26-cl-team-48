@@ -1,7 +1,7 @@
 import { useStore } from "zustand";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
-import { DeleteAction } from "./SavedFlowList.tsx";
+import { DeleteAction } from "./DeleteAction.tsx";
 
 const BYTES_PER_KILOBYTE = 1024;
 const BYTES_PER_MEGABYTE = BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE;

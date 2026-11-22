@@ -1,5 +1,5 @@
 import type { PublicationSummary } from "@nodomics/hub";
-import { ok } from "@nodomics/protocol";
+import { ok, type Flow } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
 import { useCallback, useId, useState } from "react";
 import { MESSAGES } from "../messages.ts";
@@ -8,6 +8,7 @@ import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
 import {
   ALL_KINDS,
   HUB_VIEWS,
+  isAccountView,
   PUBLIC_VIEWS,
   matching,
   offeredTags,
@@ -16,6 +17,8 @@ import {
   type KindFilter,
 } from "./hub-filters.ts";
 import { PublicationList } from "./PublicationCard.tsx";
+import { MyFlowsSection } from "./MyFlowsSection.tsx";
+import type { EditorOpening } from "../routing/routes.ts";
 import { useHubQuery, type HubQuery } from "./use-hub-query.ts";
 
 const SEARCH_DELAY_MS = 200;
@@ -27,8 +30,14 @@ const INITIAL_FILTERS: HubFilterState = {
   pressedTags: new Set(),
 };
 
-/** Everything published (ADR 0018, `/hub`), filtered by the text typed in the hub's header. */
-export function HubPage({ text }: { readonly text: string }) {
+type HubPageProps = {
+  readonly text: string;
+  readonly onOpenEditor: (opening: EditorOpening) => void;
+  readonly onOpenCopy: (flow: Flow) => void;
+};
+
+/** The home page (ADR 0018, 0024): what is published, and the account's own flows. */
+export function HubPage({ text, onOpenEditor }: HubPageProps) {
   const [chosen, setFilters] = useState(INITIAL_FILTERS);
   const handle = useHubProfile()?.handle;
   const filters = reachableFilters(chosen, handle !== undefined);
@@ -55,11 +64,15 @@ export function HubPage({ text }: { readonly text: string }) {
       <main className="web-hub-page">
         <h1 className="web-visually-hidden">{MESSAGES.hub.title}</h1>
         {filters.view === "for-you" && <ForYouMockup />}
-        <PublicationsSection
-          heading={listHeading(filters, text)}
-          listed={listed}
-          pressedTags={filters.pressedTags}
-        />
+        {filters.view === "flows" ? (
+          <MyFlowsSection onOpenEditor={onOpenEditor} />
+        ) : (
+          <PublicationsSection
+            heading={listHeading(filters, text)}
+            listed={listed}
+            pressedTags={filters.pressedTags}
+          />
+        )}
       </main>
     </div>
   );
@@ -120,9 +133,9 @@ function ForYouMockup() {
   );
 }
 
-/** "Mis publicaciones" needs an account: signed out, it goes back to "Para ti". */
+/** The account's views need a session: signed out, they go back to "Para ti". */
 const reachableFilters = (filters: HubFilterState, isSignedIn: boolean): HubFilterState =>
-  isSignedIn || filters.view !== "mine" ? filters : { ...filters, view: "for-you" };
+  isSignedIn || !isAccountView(filters.view) ? filters : { ...filters, view: "for-you" };
 
 /** What the chosen view lists before the tags narrow it. */
 function useListed({

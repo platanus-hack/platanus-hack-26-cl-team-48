@@ -11,8 +11,16 @@ export function PublishOrSignIn({ onClose }: { readonly onClose: () => void }) {
   const profile = useHubProfile();
   const source = usePublishSource();
   const record = useRecordSnapshot();
+  const { savedFlowStore } = useAppStores();
   if (profile === undefined) return <SignInDialog onClose={onClose} />;
-  return <PublishDialog source={source} record={record} onClose={onClose} />;
+  return (
+    <PublishDialog
+      source={source}
+      record={record}
+      onPublished={(published) => savedFlowStore.getState().markPublished(published)}
+      onClose={onClose}
+    />
+  );
 }
 
 function usePublishSource(): PublishSource {

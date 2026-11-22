@@ -25,7 +25,7 @@ function raisePatch(version: string): string {
   return `${major}.${minor}.${String(Number(patch) + 1)}`;
 }
 
-function sortKeys(value: unknown): unknown {
+export function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortKeys);
   if (typeof value !== "object" || value === null) return value;
   return Object.fromEntries(

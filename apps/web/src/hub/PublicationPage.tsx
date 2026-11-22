@@ -9,7 +9,12 @@ import { Avatar } from "./Avatar.tsx";
 import { FlowPreview } from "./FlowPreview.tsx";
 import { withoutPrivateParams } from "./hub-flow.ts";
 import { manifestsToInstall } from "./hub-install.ts";
-import { useHub } from "./hub-context.ts";
+import { useHub, useHubProfile } from "./hub-context.ts";
+import { OwnFlowActions } from "./OwnFlowActions.tsx";
+import { peekPendingHubAction } from "./pending-hub-action.ts";
+import { SignInDialog } from "./SignInDialog.tsx";
+import { useAccountAction } from "./use-account-action.ts";
+import type { EditorOpening } from "../routing/routes.ts";
 import { EmptyState } from "./PublicationCard.tsx";
 import { useHubQuery } from "./use-hub-query.ts";
 
@@ -17,9 +22,10 @@ type PublicationPageProps = {
   readonly handle: string;
   readonly slug: string;
   readonly onOpenCopy: (flow: Flow) => void;
+  readonly onOpenEditor: (opening: EditorOpening) => void;
   readonly onInstall: (manifests: ReadonlyArray<NodeManifest>) => void;
 };
-type Actions = Pick<PublicationPageProps, "onOpenCopy" | "onInstall">;
+type Actions = Pick<PublicationPageProps, "onOpenCopy" | "onOpenEditor" | "onInstall">;
 
 /** One publication with its versions, its preview and how to use it (ADR 0018, `/hub/<handle>/<slug>`). */
 export function PublicationPage({ handle, slug, ...actions }: PublicationPageProps) {
@@ -39,7 +45,10 @@ export function PublicationPage({ handle, slug, ...actions }: PublicationPagePro
 }
 
 function PublicationView({ detail, ...actions }: { readonly detail: PublicationDetail } & Actions) {
-  const [selected, select] = useState(detail.versions[0]?.version ?? "");
+  // After signing in to copy or install, come back to the version that was chosen.
+  const [selected, select] = useState(
+    () => pendingVersion(detail) ?? detail.versions[0]?.version ?? "",
+  );
   const version = usePublishedVersion(detail.id, selected);
   return (
     <>
@@ -57,7 +66,7 @@ function PublicationView({ detail, ...actions }: { readonly detail: PublicationD
               <Select options={versionOptions(detail)} value={selected} onChange={select} />
             </Field>
             {version.status === "ready" && (
-              <VersionActions kind={detail.kind} version={version.value} {...actions} />
+              <VersionActions detail={detail} version={version.value} {...actions} />
             )}
             <p className="web-hub-muted">
               {detail.kind === "node" ? MESSAGES.hub.nodeHint : MESSAGES.hub.flowHint}
@@ -120,39 +129,69 @@ function PublicationFacts({ detail, selected }: FactsProps) {
 const DATE_FORMAT = new Intl.DateTimeFormat("es", { dateStyle: "medium" });
 
 type VersionActionsProps = Actions & {
-  readonly kind: PublicationDetail["kind"];
+  readonly detail: PublicationDetail;
   readonly version: PublishedVersion;
 };
 
-function VersionActions({ kind, version, onOpenCopy, onInstall }: VersionActionsProps) {
+const pendingVersion = (detail: PublicationDetail) =>
+  peekPendingHubAction(window.sessionStorage, { handle: detail.owner.handle, slug: detail.slug })
+    ?.version;
+
+function VersionActions({
+  detail,
+  version,
+  onOpenCopy,
+  onOpenEditor,
+  onInstall,
+}: VersionActionsProps) {
+  const { kind } = detail;
   const [isInstalled, setInstalled] = useState(false);
+  const isMine = useHubProfile()?.handle === detail.owner.handle;
   const catalog = snapshotOf(version).catalog;
-  const install = (manifest: NodeManifest) => {
-    onInstall(installable(manifest, version.flow, catalog));
-    setInstalled(true);
-  };
+  const { manifest } = version;
+  const account = useAccountAction(
+    { handle: detail.owner.handle, slug: detail.slug, version: version.version },
+    (action) => {
+      if (action === "copy") onOpenCopy(withoutPrivateParams(version.flow, catalog));
+      else if (manifest !== undefined) {
+        onInstall(installable(manifest, version.flow, catalog));
+        setInstalled(true);
+      }
+    },
+  );
   return (
     <div className="web-hub-actions">
-      <Button
-        variant={kind === "flow" ? "primary" : "secondary"}
-        icon="copy"
-        onClick={() => {
-          onOpenCopy(withoutPrivateParams(version.flow, catalog));
-        }}
-      >
-        {MESSAGES.hub.openCopy}
-      </Button>
-      {kind === "node" && version.manifest !== undefined && (
+      {isMine ? (
+        <OwnFlowActions
+          detail={detail}
+          version={version.version}
+          flow={withoutPrivateParams(version.flow, catalog)}
+          onOpenEditor={onOpenEditor}
+          onOpenCopy={onOpenCopy}
+        />
+      ) : (
+        <Button
+          variant={kind === "flow" ? "primary" : "secondary"}
+          icon="copy"
+          onClick={() => {
+            account.request("copy");
+          }}
+        >
+          {MESSAGES.hub.openCopy}
+        </Button>
+      )}
+      {kind === "node" && manifest !== undefined && (
         <Button
           variant="primary"
           icon="plus"
           onClick={() => {
-            if (version.manifest) install(version.manifest);
+            account.request("install");
           }}
         >
           {MESSAGES.hub.install}
         </Button>
       )}
+      {account.isAsking && <SignInDialog onClose={account.cancel} />}
       {isInstalled && <span role="status">{MESSAGES.hub.installed}</span>}
     </div>
   );

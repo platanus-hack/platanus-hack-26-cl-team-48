@@ -3,7 +3,7 @@ import { useState, type SubmitEvent } from "react";
 import { useSecretNames } from "./use-secret-names.ts";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
-import { DeleteAction } from "./SavedFlowList.tsx";
+import { DeleteAction } from "./DeleteAction.tsx";
 
 export function Credentials() {
   const names = useSecretNames();

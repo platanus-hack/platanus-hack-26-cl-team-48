@@ -7,7 +7,6 @@ import { ThemeControl } from "../theme/ThemeControl.tsx";
 
 const SECTION_ICONS: Record<SideSection, IconName> = {
   nodes: "layout-grid",
-  flows: "folder-open",
   "my-nodes": "boxes",
   data: "database",
   secrets: "key-round",

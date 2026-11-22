@@ -1,4 +1,3 @@
-import type { FlowVisibility } from "@nodomics/hub";
 import type { Flow, NodeManifest } from "@nodomics/protocol";
 
 export type SavedFlow = {
@@ -7,13 +6,22 @@ export type SavedFlow = {
   readonly flow: Flow;
   readonly files: Readonly<Record<string, string>>;
   readonly updatedAt: number;
-  /** Missing means private (ADR 0023). */
-  readonly visibility?: FlowVisibility;
+  /** Its latest publication in the hub (ADR 0024). */
+  readonly published?: PublishedLink;
   readonly node?: {
     readonly version: string;
     readonly fingerprint: string;
     readonly manifest: NodeManifest;
   };
+};
+export type PublishedLink = {
+  readonly publicationId: string;
+  readonly handle: string;
+  readonly slug: string;
+  readonly version: string;
+  /** Of the flow as published, without private params. */
+  readonly fingerprint: string;
+  readonly hasChanges: boolean;
 };
 export type StoredFile = {
   readonly key: string;

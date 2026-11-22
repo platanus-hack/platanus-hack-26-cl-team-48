@@ -3,10 +3,10 @@ export type Theme = "light" | "dark" | "system";
 /** Where node results are shown: inside each node, or in the panel under the canvas. */
 export type PreviewLocation = "nodes" | "panel";
 /** What the side panel shows, chosen in the activity rail. */
-export type SideSection = "nodes" | "flows" | "my-nodes" | "data" | "secrets" | "agent";
+/** Saved flows live in the hub now (ADR 0024), not here. */
+export type SideSection = "nodes" | "my-nodes" | "data" | "secrets" | "agent";
 export const SIDE_SECTIONS: ReadonlyArray<SideSection> = [
   "nodes",
-  "flows",
   "my-nodes",
   "data",
   "secrets",

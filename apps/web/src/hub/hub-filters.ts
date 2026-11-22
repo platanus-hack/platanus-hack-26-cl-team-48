@@ -2,9 +2,14 @@ import type { PublicationKind, PublicationSummary } from "@nodomics/hub";
 
 export const ALL_KINDS = "all";
 export type KindFilter = PublicationKind | typeof ALL_KINDS;
-export type HubView = "for-you" | "recent" | "mine";
-export const HUB_VIEWS: readonly HubView[] = ["for-you", "recent", "mine"];
-export const PUBLIC_VIEWS: readonly HubView[] = HUB_VIEWS.filter((view) => view !== "mine");
+export type HubView = "for-you" | "recent" | "flows" | "mine";
+export const HUB_VIEWS: readonly HubView[] = ["for-you", "recent", "flows", "mine"];
+/** "Mis flujos" and "Mis publicaciones" need an account. */
+const ACCOUNT_VIEWS: ReadonlySet<HubView> = new Set(["flows", "mine"]);
+export const PUBLIC_VIEWS: readonly HubView[] = HUB_VIEWS.filter(
+  (view) => !ACCOUNT_VIEWS.has(view),
+);
+export const isAccountView = (view: HubView) => ACCOUNT_VIEWS.has(view);
 
 type Publications = ReadonlyArray<PublicationSummary>;
 

@@ -7,12 +7,11 @@ export function duplicateSavedFlow(
   saved: SavedFlow,
   identity: { readonly id: string; readonly updatedAt: number },
 ): SavedFlow {
-  const { node: previous, ...record } = saved;
-  const node = duplicateNode(previous, identity.id);
+  // A copy keeps the files but not the publication: it starts unpublished (ADR 0024).
+  const node = duplicateNode(saved.node, identity.id);
   return {
-    ...record,
+    files: saved.files,
     ...identity,
-    visibility: "private",
     name: MESSAGES.savedFlows.copy(saved.name),
     flow: { ...saved.flow, name: MESSAGES.savedFlows.copy(saved.name) },
     ...(node === undefined ? {} : { node }),
