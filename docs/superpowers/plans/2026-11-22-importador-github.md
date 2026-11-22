@@ -156,3 +156,23 @@ Herramienta local nueva para el bucle del agente:
 - **Dependencia de runtime nueva:** `@renderinc/sdk`.
 - **Costo:** cada importación usa un sandbox y hasta 200 000 tokens del modelo. Se puede bajar el tope.
 - **Imagen del sandbox** con Claude Code preinstalado, si Render lo permite, para no instalarlo en cada trabajo.
+
+## Estado y siguientes pasos (2026-11-22, manda sobre lo anterior)
+
+**Alcance recortado** para no sobredimensionar: sin proxy del modelo (el sandbox usa una clave dedicada con tope de gasto) y sin re-verificación por el servicio (el estado se calcula con `decideStatus` sobre `expected` y `observed` del reporte, y se muestra como "comprobado por el agente en el sandbox"). Si se quiere un estado confiable de verdad, hay que recuperar la re-verificación (antigua D4).
+
+**Hecho en esta rama:**
+- Contrato `src/import/import-report.ts` (con `observed`).
+- `compareRows`, `decideStatus` y fixtures (pandas `isna` como referencia, `requests` como incompatible).
+- Sandbox: token de trabajo, proxy del MCP (rechaza batch, entiende SSE, sin `flows.apply`/`publish`), lanzador de Render, `run-import.sh` y prompt único.
+- Prueba de viabilidad en Render (con tarjeta): sandbox en 2,3 s, Claude Code 2.1.330 en 6,9 s, salida a GitHub/npm/PyPI/MCP = 200, `git clone` ok.
+
+**Ronda 4 (asignada en `.agentes/constructor-{d,h}/ENTRADA.md`):**
+- H: revocar el token al terminar; limitar el proxy a los borradores del trabajo (sin `flows.search` ni `flows.discard` ajenos; solo `initialize`, `notifications/initialized`, `tools/list`, `tools/call`); montar `/sandbox/mcp` fuera del router.
+- D: herramienta `import.from_github`, `import_report` en la propuesta (migración nueva), configuración opcional y ADR 0031.
+
+**Para integrar la ronda 4 (quien haga de líder):**
+1. Correr `.agentes/puerta.sh constructor-<x> origin/gabriel/agent-github-import` en cada worktree y revisar el diff.
+2. Commit en su rama (Conventional Commits, sin nombres de IA), `merge --ff-only` en `gabriel/agent-github-import`, `pnpm check` y push.
+3. Producción: aplicar la migración `agent_proposal_import` en Supabase; en `nodomics-agent` poner `RENDER_SANDBOX_API_KEY` (clave de Render solo Sandboxes), `RENDER_WORKSPACE_ID` y `SANDBOX_ANTHROPIC_API_KEY` (clave dedicada con tope); desplegar.
+4. Prueba real: pedir en el panel Agente "Quiero distinguir mediciones faltantes de ceros" y comprobar la propuesta con su procedencia.
