@@ -1,6 +1,7 @@
 import { err, ok, parse, type Result } from "@nodomics/protocol";
 import { Type } from "@sinclair/typebox";
 import { envValuesOf } from "./env-values.ts";
+import { isHttpsUrl } from "./https-url.ts";
 import type { HostingProvider, ProviderError } from "./hosting-provider.ts";
 import type { BuildSpec, DeploymentStatus, ServiceSpec } from "./types.ts";
 
@@ -14,7 +15,6 @@ const CREATE_ONLY_DETAILS = { region: REGION };
 const SUSPENDED = "suspended";
 const DEFAULT_TIMEOUT_MS = 15_000;
 const HTTP_NOT_FOUND = 404;
-const HTTPS = "https:";
 
 type CreateOnlyDetails = { readonly region?: string };
 
@@ -145,15 +145,6 @@ function createdServiceOf(
   if (!created.ok) return err({ message: "Render answered without a service id" });
   const url = created.value.service.serviceDetails?.url;
   return ok({ serviceId: created.value.service.id, ...(isHttpsUrl(url) ? { url } : {}) });
-}
-
-/** The web turns the URL into a link, so another scheme (javascript:, http:) is dropped. */
-function isHttpsUrl(url: string | undefined): url is string {
-  try {
-    return url !== undefined && new URL(url).protocol === HTTPS;
-  } catch {
-    return false;
-  }
 }
 
 const servicePath = (serviceId: string): string => `/services/${encodeURIComponent(serviceId)}`;

@@ -30,4 +30,10 @@ export interface DeploymentStore {
   /** Inserts the record, or replaces the one with the same id. */
   save(record: DeploymentRecord): Promise<Result<void, StoreError>>;
   remove(id: string): Promise<Result<void, StoreError>>;
+  /** Changes only the status of an existing record; a removed record stays removed. */
+  updateStatus(
+    id: string,
+    status: DeploymentStatus,
+    updatedAt: string,
+  ): Promise<Result<void, StoreError>>;
 }

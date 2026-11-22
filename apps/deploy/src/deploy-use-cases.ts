@@ -7,6 +7,7 @@ import { serviceNameOf } from "./service-name.ts";
 import { planDeployment } from "./spec/plan.ts";
 import { failure } from "./spec/node-params.ts";
 import { serviceSpecOf } from "./spec/service-spec.ts";
+import { isHttpsUrl } from "./https-url.ts";
 import { createSerialQueue } from "./serial-queue.ts";
 import type { Deployment, DeployError, Plan, ServiceSpec, UserIdentity } from "./types.ts";
 
@@ -30,6 +31,8 @@ export type DeployDeps = {
   readonly provider: HostingProvider;
   readonly now: () => Date;
   readonly createId: () => string;
+  /** Told about a service left live in the provider without a record, to remove it by hand. */
+  readonly reportOrphan?: (serviceId: string) => void;
 };
 
 export function createDeployUseCases(deps: DeployDeps): DeployUseCases {
@@ -146,8 +149,13 @@ async function createService(
     updatedAt: deps.now().toISOString(),
   });
   // A service without its row would stay live in Render, unseen and outside the quotas.
-  if (!saved.ok) await deps.provider.remove(created.value.serviceId);
+  if (!saved.ok) await removeOrphan(deps, created.value.serviceId);
   return saved;
+}
+
+async function removeOrphan(deps: DeployDeps, serviceId: string): Promise<void> {
+  const removed = await deps.provider.remove(serviceId);
+  if (!removed.ok) deps.reportOrphan?.(serviceId);
 }
 
 async function updateService(
@@ -179,7 +187,10 @@ async function listDeployments(
   return ok(refreshed.map(deploymentOf));
 }
 
-/** Best effort: when the provider or the store fails, the last known status is kept. */
+/**
+ * Best effort: when the provider or the store fails, the last known status is kept. Only the status
+ * is written, so a refresh that ends after a remove or an apply does not undo it.
+ */
 async function refreshStatus(
   deps: DeployDeps,
   record: DeploymentRecord,
@@ -187,7 +198,7 @@ async function refreshStatus(
   const status = await deps.provider.status(record.providerServiceId);
   if (!status.ok || status.value === record.status) return record;
   const refreshed = { ...record, status: status.value, updatedAt: deps.now().toISOString() };
-  await deps.deployments.save(refreshed);
+  await deps.deployments.updateStatus(refreshed.id, refreshed.status, refreshed.updatedAt);
   return refreshed;
 }
 
@@ -235,7 +246,7 @@ const deploymentOf = (record: DeploymentRecord): Deployment => ({
   id: record.id,
   flowId: record.flowId,
   nodeId: record.nodeId,
-  ...(record.url === undefined ? {} : { url: record.url }),
+  ...(isHttpsUrl(record.url) ? { url: record.url } : {}),
   status: record.status,
   updatedAt: record.updatedAt,
 });

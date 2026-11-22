@@ -51,6 +51,10 @@ function handlerOf(config: DeployConfig): (request: Request) => Promise<Response
       }),
       now: () => new Date(),
       createId: randomUUID,
+      reportOrphan: (serviceId) => {
+        process.stderr.write(`Orphan service left in Render without a record: ${serviceId}
+`);
+      },
     }),
     allowedOrigins: config.allowedOrigins,
     rateLimit: RATE_LIMIT,
