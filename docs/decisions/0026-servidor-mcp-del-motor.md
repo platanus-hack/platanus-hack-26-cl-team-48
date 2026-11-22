@@ -30,6 +30,8 @@ El agente (`apps/agent`) es cliente MCP y hasta hoy corre contra un MCP falso (`
    - `executor-duckdb-wasm` exporta su apertura de DuckDB para Node.
    - Dependencias de runtime nuevas: `@modelcontextprotocol/sdk` (servidor) y `@supabase/supabase-js`, ya usadas en el repo.
 
+8. **Se arma con Vite** (`vite build --ssr`, `apps/mcp/dist/start.js`), porque los paquetes del monorepo son TypeScript con importaciones solo de Vite (`?raw`). DuckDB-WASM, Pyodide y apache-arrow quedan fuera del bundle: leen sus archivos de `node_modules`.
+
 ## Alternativas consideradas
 
 | Opción | A favor | En contra |

@@ -68,6 +68,9 @@ importers:
 
   apps/mcp:
     dependencies:
+      '@duckdb/duckdb-wasm':
+        specifier: 1.33.1-dev57.0
+        version: 1.33.1-dev57.0
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
@@ -92,6 +95,16 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.119.2
         version: 2.119.2(@opentelemetry/api@1.10.0)
+      apache-arrow:
+        specifier: 17.0.0
+        version: 17.0.0
+      pyodide:
+        specifier: 314.0.7
+        version: 314.0.7
+    devDependencies:
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@24.19.2)(jiti@2.7.0)
 
   apps/web:
     dependencies:

@@ -1,5 +1,4 @@
-# Render blueprint: the web app as a static site. The browser engine (DuckDB-wasm and Pyodide)
-# runs in the visitor's browser, so no server is needed.
+# Render blueprint: web interface, agent service and MCP engine server.
 services:
   - type: web
     name: nodomics-web
@@ -55,4 +54,18 @@ services:
       - key: AGENT_ALLOWED_ORIGINS
         sync: false
       - key: AGENT_ALLOW_FAKES
+        sync: false
+  - type: web
+    name: nodomics-mcp
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @nodomics/mcp build
+    startCommand: node apps/mcp/dist/start.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
         sync: false
