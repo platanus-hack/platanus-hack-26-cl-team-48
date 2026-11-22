@@ -270,6 +270,7 @@ export const MESSAGES = {
     composer: "Escribe al agente",
     composerPlaceholder: "Pide un cambio o una explicación…",
     send: "Enviar",
+    usingTool: (name: string) => `Usando ${name}…`,
     errors: {
       STALE: "El flujo cambió mientras el agente trabajaba; vuelve a pedirlo.",
       RATE_LIMITED: "Enviaste muchos pedidos seguidos. Espera un minuto y vuelve a intentar.",

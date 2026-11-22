@@ -4,6 +4,7 @@ import { useStore } from "zustand";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
 import { agentErrorMessage } from "./agent-error-message.ts";
+import { AgentMarkdown } from "./AgentMarkdown.tsx";
 import { AgentProposal } from "./AgentProposal.tsx";
 import { useAgentConversation, type Exchange } from "./use-agent-conversation.ts";
 
@@ -50,19 +51,20 @@ export function AgentPanel() {
   );
 }
 
-function AgentExchange({ exchange: { goal, reply } }: { readonly exchange: Exchange }) {
+function AgentExchange({ exchange }: { readonly exchange: Exchange }) {
+  const { goal, reply } = exchange;
   return (
     <>
       <p className="web-agent-message" data-from="user">
         {goal}
       </p>
       {reply === undefined ? (
-        <p className="web-agent-message web-caption" role="status">
-          {text.working}
-        </p>
+        <AgentWorking exchange={exchange} />
       ) : reply.ok ? (
         <>
-          <p className="web-agent-message">{reply.value.summary}</p>
+          <div className="web-agent-message">
+            <AgentMarkdown text={reply.value.summary} />
+          </div>
           {reply.value.proposal !== undefined && <AgentProposal proposal={reply.value.proposal} />}
         </>
       ) : (
@@ -70,6 +72,22 @@ function AgentExchange({ exchange: { goal, reply } }: { readonly exchange: Excha
           {agentErrorMessage(reply.error.code)}
         </p>
       )}
+    </>
+  );
+}
+
+function AgentWorking({ exchange: { live, tool } }: { readonly exchange: Exchange }) {
+  return (
+    <>
+      {live.trim() !== "" && (
+        <div className="web-agent-message">
+          <AgentMarkdown text={live} />
+        </div>
+      )}
+      {tool !== undefined && <p className="web-agent-activity">{text.usingTool(tool)}</p>}
+      <p className="web-agent-message web-caption" role="status">
+        {text.working}
+      </p>
     </>
   );
 }

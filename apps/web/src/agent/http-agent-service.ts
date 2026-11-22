@@ -1,5 +1,6 @@
 import { err, ok } from "@nodomics/protocol";
 import type { AgentAnswer, AgentErrorCode, AgentResult, AgentService } from "./agent-service.ts";
+import { AGENT_STREAM_TYPE, isAgentStream, readAgentStream } from "./read-agent-stream.ts";
 import {
   parseDecisionReply,
   parseErrorName,
@@ -17,11 +18,13 @@ type Request = {
   readonly path: string;
   readonly body?: unknown;
   readonly signal?: AbortSignal | undefined;
+  readonly onProgress?: ((progress: AgentProgress) => void) | undefined;
 };
 
 const REQUESTS_PATH = "/agent/requests";
 const proposalPath = (id: string) => `/agent/proposals/${encodeURIComponent(id)}`;
 const CONFLICT = 409;
+const MIN_ERROR_STATUS = 300;
 const CODES_BY_STATUS: Readonly<Record<number, AgentErrorCode>> = {
   400: "INVALID",
   401: "UNAUTHENTICATED",
@@ -36,8 +39,13 @@ const failure = (code: AgentErrorCode) => err({ code });
 export function createHttpAgentService(deps: HttpAgentDeps): AgentService {
   const send = createSender(deps);
   return {
-    ask: async ({ goal, flowId }, signal) => {
-      const reply = await send({ path: REQUESTS_PATH, body: { goal, flowId }, signal });
+    ask: async ({ goal, flowId }, signal, onProgress) => {
+      const reply = await send({
+        path: REQUESTS_PATH,
+        body: { goal, flowId },
+        signal,
+        onProgress: onProgress ?? (() => undefined),
+      });
       if (!reply.ok) return reply;
       const parsed = parseRequestReply(reply.value);
       if (parsed === undefined) return failure("UNAVAILABLE");
@@ -72,7 +80,7 @@ export function createHttpAgentService(deps: HttpAgentDeps): AgentService {
 /** Sends a request with the user's token and returns the JSON of a successful reply. */
 function createSender({ baseUrl, getAccessToken, fetch }: HttpAgentDeps) {
   const root = baseUrl.replace(/\/+$/, "");
-  return async ({ path, body, signal }: Request): Promise<AgentResult<unknown>> => {
+  return async ({ path, body, signal, onProgress }: Request): Promise<AgentResult<unknown>> => {
     const token = await getAccessToken();
     if (token === undefined) return failure("UNAUTHENTICATED");
     try {
@@ -81,16 +89,30 @@ function createSender({ baseUrl, getAccessToken, fetch }: HttpAgentDeps) {
         headers: {
           authorization: `Bearer ${token}`,
           ...(body === undefined ? {} : { "content-type": "application/json" }),
+          ...(onProgress === undefined ? {} : { accept: `${AGENT_STREAM_TYPE}, application/json` }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         ...(signal === undefined ? {} : { signal }),
       });
-      const json: unknown = await response.json().catch(() => undefined);
-      return response.ok ? ok(json) : failure(codeOf(response.status, json));
+      const reply = await readReply(response, onProgress);
+      if (reply === undefined) return failure("UNAVAILABLE");
+      return reply.status < MIN_ERROR_STATUS
+        ? ok(reply.body)
+        : failure(codeOf(reply.status, reply.body));
     } catch {
       return failure("UNAVAILABLE");
     }
   };
+}
+
+async function readReply(
+  response: Response,
+  onProgress: ((progress: AgentProgress) => void) | undefined,
+): Promise<{ readonly status: number; readonly body: unknown } | undefined> {
+  if (onProgress !== undefined && isAgentStream(response))
+    return readAgentStream(response, onProgress);
+  const body: unknown = await response.json().catch(() => undefined);
+  return { status: response.status, body };
 }
 
 function codeOf(status: number, json: unknown): AgentErrorCode {

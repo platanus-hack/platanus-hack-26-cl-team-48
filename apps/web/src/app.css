@@ -446,6 +446,45 @@ body {
   margin-top: var(--space-1);
 }
 
+.web-agent-activity {
+  margin: 0;
+  font: var(--text-mono);
+  color: var(--ink-muted);
+}
+
+.web-agent-markdown > :first-child {
+  margin-top: 0;
+}
+
+.web-agent-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.web-agent-markdown :is(h3, h4, h5) {
+  margin: var(--space-3) 0 var(--space-1);
+  font: var(--text-label);
+}
+
+.web-agent-markdown :is(p, ul, ol) {
+  margin: 0 0 var(--space-2);
+}
+
+.web-agent-markdown :is(ul, ol) {
+  padding-left: var(--space-4);
+}
+
+.web-agent-markdown code {
+  font: var(--text-mono);
+}
+
+.web-agent-markdown pre {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
 .web-agent-change {
   display: flex;
   flex-direction: column;
