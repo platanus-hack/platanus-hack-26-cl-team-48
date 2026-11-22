@@ -146,7 +146,10 @@ export function PreviewStep({
       {profile !== undefined && (
         <div className="web-feed-preview-who">
           <Avatar name={profile.displayName} url={profile.avatarUrl} size="md" />
-          <p className="web-feed-preview-name">{profile.displayName}</p>
+          <div>
+            <p className="web-feed-preview-name">{profile.displayName}</p>
+            <p className="web-hub-muted">{`@${profile.handle}`}</p>
+          </div>
         </div>
       )}
       <CardSummary card={card} />

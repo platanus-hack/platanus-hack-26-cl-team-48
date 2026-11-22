@@ -1,7 +1,7 @@
 import type { ProfileCard } from "@nodomics/profile";
 import { useState } from "react";
 import { MESSAGES } from "../messages.ts";
-import { cardOfDraft, draftOfCard, EMPTY_DRAFT, type CardDraft } from "./card-draft.ts";
+import { cardOfDraft, draftOfCard, type CardDraft } from "./card-draft.ts";
 import { extractCard, type RegistrationSources } from "./extract-card.ts";
 import type { FeedError, FeedService } from "./feed-service.ts";
 
@@ -28,10 +28,30 @@ function saveFailedNotice({ code, issues }: FeedError): EditorNotice {
   return {
     tone: "error",
     title: TEXT.invalid,
-    ...(issues === undefined
-      ? {}
-      : { detail: issues.map(({ path, message }) => `${path}: ${message}`).join("\n") }),
+    ...(issues === undefined ? {} : { detail: TEXT.checkFields(fieldLabelsOf(issues)) }),
   };
+}
+
+/** The labels people see for the card fields, keyed by the schema path the agent reports. */
+const FIELD_LABELS: ReadonlyArray<readonly [path: string, label: string]> = [
+  ["/about", TEXT.about.about],
+  ["/technical", TEXT.about.technical],
+  ["/domains", TEXT.help.topics],
+  ["/offers", TEXT.help.offers],
+  ["/seeks", TEXT.seek.seeks],
+  ["/links/linkedin", TEXT.seek.linkedin],
+  ["/links/github", TEXT.seek.github],
+  ["/links/website", TEXT.seek.website],
+  ["/links", TEXT.seek.links],
+];
+
+/** Names the fields to fix in the person's words, never the raw schema paths. */
+function fieldLabelsOf(issues: ReadonlyArray<{ readonly path: string }>): string[] {
+  const labels = issues.flatMap(({ path }) => {
+    const field = FIELD_LABELS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`));
+    return field === undefined ? [] : [field[1]];
+  });
+  return [...new Set(labels)];
 }
 
 /** The state of the collaboration card wizard: the draft, what is running and what to tell. */
@@ -42,11 +62,6 @@ export function useCardEditor({ feed, initial, onSaved }: EditorDeps) {
 
   const change = (patch: Partial<CardDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
-  };
-
-  const startEmpty = () => {
-    setDraft(EMPTY_DRAFT);
-    setNotice(undefined);
   };
 
   const save = async () => {
@@ -72,5 +87,5 @@ export function useCardEditor({ feed, initial, onSaved }: EditorDeps) {
     setNotice(undefined);
   };
 
-  return { draft, notice, busy, change, startEmpty, save, generate, clearNotice };
+  return { draft, notice, busy, change, save, generate, clearNotice };
 }
