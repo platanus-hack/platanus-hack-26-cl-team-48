@@ -25,6 +25,13 @@ export function startFlowSaving(deps: SavingDeps) {
     flushPending: async () => {
       await sync.flush();
     },
+    saveNow: async () => {
+      await sync.flush();
+      const { currentId } = deps.stores.savedFlowStore.getState();
+      if (currentId !== undefined) return currentId;
+      await saveFlow(deps, deps.stores.flowStore.getState().state.flow, { allowsEmpty: true });
+      return deps.stores.savedFlowStore.getState().currentId;
+    },
   });
   return {
     flush: sync.flush,
@@ -36,7 +43,10 @@ export function startFlowSaving(deps: SavingDeps) {
     },
     close: () => {
       unsubscribe();
-      deps.stores.savedFlowStore.setState({ flushPending: () => Promise.resolve() });
+      deps.stores.savedFlowStore.setState({
+        flushPending: () => Promise.resolve(),
+        saveNow: () => Promise.resolve(deps.stores.savedFlowStore.getState().currentId),
+      });
       sync.cancel();
     },
   };
@@ -55,8 +65,9 @@ function createSavingSync(deps: SavingDeps): FlowSync {
   });
 }
 
-async function saveFlow(deps: SavingDeps, flow: Flow) {
-  if (flow.nodes.length === 0) return;
+/** An empty flow is only saved on request, so the agent can build one from scratch. */
+async function saveFlow(deps: SavingDeps, flow: Flow, { allowsEmpty = false } = {}) {
+  if (flow.nodes.length === 0 && !allowsEmpty) return;
   const store = deps.stores.savedFlowStore;
   const { currentId, generation, files, library, report } = store.getState();
   const id = currentId ?? deps.createId();

@@ -1,3 +1,4 @@
+import { err } from "@nodomics/protocol";
 import { useState } from "react";
 import { useAppStores } from "../app-context.ts";
 import { useAgent } from "./agent-context.ts";
@@ -39,10 +40,15 @@ export function useAgentConversation() {
     );
   };
 
-  const ask = async (goal: string, flowId: string) => {
+  /** A new flow with no nodes is saved first, so the agent can build it from scratch. */
+  const ask = async (goal: string) => {
     const id = exchanges.length;
     setExchanges((current) => [...current, { id, goal, live: "" }]);
-    await savedFlowStore.getState().flushPending();
+    const flowId = await savedFlowStore.getState().saveNow();
+    if (flowId === undefined) {
+      update(id, (exchange) => ({ ...exchange, reply: err({ code: "UNAUTHENTICATED" }) }));
+      return;
+    }
     const reply = await agent.ask({ goal, flowId }, undefined, (progress) => {
       update(id, (exchange) => withProgress(exchange, progress));
     });
