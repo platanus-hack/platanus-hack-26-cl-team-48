@@ -502,9 +502,11 @@ describe("createRenderProvider — timeouts", () => {
   const hangingFetch = (input: string | URL | Request, init?: RequestInit) =>
     new Promise<Response>((_resolve, reject) => {
       const signal = signalOf(input, init);
-      if (signal === undefined || signal === null) return;
+      if (signal === undefined) return;
       if (signal.aborted) reject(new DOMException("Aborted", "AbortError"));
-      signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      signal.addEventListener("abort", () => {
+        reject(new DOMException("Aborted", "AbortError"));
+      });
     });
 
   const hangingProvider = () =>
