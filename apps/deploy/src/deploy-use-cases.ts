@@ -8,7 +8,7 @@ import { planDeployment } from "./spec/plan.ts";
 import { failure } from "./spec/node-params.ts";
 import { serviceSpecOf } from "./spec/service-spec.ts";
 import { isHttpsUrl } from "./https-url.ts";
-import { createSerialQueue } from "./serial-queue.ts";
+import { createSerialQueue, type SerialQueue } from "./serial-queue.ts";
 import type { Deployment, DeployError, Plan, ServiceSpec, UserIdentity } from "./types.ts";
 
 type NodeTarget = { readonly flowId: string; readonly nodeId: string };
@@ -46,7 +46,7 @@ export function createDeployUseCases(deps: DeployDeps): DeployUseCases {
     },
     apply: (identity, request) => oneAtATime(() => applyPlan(deps, identity, request)),
     redeploy: (identity, request) => oneAtATime(() => redeployService(deps, identity, request)),
-    list: (identity, flowId) => listDeployments(deps, identity, flowId),
+    list: (identity, flowId) => listDeployments({ deps, oneAtATime }, identity, flowId),
     remove: (identity, deploymentId) =>
       oneAtATime(() => removeDeployment(deps, identity, deploymentId)),
   };
@@ -176,30 +176,43 @@ async function updateService(
   });
 }
 
+type Serialized = { readonly deps: DeployDeps; readonly oneAtATime: SerialQueue };
+
 async function listDeployments(
-  deps: DeployDeps,
+  serialized: Serialized,
   identity: UserIdentity,
   flowId: string,
 ): Outcome<Deployment[]> {
-  const records = await deps.deployments.listByFlow(identity.userId, flowId);
+  const records = await serialized.deps.deployments.listByFlow(identity.userId, flowId);
   if (!records.ok) return unavailable();
-  const refreshed = await Promise.all(records.value.map((record) => refreshStatus(deps, record)));
+  const refreshed = await Promise.all(
+    records.value.map((record) => refreshStatus(serialized, record)),
+  );
   return ok(refreshed.map(deploymentOf));
 }
 
 /**
- * Best effort: when the provider or the store fails, the last known status is kept. Only the status
- * is written, so a refresh that ends after a remove or an apply does not undo it.
+ * Best effort: when the provider or the store fails, the last known status is kept. The status is
+ * written in turn with the actions, and only if the record did not change since it was read: a
+ * status observed before an apply, a redeploy or a remove must not undo it.
  */
 async function refreshStatus(
-  deps: DeployDeps,
+  { deps, oneAtATime }: Serialized,
   record: DeploymentRecord,
 ): Promise<DeploymentRecord> {
   const status = await deps.provider.status(record.providerServiceId);
   if (!status.ok || status.value === record.status) return record;
   const refreshed = { ...record, status: status.value, updatedAt: deps.now().toISOString() };
-  await deps.deployments.updateStatus(refreshed.id, refreshed.status, refreshed.updatedAt);
-  return refreshed;
+  return oneAtATime(async () => {
+    if (!(await isUnchangedSince(deps, record))) return record;
+    await deps.deployments.updateStatus(refreshed.id, refreshed.status, refreshed.updatedAt);
+    return refreshed;
+  });
+}
+
+async function isUnchangedSince(deps: DeployDeps, record: DeploymentRecord): Promise<boolean> {
+  const current = await deps.deployments.get(record.ownerId, record.id);
+  return current.ok && current.value?.updatedAt === record.updatedAt;
 }
 
 async function removeDeployment(
