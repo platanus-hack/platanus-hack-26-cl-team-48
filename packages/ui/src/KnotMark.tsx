@@ -32,7 +32,7 @@ export function KnotMark({ size = "var(--icon-md)", title, className }: KnotMark
         cx="31"
         cy="24"
         r="12"
-        stroke="var(--brand-paper, var(--surface-100))"
+        stroke="var(--nd-glyph-halo, var(--brand-paper, var(--surface-100)))"
         strokeWidth="8"
       />
       <circle
@@ -47,7 +47,7 @@ export function KnotMark({ size = "var(--icon-md)", title, className }: KnotMark
           cx="17"
           cy="24"
           r="12"
-          stroke="var(--brand-paper, var(--surface-100))"
+          stroke="var(--nd-glyph-halo, var(--brand-paper, var(--surface-100)))"
           strokeWidth="8"
         />
         <circle cx="17" cy="24" r="12" stroke="var(--lineage-knot, var(--ink))" strokeWidth="3.4" />

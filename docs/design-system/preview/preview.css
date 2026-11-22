@@ -1,0 +1,339 @@
+/* Layout of the preview cards. Every value is a token from packages/ui. */
+:root {
+  --icon-chip: calc(var(--space-8) + var(--space-2));
+  --icon-chip-glyph: calc(var(--space-4) + var(--space-1));
+  --nd-glyph-halo: var(--surface-100);
+}
+
+body {
+  margin: 0;
+  background: var(--surface-100);
+  color: var(--ink);
+  font: var(--text-body);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-6);
+  background: var(--surface-200);
+  border-bottom: var(--stroke-hairline) solid var(--line);
+}
+
+.bar a {
+  color: var(--ink);
+  font: var(--text-title);
+  text-decoration: none;
+}
+
+.toggle,
+.theme-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-100);
+  color: var(--ink);
+  font: var(--text-body-sm);
+  cursor: pointer;
+}
+
+.toggle:focus-visible,
+.theme-switch button:focus-visible,
+a:focus-visible {
+  outline: var(--stroke-strong) solid var(--focus-ring);
+  outline-offset: var(--stroke-strong);
+}
+
+main {
+  max-width: calc(var(--node-width) * 5);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-12);
+  display: grid;
+  gap: var(--space-6);
+}
+
+h1 {
+  margin: 0;
+  font: var(--text-display);
+  letter-spacing: var(--text-display-tracking);
+}
+
+h2 {
+  margin: var(--space-4) 0 0;
+  font: var(--text-title-lg);
+}
+
+p {
+  margin: 0;
+}
+
+.lead,
+.note {
+  color: var(--ink-muted);
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.row.ink {
+  color: var(--ink);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--node-width) * 0.9), 1fr));
+  gap: var(--space-4);
+}
+
+.swatch {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.chipcolor {
+  height: var(--space-12);
+  border-radius: var(--radius-md);
+  border: var(--stroke-hairline) solid var(--line);
+}
+
+.swatch small {
+  color: var(--ink-muted);
+  font: var(--text-caption);
+}
+
+.eyebrow {
+  color: var(--ink-muted);
+  font: var(--text-caption);
+  text-transform: uppercase;
+}
+
+section {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--stroke-hairline) solid var(--brand-rule);
+}
+
+.display {
+  font: var(--text-display);
+  letter-spacing: var(--text-display-tracking);
+  text-wrap: balance;
+}
+
+.display-sm {
+  font: var(--text-display-sm);
+}
+
+.title-lg {
+  font: var(--text-title-lg);
+}
+
+.title {
+  font: var(--text-title);
+}
+
+.body-sm {
+  font: var(--text-body-sm);
+}
+
+.caption {
+  font: var(--text-caption);
+  color: var(--ink-muted);
+}
+
+.accent {
+  color: var(--lineage-adapt);
+}
+
+.chip {
+  width: var(--icon-chip);
+  height: var(--icon-chip);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--lineage-adapt);
+  color: var(--surface-100);
+}
+
+.glyph {
+  width: 100%;
+  max-width: calc(var(--space-12) * 2);
+  height: auto;
+  display: block;
+}
+
+.glyphs figure,
+.glyph-grid figure {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.glyph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--node-width) * 0.9), 1fr));
+  gap: var(--space-6);
+}
+
+figcaption {
+  color: var(--ink-muted);
+  font: var(--text-body-sm);
+}
+
+.thread {
+  --knot: var(--icon-chip);
+  --gap: var(--space-8);
+  list-style: none;
+  margin: 0;
+  padding: var(--space-8) var(--space-6);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+  background: var(--brand-surface);
+  border-block: var(--stroke-hairline) solid var(--brand-rule);
+}
+
+.thread li {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding-top: calc(var(--knot) + var(--space-4));
+}
+
+.thread li .chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.thread li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: calc((var(--knot) - var(--stroke-strong)) / 2);
+  left: var(--knot);
+  width: calc(100% + var(--gap) - var(--knot));
+  height: var(--stroke-strong);
+  background: var(--lineage-adapt);
+}
+
+.thread b {
+  font: var(--text-title-lg);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--node-width) * 1.1), 1fr));
+  gap: var(--space-6);
+}
+
+.card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-300);
+  border: var(--stroke-hairline) solid var(--brand-rule);
+  border-radius: var(--radius-lg);
+  --nd-glyph-halo: var(--surface-300);
+}
+
+.card h3 {
+  margin: 0;
+  font: var(--text-title);
+}
+
+.kind,
+.who,
+.desc {
+  color: var(--ink-muted);
+  font: var(--text-body-sm);
+}
+
+.trail {
+  padding: var(--space-3);
+  background: var(--brand-surface);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 var(--stroke-hairline) var(--brand-rule);
+}
+
+.strip {
+  width: 100%;
+  height: var(--control-md);
+  display: block;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  background: var(--brand-surface);
+  border: var(--stroke-hairline) solid var(--brand-rule);
+  border-radius: var(--radius-lg);
+}
+
+.theme-switch {
+  display: inline-flex;
+  width: fit-content;
+  padding: var(--stroke-strong);
+  gap: var(--stroke-strong);
+  border: var(--stroke-hairline) solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.theme-switch button {
+  border: 0;
+  color: var(--ink-muted);
+}
+
+.theme-switch button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.index {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.index a {
+  color: var(--lineage-adapt);
+  font: var(--text-title);
+}
+
+@media (max-width: 720px) {
+  .thread {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thread li:not(:last-child)::after {
+    top: var(--knot);
+    left: calc((var(--knot) - var(--stroke-strong)) / 2);
+    width: var(--stroke-strong);
+    height: calc(100% + var(--gap) - var(--knot));
+  }
+
+  .thread li {
+    padding: 0 0 0 calc(var(--knot) + var(--space-4));
+    min-height: var(--knot);
+  }
+}

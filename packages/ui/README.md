@@ -1,5 +1,7 @@
 # @nodomics/ui — design system de Nodomics
 
+> La identidad visual del Hub (tokens de marca y linaje, componentes del hilo y reglas de estilo) está en [lenguaje-del-nudo.md](./lenguaje-del-nudo.md).
+
 Tokens, fuentes, estilos y componentes React **de presentación**. Es la única fuente de colores, tamaños, radios y tipografía de la interfaz (`CLAUDE.md`, invariante 7).
 
 - Los componentes reciben datos y callbacks por props. No guardan estado de negocio, no hacen I/O y no conocen el protocolo: `apps/web` traduce sus tipos (por ejemplo `NodeState` del NEP) a los de este paquete.

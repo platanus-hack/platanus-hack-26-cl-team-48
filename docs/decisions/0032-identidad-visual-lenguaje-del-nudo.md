@@ -1,4 +1,4 @@
-# 0029. Identidad visual: lenguaje del nudo
+# 0032. Identidad visual: lenguaje del nudo
 
 - **Estado:** propuesta
 - **Fecha:** 2026-11-22

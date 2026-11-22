@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Colores del hilo</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="preview.css" />
+    <script src="theme-toggle.js" defer></script>
+  </head>
+  <body>
+    <header class="bar">
+      <a href="index.html">Sistema de diseño</a>
+      <button type="button" class="toggle" data-theme-toggle>Claro / Oscuro</button>
+    </header>
+    <main>
+      <h1>Colores del hilo</h1>
+      <p class="lead">Cuatro tokens cuentan la historia de una solución.</p>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="chipcolor" style="background: var(--lineage-origin)"></span
+          ><code>--lineage-origin</code><small>Tramo de quien creó la solución</small>
+        </div>
+        <div class="swatch">
+          <span class="chipcolor" style="background: var(--lineage-adapt)"></span
+          ><code>--lineage-adapt</code
+          ><small>Acento único: tramo adaptado, chips y palabra destacada</small>
+        </div>
+        <div class="swatch">
+          <span class="chipcolor" style="background: var(--lineage-knot)"></span
+          ><code>--lineage-knot</code><small>El nudo donde el hilo cambia de manos</small>
+        </div>
+        <div class="swatch">
+          <span class="chipcolor" style="background: var(--lineage-attention)"></span
+          ><code>--lineage-attention</code><small>Solo cuando algo pide atención</small>
+        </div>
+      </div>
+      <p class="note">
+        Los estados de ejecución (<code>--status-ok</code>, <code>--status-error</code>) son de la
+        app, no de la marca.
+      </p>
+    </main>
+  </body>
+</html>
