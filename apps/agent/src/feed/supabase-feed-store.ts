@@ -1,4 +1,11 @@
-import { FeedHitSchema, parseProfileCard, type FeedHit, type ProfileCard } from "@nodomics/profile";
+import {
+  FEED_MAP_MAX_PEOPLE,
+  FeedHitSchema,
+  parseProfileCard,
+  type FeedHit,
+  type FeedMapPerson,
+  type ProfileCard,
+} from "@nodomics/profile";
 import { err, ok, type Result } from "@nodomics/protocol";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
@@ -18,17 +25,61 @@ const StoredRow = Type.Object({
 });
 const HandleRow = Type.Object({ profile_cards: Type.Unknown() });
 const VectorSchema = Type.Array(Type.Number());
+const MapRow = Type.Object({
+  handle: Type.String(),
+  display_name: Type.Union([Type.String(), Type.Null()]),
+  profile_cards: Type.Object({
+    card: Type.Unknown(),
+    offers_embedding: Type.String(),
+  }),
+});
 
 const storeError = (message: string): Outcome<never> => err({ code: "STORE_ERROR", message });
 const malformed = (what: string): Outcome<never> => storeError(`Stored ${what} is malformed.`);
 
 export function createSupabaseFeedStore(client: SupabaseClient): FeedStorePort {
   return {
+    mapProfiles: (model, handles) => mapProfiles(client, model, handles),
     getOwnCard: (profileId) => getOwnCard(client, profileId),
     getCardByHandle: (handle) => getCardByHandle(client, handle),
     upsertCard: (row) => upsertCard(client, row),
     match: (query, k, exclude) => match(client, { query, k, exclude }),
   };
+}
+
+async function mapProfiles(
+  client: SupabaseClient,
+  model: string,
+  handles?: readonly string[],
+): Promise<Outcome<Omit<FeedMapPerson, "match">[]>> {
+  if (handles?.length === 0) return ok([]);
+  const query = client
+    .from("profiles")
+    .select("handle,display_name,profile_cards!inner(card,offers_embedding)")
+    .eq("profile_cards.embedding_model", model)
+    .order("handle")
+    .limit(FEED_MAP_MAX_PEOPLE);
+  const { data, error }: Reply = await (handles === undefined
+    ? query
+    : query.in("handle", handles));
+  if (error || !Array.isArray(data)) return storeError("Reading the feed map failed.");
+  return ok(data.flatMap(mapPerson));
+}
+
+function mapPerson(row: unknown): Omit<FeedMapPerson, "match">[] {
+  if (!Value.Check(MapRow, row)) return [];
+  const card = parseProfileCard(row.profile_cards.card);
+  const vector = parseVector(row.profile_cards.offers_embedding);
+  if (!card.ok || !vector?.length) return [];
+  return [
+    {
+      handle: row.handle,
+      title: row.display_name || row.handle,
+      technical: card.value.technical,
+      offers: [...card.value.offers],
+      vector: [...vector],
+    },
+  ];
 }
 
 const serializeVector = (vector: readonly number[]): string => JSON.stringify(vector);

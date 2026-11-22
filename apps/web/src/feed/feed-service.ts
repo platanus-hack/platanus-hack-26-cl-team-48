@@ -1,4 +1,4 @@
-import type { FeedHit, ProfileCard, RegistrationRequest } from "@nodomics/profile";
+import type { FeedHit, FeedMapPerson, ProfileCard, RegistrationRequest } from "@nodomics/profile";
 import type { Result, ValidationIssue } from "@nodomics/protocol";
 
 export type FeedErrorCode =
@@ -13,6 +13,7 @@ export type FeedResult<T> = Result<T, FeedError>;
 
 /** What the web app asks of the Feed (ADR 0022); the agent service or an in-memory copy answers. */
 export interface FeedService {
+  readonly mapPeople?: (text: string) => Promise<FeedResult<FeedMapPerson[]>>;
   readonly search: (text: string) => Promise<FeedResult<FeedHit[]>>;
   readonly matches: () => Promise<FeedResult<FeedHit[]>>;
   /** The collaboration card of a handle; `undefined` when the person has none yet. */

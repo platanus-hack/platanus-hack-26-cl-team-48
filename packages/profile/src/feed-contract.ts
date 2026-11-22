@@ -6,8 +6,26 @@ export const FEED_PATHS = {
   card: "/feed/cards/:handle",
   search: "/feed/search",
   matches: "/feed/matches",
+  map: "/feed/map",
   registration: "/feed/registration",
 } as const;
+
+export const FEED_MAP_MAX_PEOPLE = 100;
+
+export const FeedMapReplySchema = Type.Object({
+  people: Type.Array(
+    Type.Object({
+      handle: Type.String(),
+      title: Type.String(),
+      technical: Type.Union([Type.Literal("uses"), Type.Literal("builds"), Type.Literal("codes")]),
+      offers: Type.Array(Type.String()),
+      vector: Type.Array(Type.Number(), { minItems: 1 }),
+      match: Type.Boolean(),
+    }),
+    { maxItems: FEED_MAP_MAX_PEOPLE },
+  ),
+});
+export type FeedMapPerson = Static<typeof FeedMapReplySchema>["people"][number];
 
 export const FeedHitSchema = Type.Object({
   kind: Type.Union([Type.Literal("profile"), Type.Literal("node"), Type.Literal("flow")]),

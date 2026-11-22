@@ -12,6 +12,7 @@ import {
   type SaveProfileError,
 } from "./feed-service.ts";
 import type { FeedStorePort } from "./feed-store-port.ts";
+import { loadFeedMap } from "./feed-map.ts";
 import { parseJson } from "./parse-json.ts";
 import { createRegistrationRoute, type RegistrationRouteDeps } from "./registration-route.ts";
 
@@ -51,8 +52,17 @@ export function createFeedRoutes(deps: FeedRoutesDeps): readonly Route[] {
     route("GET", FEED_PATHS.matches, (request) =>
       handleMatches(serviceFor(request.identity), request),
     ),
+    route("GET", FEED_PATHS.map, (request) => handleMap(serviceFor(request.identity), request)),
     createRegistrationRoute(deps),
   ];
+}
+
+async function handleMap(deps: FeedServiceDeps, request: RouteRequest): Promise<RouteReply> {
+  const query = request.query["q"]?.trim();
+  if (query && query.length > MAX_QUERY_LENGTH) return INVALID_QUERY;
+  const found = await loadFeedMap(deps, request.identity.userId, query);
+  if (found.ok) return { status: 200, body: { people: found.value } };
+  return found.error.code === "EMBEDDINGS_UNAVAILABLE" ? EMBEDDINGS_UNAVAILABLE : STORE_UNAVAILABLE;
 }
 
 const route = (method: Route["method"], path: string, handle: Route["handle"]): Route => ({
