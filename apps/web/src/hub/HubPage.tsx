@@ -1,5 +1,5 @@
 import type { HubError, PublicationSummary } from "@nodomics/hub";
-import { ok, type Flow } from "@nodomics/protocol";
+import type { Flow } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
 import { useCallback, useId, useState } from "react";
 import { ForYouSection } from "../feed/ForYouSection.tsx";
@@ -7,15 +7,15 @@ import { PeopleSection } from "../feed/PeopleSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { useHub, useHubProfile } from "./hub-context.ts";
 import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
+import { HubHero } from "./HubHero.tsx";
+import { HubTabs } from "./HubTabs.tsx";
 import {
   ALL_KINDS,
-  HUB_VIEWS,
-  isAccountView,
-  PUBLIC_VIEWS,
   matching,
   offeredTags,
   toggled,
   withTags,
+  type HubTab,
   type KindFilter,
 } from "./hub-filters.ts";
 import { PublicationList } from "./PublicationCard.tsx";
@@ -26,60 +26,96 @@ import { useQuery, type Query } from "../async/use-query.ts";
 const SEARCH_DELAY_MS = 200;
 type Listed = Query<ReadonlyArray<PublicationSummary>, HubError>;
 
-const INITIAL_FILTERS: HubFilterState = {
-  view: "for-you",
-  kind: ALL_KINDS,
-  pressedTags: new Set(),
-};
+const NO_TAGS: ReadonlySet<string> = new Set();
+const INITIAL_FILTERS: HubFilterState = { kind: ALL_KINDS, pressedTags: NO_TAGS };
 
 type HubPageProps = {
   readonly text: string;
+  readonly onSearch: (text: string) => void;
   readonly onOpenEditor: (opening: EditorOpening) => void;
   readonly onOpenCopy: (flow: Flow) => void;
 };
 
-/** The home page (ADR 0018, 0024): what is published, and the account's own flows. */
-export function HubPage({ text, onOpenEditor }: HubPageProps) {
-  const [chosen, setFilters] = useState(INITIAL_FILTERS);
+/** The home page (ADR 0018, 0024): discover what is published, or work on the account's own. */
+export function HubPage({ text, onSearch, onOpenEditor }: HubPageProps) {
+  const [chosenTab, setTab] = useState<HubTab>("discover");
   const handle = useHubProfile()?.handle;
-  const filters = reachableFilters(chosen, handle !== undefined);
-  const listed = useListed({ filters, text, handle });
-  const change = (patch: (current: HubFilterState) => Partial<HubFilterState>) => {
-    setFilters((current) => ({ ...current, ...patch(current) }));
+  // The account's space needs a session: signed out, the page goes back to discovering.
+  const tab = handle === undefined ? "discover" : chosenTab;
+  const ids = { panel: useId(), discover: useId(), workspace: useId() };
+  return (
+    <div className="web-hub-home">
+      <h1 className="web-visually-hidden">{MESSAGES.hub.title}</h1>
+      <HubTabs tab={tab} ids={ids} isSignedIn={handle !== undefined} onTab={setTab} />
+      <div role="tabpanel" id={ids.panel} aria-labelledby={ids[tab]} className="web-hub-page">
+        {handle === undefined || tab === "discover" ? (
+          <DiscoverPanel text={text} onSearch={onSearch} isSignedIn={handle !== undefined} />
+        ) : (
+          <WorkspacePanel text={text} handle={handle} onOpenEditor={onOpenEditor} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DiscoverPanel({
+  text,
+  onSearch,
+  isSignedIn,
+}: {
+  readonly text: string;
+  readonly onSearch: (text: string) => void;
+  readonly isSignedIn: boolean;
+}) {
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const listed = useSearch(text, filters.kind);
+  const chooseKind = (kind: KindFilter) => {
+    setFilters((current) => ({ ...current, kind }));
   };
   return (
-    <div className="web-hub-browse">
+    <>
+      {isSignedIn ? <ForYouSection onSearch={onSearch} /> : <HubHero onKind={chooseKind} />}
       <HubFilters
         filters={filters}
-        views={handle === undefined ? PUBLIC_VIEWS : HUB_VIEWS}
         tags={offeredTags(listed.status === "ready" ? listed.value : [], filters.pressedTags)}
-        onView={(view) => {
-          change(() => ({ view }));
-        }}
-        onKind={(kind) => {
-          change(() => ({ kind }));
-        }}
+        onKind={chooseKind}
         onTag={(tag) => {
-          change((current) => ({ pressedTags: toggled(current.pressedTags, tag) }));
+          setFilters((current) => ({ ...current, pressedTags: toggled(current.pressedTags, tag) }));
         }}
       />
-      <main className="web-hub-page">
-        <h1 className="web-visually-hidden">{MESSAGES.hub.title}</h1>
-        {filters.view === "for-you" && <ForYouSection />}
-        {filters.view === "flows" ? (
-          <MyFlowsSection onOpenEditor={onOpenEditor} />
-        ) : (
-          <>
-            <PeopleSection text={text} browse={!isAccountView(filters.view)} />
-            <PublicationsSection
-              heading={listHeading(filters, text)}
-              listed={listed}
-              pressedTags={filters.pressedTags}
-            />
-          </>
-        )}
-      </main>
-    </div>
+      <PeopleSection text={text} browse />
+      <PublicationsSection
+        heading={text.trim() === "" ? MESSAGES.hub.recent : MESSAGES.hub.results}
+        listed={listed}
+        pressedTags={filters.pressedTags}
+      />
+    </>
+  );
+}
+
+function WorkspacePanel({
+  text,
+  handle,
+  onOpenEditor,
+}: {
+  readonly text: string;
+  readonly handle: string;
+  readonly onOpenEditor: (opening: EditorOpening) => void;
+}) {
+  const mine = useOwnPublications(handle);
+  return (
+    <>
+      <MyFlowsSection onOpenEditor={onOpenEditor} />
+      <PublicationsSection
+        heading={MESSAGES.hub.mine}
+        listed={
+          mine.status === "ready"
+            ? { status: "ready", value: matching(mine.value, { text, kind: ALL_KINDS }) }
+            : mine
+        }
+        pressedTags={NO_TAGS}
+      />
+    </>
   );
 }
 
@@ -114,34 +150,6 @@ function SectionBody({
   );
 }
 
-const listHeading = ({ view }: HubFilterState, text: string) => {
-  if (view === "mine") return MESSAGES.hub.views.mine;
-  return text.trim() === "" ? MESSAGES.hub.views.recent : MESSAGES.hub.results;
-};
-
-/** The account's views need a session: signed out, they go back to "Para ti". */
-const reachableFilters = (filters: HubFilterState, isSignedIn: boolean): HubFilterState =>
-  isSignedIn || !isAccountView(filters.view) ? filters : { ...filters, view: "for-you" };
-
-/** What the chosen view lists before the tags narrow it. */
-function useListed({
-  filters,
-  text,
-  handle,
-}: {
-  readonly filters: HubFilterState;
-  readonly text: string;
-  readonly handle: string | undefined;
-}): Listed {
-  const isMine = filters.view === "mine";
-  const searched = useSearch(text, filters.kind);
-  const mine = useOwnPublications(isMine ? handle : undefined);
-  if (!isMine) return searched;
-  return mine.status === "ready"
-    ? { status: "ready", value: matching(mine.value, { text, kind: filters.kind }) }
-    : mine;
-}
-
 function useSearch(text: string, kind: KindFilter) {
   const hub = useHub();
   const search = useCallback(
@@ -151,12 +159,8 @@ function useSearch(text: string, kind: KindFilter) {
   return useQuery(search, SEARCH_DELAY_MS);
 }
 
-/** Asks the hub only for someone's publications: none while signed out or in another view. */
-function useOwnPublications(handle: string | undefined) {
+function useOwnPublications(handle: string) {
   const hub = useHub();
-  const ask = useCallback(
-    () => (handle === undefined ? Promise.resolve(ok([])) : hub.publicationsOf(handle)),
-    [hub, handle],
-  );
+  const ask = useCallback(() => hub.publicationsOf(handle), [hub, handle]);
   return useQuery(ask);
 }

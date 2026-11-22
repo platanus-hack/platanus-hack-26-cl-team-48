@@ -1,6 +1,6 @@
 import type { Flow } from "@nodomics/protocol";
 import { useState } from "react";
-import { Input } from "@nodomics/ui";
+import { Button, Input } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
@@ -24,18 +24,22 @@ export type HubNavigation = {
 export function HubApp(navigation: HubNavigation) {
   const route = useRoute();
   const [text, setText] = useState("");
+  const search = (next: string) => {
+    setText(next);
+    if (route.page !== "hub") navigate({ page: "hub" });
+  };
   return (
     <div className="web-hub-app">
       <HubBar
         text={text}
-        onSearch={(next) => {
-          setText(next);
-          if (route.page !== "hub") navigate({ page: "hub" });
+        onSearch={search}
+        onNewFlow={() => {
+          navigation.onOpenEditor({ kind: "new" });
         }}
       />
       <div className="web-hub-scroll">
         {route.page === "workspace" || route.page === "hub" ? (
-          <HubPage text={text} {...navigation} />
+          <HubPage text={text} onSearch={search} {...navigation} />
         ) : (
           <HubRoutePage route={route} {...navigation} />
         )}
@@ -47,9 +51,11 @@ export function HubApp(navigation: HubNavigation) {
 function HubBar({
   text,
   onSearch,
+  onNewFlow,
 }: {
   readonly text: string;
   readonly onSearch: (text: string) => void;
+  readonly onNewFlow: () => void;
 }) {
   return (
     <header className="web-hub-bar">
@@ -69,6 +75,9 @@ function HubBar({
         />
       </search>
       <div className="web-hub-bar-end">
+        <Button variant="primary" icon="plus" onClick={onNewFlow}>
+          {MESSAGES.savedFlows.newFlow}
+        </Button>
         <AccountButton />
       </div>
     </header>

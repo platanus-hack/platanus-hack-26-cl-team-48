@@ -12,7 +12,7 @@ import "../library/saved-flows.css";
 
 type OpenEditor = (opening: EditorOpening) => void;
 
-/** The account's flows in the hub (ADR 0024): from here one enters the editor. */
+/** The account's flows in the hub (ADR 0024): from here one enters the editor; "Nuevo flujo" is in the bar. */
 export function MyFlowsSection({ onOpenEditor }: { readonly onOpenEditor: OpenEditor }) {
   const { savedFlowStore } = useAppStores();
   const flows = useStore(savedFlowStore, (state) => state.flows);
@@ -23,18 +23,7 @@ export function MyFlowsSection({ onOpenEditor }: { readonly onOpenEditor: OpenEd
   }, [savedFlowStore]);
   return (
     <section className="web-hub-section" aria-labelledby={heading}>
-      <div className="web-hub-section-head">
-        <h2 id={heading}>{MESSAGES.hub.views.flows}</h2>
-        <Button
-          variant="primary"
-          icon="plus"
-          onClick={() => {
-            onOpenEditor({ kind: "new" });
-          }}
-        >
-          {MESSAGES.savedFlows.newFlow}
-        </Button>
-      </div>
+      <h2 id={heading}>{MESSAGES.hub.myFlows}</h2>
       {flows.length === 0 && <p className="web-panel-hint">{MESSAGES.savedFlows.empty}</p>}
       <div className="web-hub-grid">
         {flows.map((flow) => (
@@ -92,7 +81,8 @@ function FlowChores({ flow }: { readonly flow: SavedFlow }) {
   const [name, setName] = useState(flow.name);
   const state = savedFlowStore.getState();
   return (
-    <>
+    <details className="web-hub-more">
+      <summary>{MESSAGES.hub.moreActions}</summary>
       {isRenaming && (
         <div className="web-saved-actions">
           <Input label={MESSAGES.savedFlows.name} value={name} onChange={setName} />
@@ -125,7 +115,7 @@ function FlowChores({ flow }: { readonly flow: SavedFlow }) {
         </Button>
         <DeleteAction onDelete={() => state.remove(flow.id)} />
       </div>
-    </>
+    </details>
   );
 }
 
