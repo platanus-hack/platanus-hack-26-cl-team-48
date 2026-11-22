@@ -46,6 +46,7 @@ Patrones que dan forma al sistema (catálogo completo, con criterios de verifica
 | `packages/profile` | Ficha de perfil del Feed: esquema versionado, parseo con migraciones y textos a vectorizar. Puro, sin I/O (ADR 0022) | I/O, red, conocer Supabase o el proveedor de embeddings |
 | `apps/web` | Interfaz: lienzo, formularios generados por JSON Schema, vistas, estado de edición, compartir, hub, Feed | Importar algo que no sea `protocol`, `client`, `ui`, `hub` o `profile` |
 | `apps/agent` | Bucle del agente, cliente MCP, propuestas y Diff de Dominio, memoria | Escribir flujos fuera de la herramienta de escritura del MCP; ejecutar código; importar `apps/web` ni paquetes de motor |
+| `apps/mcp` | Servidor MCP del motor: leer flujos y nodos, borradores aislados, diff, aplicar con la identidad del usuario, ejecutar en un coordinador propio (ADR 0026) | Guardar secretos; saltarse RLS; importar `apps/*`, `hub` ni `client` |
 | `engines/python-local` | Ejecutor Python local por WebSocket (`duckdb`, `pandas`, `pyarrow`) | Lógica de grafo (en la PoC la hace el coordinador TS) |
 | `tests/conformance` | Flujos de referencia que corren contra cada motor y comparan resultados | Probar detalles internos de un motor |
 
@@ -57,12 +58,14 @@ protocol, rpc  ←  client  ←  apps/web  →  ui
 protocol, rpc  ←  coordinator  ←  engine-browser  →  executor-duckdb-wasm, executor-pyodide
 protocol, rpc  ←  engine-mock
 protocol       ←  apps/agent
+protocol, coordinator, executor-*, nodes-core  ←  apps/mcp
 protocol       ←  executor-*       (implementan la interfaz Executor definida en protocol)
 ```
 
 - `protocol` no depende de ningún paquete interno.
 - `apps/web` solo depende de `protocol`, `client`, `ui`, `hub` y `profile` (ADR 0018 y 0022).
 - `apps/agent` solo depende de `protocol` y `profile` (ADR 0019 y 0022).
+- `apps/mcp` solo depende de `protocol`, `coordinator`, `executor-duckdb-wasm`, `executor-pyodide` y `nodes-core` (ADR 0026).
 - `profile` solo depende de `protocol` (ADR 0022).
 - `hub` solo depende de `protocol` (y de `@supabase/supabase-js`).
 - `rpc` y `ui` no dependen de ningún paquete interno.

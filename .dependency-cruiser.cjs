@@ -17,6 +17,28 @@ module.exports = {
       to: { path: "^apps/agent/" },
     },
     {
+      name: "mcp-uses-only-engine-packages",
+      severity: "error",
+      from: { path: "^apps/mcp/" },
+      to: {
+        path: internal,
+        pathNot: [
+          "^apps/mcp/",
+          pkg("protocol"),
+          pkg("coordinator"),
+          pkg("executor-duckdb-wasm"),
+          pkg("executor-pyodide"),
+          pkg("nodes-core"),
+        ],
+      },
+    },
+    {
+      name: "nothing-imports-mcp",
+      severity: "error",
+      from: { pathNot: "^apps/mcp/" },
+      to: { path: "^apps/mcp/" },
+    },
+    {
       name: "web-only-uses-protocol-client-ui",
       severity: "error",
       from: { path: "^apps/web/", pathNot: "^apps/web/src/engine-registry\\.ts$" },
