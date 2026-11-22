@@ -13,12 +13,16 @@ const FlowRow = Type.Object({ document: Type.Object({ flow: Flow }) });
 export function createSupabaseFlowReader(options: {
   readonly supabaseUrl: string;
   readonly anonKey: string;
+  readonly fetch?: typeof fetch;
 }): FlowReader {
   return {
     read: async (identity, flowId) => {
       try {
         const result = await createClient(options.supabaseUrl, options.anonKey, {
-          global: { headers: { Authorization: `Bearer ${identity.accessToken}` } },
+          global: {
+            headers: { Authorization: `Bearer ${identity.accessToken}` },
+            ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+          },
           auth: { persistSession: false, autoRefreshToken: false },
         })
           .from("flows")
