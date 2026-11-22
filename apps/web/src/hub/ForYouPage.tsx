@@ -1,5 +1,6 @@
 import { Input } from "@nodomics/ui";
 import { useState } from "react";
+import { useOptionalFeed } from "../feed/feed-context.ts";
 import { ForYouSection } from "../feed/ForYouSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { FeaturedTrip } from "./FeaturedTrip.tsx";
@@ -7,6 +8,7 @@ import { Highlighted } from "./Highlighted.tsx";
 import { BROWSE_VIEWS, offeredTags, toggled, ALL_KINDS } from "./hub-filters.ts";
 import { HubFilters, type HubFilterState } from "./HubFilters.tsx";
 import { HubLegend } from "./HubLegend.tsx";
+import { NicheMapPage } from "./NicheMapPage.tsx";
 import { useHubProfile } from "./hub-context.ts";
 import { PublicationsSection } from "./PublicationResults.tsx";
 import { useListed } from "./use-hub-listing.ts";
@@ -27,6 +29,7 @@ type ForYouPageProps = {
 export function ForYouPage({ text, onSearch }: ForYouPageProps) {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const handle = useHubProfile()?.handle;
+  const mapPeople = useOptionalFeed()?.mapPeople;
   const listed = useListed({ filters, text, handle });
   const publications = listed.status === "ready" ? listed.value : [];
   const change = (patch: (current: HubFilterState) => Partial<HubFilterState>) => {
@@ -39,7 +42,7 @@ export function ForYouPage({ text, onSearch }: ForYouPageProps) {
     <div className="web-hub-browse">
       <HubFilters
         filters={filters}
-        views={BROWSE_VIEWS}
+        views={BROWSE_VIEWS.filter((view) => view !== "map" || mapPeople !== undefined)}
         tags={offeredTags(publications, filters.pressedTags)}
         onView={(view) => {
           change(() => ({ view }));
@@ -49,38 +52,44 @@ export function ForYouPage({ text, onSearch }: ForYouPageProps) {
         }}
         onTag={onTag}
       />
-      <main className="web-hub-page">
-        <div className="web-hub-hero">
-          <div className="web-hub-hero-main">
-            <h1 className="web-hub-hero-title">
-              <Highlighted text={MESSAGES.hub.heroTitle} emphasis={MESSAGES.hub.heroEmphasis} />
-            </h1>
-            <div className="web-hub-hero-search" role="search">
-              <Input
-                type="text"
-                icon="search"
-                label={MESSAGES.hub.heroSearch}
-                placeholder={MESSAGES.hub.heroPlaceholder}
-                value={text}
-                onChange={onSearch}
+      {filters.view === "map" && mapPeople !== undefined ? (
+        <NicheMapPage load={mapPeople} text={text} onSearch={onSearch} />
+      ) : (
+        <main className="web-hub-page">
+          <div className="web-hub-hero">
+            <div className="web-hub-hero-main">
+              <h1 className="web-hub-hero-title">
+                <Highlighted text={MESSAGES.hub.heroTitle} emphasis={MESSAGES.hub.heroEmphasis} />
+              </h1>
+              <div className="web-hub-hero-search" role="search">
+                <Input
+                  type="text"
+                  icon="search"
+                  label={MESSAGES.hub.heroSearch}
+                  placeholder={MESSAGES.hub.heroPlaceholder}
+                  value={text}
+                  onChange={onSearch}
+                />
+              </div>
+              <QuickTopics
+                tags={offeredTags(publications, new Set()).slice(0, MAX_QUICK_TOPICS)}
+                pressed={filters.pressedTags}
+                onTag={onTag}
               />
             </div>
-            <QuickTopics
-              tags={offeredTags(publications, new Set()).slice(0, MAX_QUICK_TOPICS)}
-              pressed={filters.pressedTags}
-              onTag={onTag}
-            />
+            <FeaturedTrip publication={publications[0]} />
           </div>
-          <FeaturedTrip publication={publications[0]} />
-        </div>
-        <HubLegend />
-        {filters.view === "for-you" && !isSearching(text) && <ForYouSection onSearch={onSearch} />}
-        <PublicationsSection
-          heading={listHeading(filters, text)}
-          listed={listed}
-          pressedTags={filters.pressedTags}
-        />
-      </main>
+          <HubLegend />
+          {filters.view === "for-you" && !isSearching(text) && (
+            <ForYouSection onSearch={onSearch} />
+          )}
+          <PublicationsSection
+            heading={listHeading(filters, text)}
+            listed={listed}
+            pressedTags={filters.pressedTags}
+          />
+        </main>
+      )}
     </div>
   );
 }
