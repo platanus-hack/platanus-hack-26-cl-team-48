@@ -74,7 +74,7 @@ export function ForYouPage({ text, onSearch }: ForYouPageProps) {
           <FeaturedTrip publication={publications[0]} />
         </div>
         <HubLegend />
-        {filters.view === "for-you" && <ForYouSection onSearch={onSearch} />}
+        {filters.view === "for-you" && !isSearching(text) && <ForYouSection onSearch={onSearch} />}
         <PublicationsSection
           heading={listHeading(filters, text)}
           listed={listed}
@@ -85,9 +85,11 @@ export function ForYouPage({ text, onSearch }: ForYouPageProps) {
   );
 }
 
+const isSearching = (text: string) => text.trim() !== "";
+
 const listHeading = ({ view }: HubFilterState, text: string) => {
   if (view === "mine") return MESSAGES.hub.views.mine;
-  return text.trim() === "" ? MESSAGES.hub.views.recent : MESSAGES.hub.results;
+  return isSearching(text) ? MESSAGES.hub.results : MESSAGES.hub.views.recent;
 };
 
 /** Shortcuts to the tags the listed publications really carry. */
