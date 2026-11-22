@@ -54,8 +54,8 @@ function EntryPanel({ icon, title, entries }: EntryPanelProps) {
         {title}
       </h3>
       <ul className="web-feed-tag-list" aria-labelledby={heading}>
-        {entries.map((entry) => (
-          <li key={entry} className="web-feed-tag">
+        {entries.map((entry, position) => (
+          <li key={position} className="web-feed-tag">
             {entry}
           </li>
         ))}
@@ -74,8 +74,8 @@ function DomainPanel({ domains }: { readonly domains: ProfileCard["domains"] }) 
         {TEXT.domains}
       </h3>
       <ul className="web-feed-tag-list" aria-labelledby={heading}>
-        {domains.map(({ name, depth }) => (
-          <li key={name} className="web-feed-tag web-feed-domain">
+        {domains.map(({ name, depth }, position) => (
+          <li key={position} className="web-feed-tag web-feed-domain">
             {name}
             <span className="web-feed-depth">
               <DepthDots depth={depth} />
