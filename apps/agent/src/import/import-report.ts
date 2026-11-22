@@ -62,4 +62,8 @@ export type CheckedCase = {
   readonly observed: readonly Row[];
 };
 
-export type ImportReport = SandboxReport & { readonly checkedCases: readonly CheckedCase[] };
+export type ImportReport = SandboxReport & {
+  readonly checkedCases: readonly CheckedCase[];
+  readonly label?: string | undefined;
+  readonly verificationLabel?: string | undefined;
+};

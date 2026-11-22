@@ -58,6 +58,12 @@ services:
         sync: false
       - key: AGENT_ALLOW_FAKES
         sync: false
+      - key: RENDER_SANDBOX_API_KEY
+        sync: false
+      - key: RENDER_WORKSPACE_ID
+        sync: false
+      - key: SANDBOX_ANTHROPIC_API_KEY
+        sync: false
   - type: web
     name: nodomics-mcp
     runtime: node
