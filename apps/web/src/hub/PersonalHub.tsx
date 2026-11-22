@@ -61,7 +61,7 @@ function PeoplePage({
           </RouteLink>
         </EmptyPanel>
       ) : (
-        <PeopleSection text={text} browse />
+        <PeopleSection text={text} />
       )}
     </main>
   );

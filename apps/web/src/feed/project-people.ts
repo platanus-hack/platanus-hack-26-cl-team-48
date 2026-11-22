@@ -5,8 +5,25 @@ const ITERATIONS = 80;
 const EPSILON = 1e-12;
 const CENTER = 0.5;
 
-const dot = (left: Vector, right: Vector) =>
-  left.reduce((sum, value, index) => sum + value * (right[index] ?? 0), 0);
+// Plain loops: these run many times over vectors of about a thousand numbers.
+function dot(left: Vector, right: Vector): number {
+  let sum = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    sum += (left[index] ?? 0) * (right[index] ?? 0);
+  }
+  return sum;
+}
+
+/** The rows added up, each scaled by its weight. */
+function weightedSum(rows: readonly Vector[], weights: readonly number[], size: number): number[] {
+  const sum = new Array<number>(size).fill(0);
+  rows.forEach((row, rowIndex) => {
+    const weight = weights[rowIndex] ?? 0;
+    for (let index = 0; index < size; index += 1)
+      sum[index] = (sum[index] ?? 0) + (row[index] ?? 0) * weight;
+  });
+  return sum;
+}
 
 function centered(vectors: readonly Vector[]): Vector[] {
   const mean = (vectors[0] ?? []).map(
@@ -22,9 +39,7 @@ function principalDirection(rows: readonly Vector[]): Vector {
   }
   for (let iteration = 0; iteration < ITERATIONS; iteration += 1) {
     const weights = rows.map((row) => dot(row, direction));
-    const next = direction.map((_, index) =>
-      rows.reduce((sum, row, rowIndex) => sum + (row[index] ?? 0) * (weights[rowIndex] ?? 0), 0),
-    );
+    const next = weightedSum(rows, weights, direction.length);
     const norm = Math.sqrt(dot(next, next));
     if (norm < EPSILON) return [];
     direction = next.map((value) => value / norm);

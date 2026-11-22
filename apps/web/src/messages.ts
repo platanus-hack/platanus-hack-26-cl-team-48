@@ -71,6 +71,7 @@ export const MESSAGES = {
       recent: "Recientes",
       flows: "Mis flujos",
       mine: "Mis publicaciones",
+      map: "Mapa de nichos",
     },
     tags: "Etiquetas",
     tagSearch: "Buscar etiquetas…",
