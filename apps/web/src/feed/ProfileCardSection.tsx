@@ -33,6 +33,8 @@ function CardBody({ feed, ...person }: PersonProps & { readonly feed: FeedServic
   const session = useSessionVersion();
   if (loaded.status === "loading")
     return <PersonWithMessage person={person} message={MESSAGES.feed.loading} />;
+  if (loaded.status === "failed" && loaded.error.code === "UNAUTHENTICATED")
+    return <PersonWithMessage person={person} message={MESSAGES.feed.card.signIn(handle)} />;
   if (loaded.status === "failed")
     return (
       <>
