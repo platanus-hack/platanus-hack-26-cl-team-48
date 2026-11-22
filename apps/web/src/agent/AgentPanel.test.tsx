@@ -216,8 +216,10 @@ describe("AgentPanel asking", () => {
     expect({
       request: (await screen.findByText(GOAL, { ignore: "textarea, input, script, style" }))
         .textContent,
-      working: (await screen.findByText(/El agente está trabajando/)).textContent,
-    }).toEqual({ request: GOAL, working: expect.stringMatching(/trabajando/) });
+      isWorking: /trabajando/.test(
+        (await screen.findByText(/El agente está trabajando/)).textContent,
+      ),
+    }).toEqual({ request: GOAL, isWorking: true });
   });
 
   it("disables Enviar while the agent answers", async () => {
@@ -383,9 +385,11 @@ describe("AgentPanel discarding", () => {
     await userEvent.click(screen.getByRole("button", { name: DISCARD }));
 
     expect({
-      said: (await screen.findByText(/Propuesta descartada/)).textContent,
+      isSaid: /Propuesta descartada/.test(
+        (await screen.findByText(/Propuesta descartada/)).textContent,
+      ),
       opened,
-    }).toEqual({ said: expect.stringMatching(/Propuesta descartada/), opened: [] });
+    }).toEqual({ isSaid: true, opened: [] });
   });
 
   it("does not let the proposal be decided again after discarding", async () => {
@@ -410,9 +414,11 @@ describe("AgentPanel errors", () => {
     await userEvent.click(screen.getByRole("button", { name: APPLY }));
 
     expect({
-      said: (await screen.findByText(/El flujo cambió mientras el agente trabajaba/)).textContent,
+      isSaid: /vuelve a pedirlo/.test(
+        (await screen.findByText(/El flujo cambió mientras el agente trabajaba/)).textContent,
+      ),
       opened,
-    }).toEqual({ said: expect.stringMatching(/vuelve a pedirlo/), opened: [] });
+    }).toEqual({ isSaid: true, opened: [] });
   });
 
   it("uses the stale message from the agent messages", () => {
