@@ -169,11 +169,15 @@ type WizardFooterProps = {
   readonly onCancel: () => void;
 };
 
-/** While a request is pending nothing can leave the step, so a late answer never lands elsewhere. */
+/**
+ * While a request is pending no other step can open, so a late answer never lands elsewhere.
+ * Cancelar still closes during a CV reading, whose late answer is then dropped with the wizard,
+ * but not during a save, which cannot be undone once sent.
+ */
 function WizardFooter({ onCancel, ...buttons }: WizardFooterProps) {
   return (
     <footer className="web-feed-wizard-footer">
-      <Button variant="ghost" disabled={buttons.busy !== "idle"} onClick={onCancel}>
+      <Button variant="ghost" disabled={buttons.busy === "saving"} onClick={onCancel}>
         {TEXT.cancel}
       </Button>
       <span className="web-feed-wizard-spacer" />
