@@ -1,5 +1,5 @@
 import { ok } from "@nodomics/protocol";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useDeploy } from "./deploy-context.ts";
 import type { DeployErrorCode, Deployment, DeployPlan, DeployResult } from "./deploy-service.ts";
 import { withDeployment, withoutDeployment } from "./deploy-view.ts";
@@ -29,21 +29,17 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const [plan, setPlan] = useState<DeploymentsState["plan"]>();
   const [isBusy, setBusy] = useState(false);
   const [failure, setFailure] = useState<DeployErrorCode>();
-  // Each action bumps it, so a list sent before the action cannot overwrite what the action did.
-  const listGeneration = useRef(0);
+  // Every list and every action takes a new turn: only the reply to the latest one is shown.
+  const listTurns = useTurns();
+  const planTurns = useTurns();
 
   const refreshStatus = useCallback(() => {
-    const generation = listGeneration.current;
-    void service.list(flowId).then(
-      whileMounted(isMounted, (listed) => {
-        if (generation === listGeneration.current) setDeployments(listed);
-      }),
-    );
-  }, [service, flowId, isMounted]);
+    void service.list(flowId).then(whileLatest(isMounted, listTurns.take(), setDeployments));
+  }, [service, flowId, isMounted, listTurns]);
   const requestPlan = useCallback(() => {
     setPlan(undefined);
-    void service.plan({ flowId, nodeId }).then(whileMounted(isMounted, setPlan));
-  }, [service, flowId, nodeId, isMounted]);
+    void service.plan({ flowId, nodeId }).then(whileLatest(isMounted, planTurns.take(), setPlan));
+  }, [service, flowId, nodeId, isMounted, planTurns]);
 
   const refresh = useCallback(() => {
     refreshStatus();
@@ -61,10 +57,10 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const runAction = async <T>(action: Promise<DeployResult<T>>, onDone: (value: T) => void) => {
     setBusy(true);
     setFailure(undefined);
-    listGeneration.current += 1;
+    listTurns.take();
     const result = await action;
     if (!isMounted.current) return;
-    listGeneration.current += 1;
+    listTurns.take();
     setBusy(false);
     if (result.ok) onDone(result.value);
     else failWith(result.error.code);
@@ -110,11 +106,29 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   };
 }
 
-/** Drops replies that arrive after the tab closed. */
-const whileMounted =
-  <T>(isMounted: RefObject<boolean>, apply: (value: T) => void) =>
+type Turns = { readonly take: () => Turn };
+type Turn = { readonly isLatest: () => boolean };
+
+/** Numbers requests so a slow reply cannot overwrite the reply to a later request. */
+function useTurns(): Turns {
+  const latest = useRef(0);
+  return useMemo(
+    () => ({
+      take: () => {
+        latest.current += 1;
+        const turn = latest.current;
+        return { isLatest: () => turn === latest.current };
+      },
+    }),
+    [],
+  );
+}
+
+/** Drops replies that arrive after the tab closed or after a later request was sent. */
+const whileLatest =
+  <T>(isMounted: RefObject<boolean>, turn: Turn, apply: (value: T) => void) =>
   (value: T) => {
-    if (isMounted.current) apply(value);
+    if (isMounted.current && turn.isLatest()) apply(value);
   };
 
 function useIsMounted(): RefObject<boolean> {

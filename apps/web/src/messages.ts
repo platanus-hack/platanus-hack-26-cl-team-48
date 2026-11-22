@@ -302,7 +302,7 @@ export const MESSAGES = {
       repo: "Repo",
       build: "Construcción",
       env: "Variables de entorno",
-      healthCheckPath: "Health check",
+      healthCheckPath: "Comprobación de salud",
     },
     deploy: "Desplegar",
     confirmDeployQuestion: "El servicio quedará publicado en internet. ¿Desplegar ahora?",
