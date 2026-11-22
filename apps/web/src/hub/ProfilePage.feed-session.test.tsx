@@ -1,43 +1,25 @@
-import { ok } from "@nodomics/protocol";
-import { act, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { FeedContext } from "../feed/feed-context.ts";
-import { MINIMAL_CARD, createFakeFeed } from "../feed/feed-fixtures.ts";
-import { createSeededHub, renderWithHub } from "./hub-pages-fixtures.tsx";
-import { ProfilePage } from "./ProfilePage.tsx";
+import { MINIMAL_CARD } from "../feed/feed-fixtures.ts";
+import { editCard, startNewCard, textbox, wizardIsOpen } from "./profile-wizard-fixtures.tsx";
 
-const EDITOR_NAME = "Editar perfil de colaboración";
+const VISITOR_EMPTY = "@ana todavía no completó su perfil de colaboración.";
 
 afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
 async function editAsAna() {
-  const user = userEvent.setup();
-  const { feed, saveProfile } = createFakeFeed({
-    card: () => Promise.resolve(ok(MINIMAL_CARD)),
-  });
-  const hub = await createSeededHub();
-  await hub.signIn({ kind: "email", email: "ana" });
-  renderWithHub(
-    <FeedContext.Provider value={feed}>
-      <ProfilePage handle="ana" />
-    </FeedContext.Provider>,
-    hub,
-  );
-  await user.click(await screen.findByRole("button", { name: "Editar perfil" }));
-  const form = await screen.findByRole("form", { name: EDITOR_NAME });
-  await user.clear(within(form).getByLabelText("Sobre ti"));
-  await user.type(within(form).getByLabelText("Sobre ti"), "Borrador de Ana");
-  return { user, hub, saveProfile };
+  const rendered = await editCard(MINIMAL_CARD);
+  await rendered.user.clear(textbox("Sobre ti"));
+  await rendered.user.type(textbox("Sobre ti"), "Borrador de Ana");
+  return rendered;
 }
 
-const editorIsOpen = () => screen.queryByRole("form", { name: EDITOR_NAME }) !== null;
 const editButton = () => screen.queryByRole("button", { name: "Editar perfil" });
 
-describe("ProfilePage editor when the session changes", () => {
-  it("closes the editor and shows the read-only card on sign-out", async () => {
+describe("ProfilePage wizard when the session changes", () => {
+  it("closes the wizard and shows the read-only card on sign-out", async () => {
     const { hub, saveProfile } = await editAsAna();
 
     await act(async () => {
@@ -46,13 +28,13 @@ describe("ProfilePage editor when the session changes", () => {
 
     expect(await screen.findByText(MINIMAL_CARD.about)).toBeTruthy();
     expect({
-      editing: editorIsOpen(),
+      open: wizardIsOpen(),
       editButton: editButton() !== null,
       saved: saveProfile.mock.calls.length,
-    }).toEqual({ editing: false, editButton: false, saved: 0 });
+    }).toEqual({ open: false, editButton: false, saved: 0 });
   });
 
-  it("closes the editor and hides Editar perfil when another user signs in", async () => {
+  it("closes the wizard and hides Editar perfil when another user signs in", async () => {
     const { hub } = await editAsAna();
 
     await act(async () => {
@@ -61,13 +43,13 @@ describe("ProfilePage editor when the session changes", () => {
     });
 
     expect(await screen.findByText(MINIMAL_CARD.about)).toBeTruthy();
-    expect({ editing: editorIsOpen(), editButton: editButton() !== null }).toEqual({
-      editing: false,
+    expect({ open: wizardIsOpen(), editButton: editButton() !== null }).toEqual({
+      open: false,
       editButton: false,
     });
   });
 
-  it("starts with the editor closed when Ana signs back in", async () => {
+  it("starts with the wizard closed when Ana signs back in", async () => {
     const { hub } = await editAsAna();
 
     await act(async () => {
@@ -76,7 +58,18 @@ describe("ProfilePage editor when the session changes", () => {
     });
 
     expect(await screen.findByRole("button", { name: "Editar perfil" })).toBeTruthy();
-    expect(editorIsOpen()).toBe(false);
+    expect(wizardIsOpen()).toBe(false);
     expect(screen.queryByDisplayValue("Borrador de Ana")).toBeNull();
+  });
+
+  it("closes a new-card wizard on sign-out and shows the visitor message", async () => {
+    const { hub } = await startNewCard();
+
+    await act(async () => {
+      await hub.signOut();
+    });
+
+    expect(await screen.findByText(VISITOR_EMPTY)).toBeTruthy();
+    expect(wizardIsOpen()).toBe(false);
   });
 });

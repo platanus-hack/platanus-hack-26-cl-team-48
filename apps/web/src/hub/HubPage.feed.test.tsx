@@ -76,7 +76,7 @@ describe("HubPage Para ti", () => {
     ).toBeTruthy();
   });
 
-  it("asks to complete the profile when matches reports NO_PROFILE", async () => {
+  it("invites to build the profile when matches reports NO_PROFILE", async () => {
     const { feed } = createFakeFeed({
       matches: () => Promise.resolve(err({ code: "NO_PROFILE" })),
     });
@@ -85,11 +85,23 @@ describe("HubPage Para ti", () => {
     const section = await forYou();
 
     expect(
-      await within(section).findByText("Completa tu perfil para ver con quién puedes colaborar."),
+      await within(section).findByText(
+        "Cuéntanos qué haces y te conectamos con quien te complementa.",
+      ),
     ).toBeTruthy();
+  });
+
+  it("links the NO_PROFILE invitation to the own profile", async () => {
+    const { feed } = createFakeFeed({
+      matches: () => Promise.resolve(err({ code: "NO_PROFILE" })),
+    });
+    renderWithHub(withFeed(feed), await signedInHub("beto"));
+
+    const section = await forYou();
+
     expect(
-      within(section).getByRole("link", { name: "Completar perfil" }).getAttribute("href"),
-    ).toBe("/u/ana");
+      (await within(section).findByRole("link", { name: "Armar mi perfil" })).getAttribute("href"),
+    ).toBe("/u/beto");
   });
 
   it("shows one item per hit with its title", async () => {
