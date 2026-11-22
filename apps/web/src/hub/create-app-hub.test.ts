@@ -1,10 +1,10 @@
-import type { FlowStore, Hub } from "@nodomics/hub";
+import type { FlowStore, Hub, SessionToken } from "@nodomics/hub";
 import { describe, expect, it } from "vitest";
 import { createAppHub } from "./create-app-hub.ts";
 
 const LOCAL_ACCOUNT = { id: "local", handle: "local", displayName: "Cuenta local" };
 
-const hubWithoutKeys = (): Hub & FlowStore => createAppHub({});
+const hubWithoutKeys = (): Hub & FlowStore & SessionToken => createAppHub({});
 
 describe("createAppHub without Supabase keys", () => {
   it("signs in to the local account with a provider", async () => {
@@ -47,5 +47,14 @@ describe("createAppHub without Supabase keys", () => {
       ok: true,
       value: [{ id: "one", ownerId: "local", visibility: "private" }],
     });
+  });
+
+  it("resolves no access token for the local account", async () => {
+    const hub = hubWithoutKeys();
+    await hub.signIn({ kind: "provider", provider: "github" });
+
+    const token = await hub.accessToken();
+
+    expect(token).toBeUndefined();
   });
 });
