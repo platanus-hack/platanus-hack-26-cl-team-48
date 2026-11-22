@@ -104,7 +104,7 @@ async function buildProposalData(
     readonly flowId: string;
     readonly importReport?: ImportReport | undefined;
   },
-): Promise<ProposalPayload | null> {
+): Promise<ProposalPayload | null | "failed"> {
   const store = deps.proposalsForUser?.(identity) ?? deps.proposals;
   if (!store) return null;
   const outcome = await buildProposal({
@@ -119,16 +119,20 @@ async function buildProposalData(
       code: outcome.error.code,
       message: outcome.error.message,
     });
-    return null;
+    return "failed";
   }
   if (!outcome.value) return null;
   const { proposal, cards } = outcome.value;
-  await store.save({
+  const saved = await store.save({
     proposal,
     cards,
     ownerId: identity.userId,
     ...(input.importReport ? { importReport: input.importReport } : {}),
   });
+  if (!saved.ok) {
+    deps.logger?.warn("proposal not saved", { code: saved.error.code });
+    return "failed";
+  }
   return { proposalId: proposal.id, cards };
 }
 
@@ -167,9 +171,18 @@ async function runRequest(
     draftId && flowId
       ? await buildProposalData(deps, identity, { draftId, flowId, importReport })
       : null;
-  return success(outcome.value, {
+  const answer =
+    proposal === "failed"
+      ? {
+          ...outcome.value,
+          text:
+            outcome.value.text +
+            "\n\nNo se pudo preparar o guardar la propuesta. Ningún cambio se ha aplicado. Puedes volver a pedirlo.",
+        }
+      : outcome.value;
+  return success(answer, {
     ...(draftId ? { draftId } : {}),
-    ...(proposal ? { proposalData: proposal } : {}),
+    ...(proposal && proposal !== "failed" ? { proposalData: proposal } : {}),
     ...(importReport ? { importReport } : {}),
   });
 }

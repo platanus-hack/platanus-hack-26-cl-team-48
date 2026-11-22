@@ -28,7 +28,12 @@ export function AgentPanel() {
   return (
     <div className="web-agent">
       {exchanges.map((exchange) => (
-        <AgentExchange key={exchange.id} exchange={exchange} />
+        <AgentExchange
+          key={exchange.id}
+          exchange={exchange}
+          retry={() => void ask(exchange.goal)}
+          isWaiting={isWaiting}
+        />
       ))}
       <form className="web-agent-composer" onSubmit={submit}>
         <Input
@@ -45,7 +50,15 @@ export function AgentPanel() {
   );
 }
 
-function AgentExchange({ exchange }: { readonly exchange: Exchange }) {
+function AgentExchange({
+  exchange,
+  retry,
+  isWaiting,
+}: {
+  readonly exchange: Exchange;
+  readonly retry: () => void;
+  readonly isWaiting: boolean;
+}) {
   const { goal, reply } = exchange;
   return (
     <>
@@ -64,6 +77,9 @@ function AgentExchange({ exchange }: { readonly exchange: Exchange }) {
       ) : (
         <p className="web-agent-message" role="alert">
           {agentErrorMessage(reply.error.code)}
+          <Button disabled={isWaiting} onClick={retry}>
+            {text.retry}
+          </Button>
         </p>
       )}
     </>

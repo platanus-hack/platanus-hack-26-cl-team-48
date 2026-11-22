@@ -14,6 +14,9 @@ export type Exchange = {
   readonly reply?: AgentResult<AgentAnswer>;
 };
 
+// Allow the server's five-minute loop and the final proposal read to finish.
+const REQUEST_TIMEOUT_MS = 330_000;
+
 const STEP_BREAK = "\n\n";
 
 function withProgress(exchange: Exchange, progress: AgentProgress): Exchange {
@@ -44,14 +47,27 @@ export function useAgentConversation() {
   const ask = async (goal: string) => {
     const id = exchanges.length;
     setExchanges((current) => [...current, { id, goal, live: "" }]);
-    const flowId = await savedFlowStore.getState().saveNow();
-    if (flowId === undefined) {
-      update(id, (exchange) => ({ ...exchange, reply: err({ code: "UNAUTHENTICATED" }) }));
-      return;
-    }
-    const reply = await agent.ask({ goal, flowId }, undefined, (progress) => {
-      update(id, (exchange) => withProgress(exchange, progress));
+    const controller = new AbortController();
+    const run = async (): Promise<AgentResult<AgentAnswer>> => {
+      const flowId = await savedFlowStore.getState().saveNow();
+      if (controller.signal.aborted) return err({ code: "TIMEOUT" });
+      if (flowId === undefined) return err({ code: "UNAUTHENTICATED" });
+      return agent.ask({ goal, flowId }, controller.signal, (progress) => {
+        if (!controller.signal.aborted) update(id, (exchange) => withProgress(exchange, progress));
+      });
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<AgentResult<AgentAnswer>>((resolve) => {
+      timer = setTimeout(() => {
+        resolve(err({ code: "TIMEOUT" }));
+        controller.abort();
+      }, REQUEST_TIMEOUT_MS);
     });
+    const reply = await Promise.race([run(), timeout])
+      .catch((): AgentResult<AgentAnswer> => err({ code: "UNAVAILABLE" }))
+      .finally(() => {
+        clearTimeout(timer);
+      });
     update(id, (exchange) => ({ ...exchange, reply }));
   };
 

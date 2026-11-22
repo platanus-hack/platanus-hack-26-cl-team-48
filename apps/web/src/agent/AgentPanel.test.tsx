@@ -1,7 +1,7 @@
 import { err, ok } from "@nodomics/protocol";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAppStores } from "../app-stores.ts";
 import { MESSAGES } from "../messages.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
@@ -109,10 +109,11 @@ function renderPanel(options: { readonly currentId?: string } = { currentId: FLO
   const flush = { next: Promise.resolve() };
   stores.savedFlowStore.setState({
     currentId: options.currentId,
-    flushPending: async () => {
+    saveNow: async () => {
       events.push("flush:start");
       await flush.next;
       events.push("flush:end");
+      return options.currentId;
     },
     openFlow: (id) => {
       events.push("openFlow");
@@ -126,7 +127,7 @@ function renderPanel(options: { readonly currentId?: string } = { currentId: FLO
     </AgentContext>,
     stores,
   );
-  return { agent, events, opened, flush };
+  return { agent, events, opened, flush, stores };
 }
 
 async function send(goal = GOAL) {
@@ -156,16 +157,10 @@ const cannotDecide = () =>
   });
 
 describe("AgentPanel without a saved flow", () => {
-  it("explains that the agent works on a saved flow", () => {
+  it("can start a new flow and asks for a session if saving requires sign in", async () => {
     renderPanel({});
-
-    expect(screen.getByText(/flujo guardado/i)).toBeTruthy();
-  });
-
-  it("disables the request field", () => {
-    renderPanel({});
-
-    expect(isDisabled(screen.getByRole("textbox", { name: FIELD }))).toBe(true);
+    await send();
+    expect(await screen.findByText(MESSAGES.agent.errors.UNAUTHENTICATED)).toBeTruthy();
   });
 });
 
@@ -571,6 +566,58 @@ describe("AgentPanel errors", () => {
     const { STALE, RATE_LIMITED, TIMEOUT, UNAUTHENTICATED, generic } = MESSAGES.agent.errors;
 
     expect(new Set([STALE, RATE_LIMITED, TIMEOUT, UNAUTHENTICATED, generic]).size).toBe(5);
+  });
+
+  it.each(["save", "ask"] as const)(
+    "can retry the original message after %s rejects",
+    async (stage) => {
+      const { agent, stores } = renderPanel();
+      const action =
+        stage === "save"
+          ? vi.spyOn(stores.savedFlowStore.getState(), "saveNow")
+          : vi.spyOn(agent.service, "ask");
+      action.mockRejectedValueOnce(new Error("Connection closed"));
+
+      await send();
+      const retry = await screen.findByRole("button", { name: /reintentar/i });
+      expect(screen.queryByText(/El agente está trabajando/)).toBeNull();
+      await userEvent.click(retry);
+
+      expect(await screen.findByText(SUMMARY)).toBeTruthy();
+      expect(agent.asks).toEqual([{ goal: GOAL, flowId: FLOW_ID }]);
+    },
+  );
+
+  it("releases a stalled request and ignores its late reply after a successful retry", async () => {
+    const { agent } = renderPanel();
+    const stalled = deferred<AgentResult<AgentAnswer>>();
+    agent.answerWith(stalled.promise, Promise.resolve(ok({ summary: "Segundo intento." })));
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(screen.getByRole("textbox", { name: FIELD }), { target: { value: GOAL } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: SEND }));
+        await Promise.resolve();
+      });
+      expect(agent.asks).toHaveLength(1);
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      const retry = screen.getByRole("button", { name: /reintentar/i });
+      await act(async () => {
+        fireEvent.click(retry);
+        await Promise.resolve();
+      });
+      expect(screen.getByText("Segundo intento.")).toBeTruthy();
+
+      await act(async () => {
+        stalled.resolve(ok({ summary: "Respuesta antigua." }));
+        await Promise.resolve();
+      });
+      expect(screen.queryByText("Respuesta antigua.")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lets the user ask again after an error", async () => {

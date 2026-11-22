@@ -386,6 +386,7 @@ export const MESSAGES = {
   agent: {
     draft: "Trabaja en un borrador: nada cambia en tu flujo hasta que apliques",
     notConfigured: "El agente no está configurado en este sitio.",
+    retry: "Reintentar",
     working: "El agente está trabajando… puede tardar unos minutos.",
     choose: "Elige qué cambios aplicar",
     apply: "Aplicar seleccionados",

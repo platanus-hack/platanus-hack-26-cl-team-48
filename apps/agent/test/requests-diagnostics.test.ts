@@ -170,11 +170,32 @@ describe("request diagnostics", () => {
 
     expect(reply.status).toBe(200);
     expect(reply.body["proposalId"]).toBeUndefined();
+    expect(reply.body["summary"]).toContain("Listo");
+    expect(reply.body["summary"]).toMatch(/propuesta/i);
     const warns = calls.filter((call) => call.level === "warn");
     expect(warns).toHaveLength(1);
     expect(warns[0]?.message).toBe("proposal not built");
     expect(warns[0]?.data).toHaveProperty("code");
     expect(warns[0]?.data).toHaveProperty("message");
+  });
+
+  it("keeps the summary and reports a proposal that could not be stored", async () => {
+    const deps: RequestDeps = {
+      identity,
+      llm: scriptedLlm(proposalTurns()),
+      mcp: createFakeMcp(),
+      proposals: {
+        ...createFakeProposalStore(),
+        save: () => Promise.resolve(err({ code: "STORE_FAILED", message: "permission denied" })),
+      },
+    };
+
+    const reply = await post(deps, { goal: "agrega nodo fuente" });
+
+    expect(reply.status).toBe(200);
+    expect(reply.body["summary"]).toContain("Listo");
+    expect(reply.body["summary"]).toMatch(/propuesta/i);
+    expect(reply.body["proposalId"]).toBeUndefined();
   });
 
   it("never logs the access token", async () => {
