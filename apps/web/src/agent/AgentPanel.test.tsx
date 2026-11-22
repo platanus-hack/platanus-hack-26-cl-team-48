@@ -1,5 +1,5 @@
 import { err, ok } from "@nodomics/protocol";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { createAppStores } from "../app-stores.ts";
@@ -10,6 +10,7 @@ import { AgentPanel } from "./AgentPanel.tsx";
 import type {
   AgentAnswer,
   AgentErrorCode,
+  AgentProgress,
   AgentResult,
   AgentService,
   ProposalCard,
@@ -57,14 +58,16 @@ type Decision = { readonly acceptedIds: readonly string[]; readonly version: num
 function createFakeAgent(events: string[]) {
   const asks: { goal: string; flowId: string }[] = [];
   const decisions: { proposalId: string; decision: Decision }[] = [];
+  let reportProgress: (progress: AgentProgress) => void = () => undefined;
   let answers: Promise<AgentResult<AgentAnswer>>[] = [Promise.resolve(ok(WITH_PROPOSAL))];
   let decision: Promise<AgentResult<{ readonly status: string }>> = Promise.resolve(
     ok({ status: "accepted" }),
   );
   const service: AgentService = {
-    ask: (request) => {
+    ask: (request, _signal, onProgress) => {
       events.push("ask");
       asks.push({ ...request });
+      reportProgress = onProgress ?? (() => undefined);
       const next = answers.length > 1 ? answers.shift() : answers[0];
       return next ?? Promise.resolve(err({ code: "UNAVAILABLE" }));
     },
@@ -86,6 +89,14 @@ function createFakeAgent(events: string[]) {
     },
     decideWith: (reply: Promise<AgentResult<{ readonly status: string }>>) => {
       decision = reply;
+    },
+    /** Reports progress through the callback of the last ask, as the agent streams it. */
+    progress: (...progress: AgentProgress[]) => {
+      act(() => {
+        progress.forEach((event) => {
+          reportProgress(event);
+        });
+      });
     },
   };
 }
@@ -231,6 +242,118 @@ describe("AgentPanel asking", () => {
     await userEvent.type(screen.getByRole("textbox", { name: FIELD }), "otra cosa");
 
     expect(isDisabled(screen.getByRole("button", { name: SEND }))).toBe(true);
+  });
+});
+
+describe("AgentPanel live progress", () => {
+  async function sendAndKeepWorking() {
+    const rendered = renderPanel();
+    const answer = deferred<AgentResult<AgentAnswer>>();
+    rendered.agent.answerWith(answer.promise);
+    await send();
+    await waitFor(() => {
+      expect(rendered.agent.asks.length).toBe(1);
+    });
+    return { ...rendered, answer };
+  }
+
+  const text = (delta: string): AgentProgress => ({ type: "text", delta });
+  const tool = (name: string): AgentProgress => ({ type: "tool", name });
+
+  it("shows what the agent writes before its final answer", async () => {
+    const { agent } = await sendAndKeepWorking();
+
+    agent.progress(text("Reviso el flujo "), text("de ventas."));
+
+    expect(screen.getByText("Reviso el flujo de ventas.").textContent).toBe(
+      "Reviso el flujo de ventas.",
+    );
+  });
+
+  it("keeps the working state while the agent writes", async () => {
+    const { agent } = await sendAndKeepWorking();
+
+    agent.progress(text("Reviso el flujo."));
+
+    expect(screen.getByText(/El agente está trabajando/).textContent).toMatch(/trabajando/);
+  });
+
+  it("formats what the agent writes", async () => {
+    const { agent } = await sendAndKeepWorking();
+
+    agent.progress(text("Encontré **atípicos**"));
+
+    expect(screen.getByRole("strong").textContent).toBe("atípicos");
+  });
+
+  it("starts a new paragraph after a step, keeping the earlier text above", async () => {
+    const { agent } = await sendAndKeepWorking();
+
+    agent.progress(text("Primero leo el flujo."), { type: "step" }, text("Después lo cambio."));
+
+    const before = screen.getByText("Primero leo el flujo.");
+    const after = screen.getByText("Después lo cambio.");
+    expect({
+      isSeparate: before !== after,
+      isAbove: Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING),
+    }).toEqual({ isSeparate: true, isAbove: true });
+  });
+
+  it("shows the tool the agent is using", async () => {
+    const { agent } = await sendAndKeepWorking();
+
+    agent.progress(tool("flows.get"));
+
+    expect(screen.getByText("Usando flows.get…").textContent).toBe("Usando flows.get…");
+  });
+
+  it("shows only the latest tool the agent is using", async () => {
+    const { agent } = await sendAndKeepWorking();
+
+    agent.progress(tool("flows.get"), tool("nodes.list"));
+
+    expect({
+      latest: screen.queryByText("Usando nodes.list…")?.textContent,
+      earlier: screen.queryByText("Usando flows.get…"),
+    }).toEqual({ latest: "Usando nodes.list…", earlier: null });
+  });
+
+  it("shows the final summary formatted", async () => {
+    const { agent, answer } = await sendAndKeepWorking();
+    agent.progress(text("Reviso el flujo."));
+
+    answer.resolve(ok({ summary: "Propongo **dos** cambios." }));
+
+    expect((await screen.findByText("dos", { selector: "strong" })).textContent).toBe("dos");
+  });
+
+  it("replaces what the agent wrote with the final summary", async () => {
+    const { agent, answer } = await sendAndKeepWorking();
+    agent.progress(text("Reviso el flujo."), tool("flows.get"));
+    screen.getByText("Reviso el flujo.");
+
+    answer.resolve(ok({ summary: "El flujo agrupa por mes." }));
+    await screen.findByText("El flujo agrupa por mes.");
+
+    expect({
+      live: screen.queryByText("Reviso el flujo."),
+      working: screen.queryByText(/El agente está trabajando/),
+    }).toEqual({ live: null, working: null });
+  });
+
+  it("shows the proposal below the formatted summary", async () => {
+    const { agent, answer } = await sendAndKeepWorking();
+    agent.progress(text("Reviso el flujo."));
+
+    answer.resolve(ok({ ...WITH_PROPOSAL, summary: "Propongo **2** cambios." }));
+    const summary = await screen.findByText("2", { selector: "strong" });
+
+    expect(
+      Boolean(
+        summary.compareDocumentPosition(screen.getByText(THRESHOLD.title)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
   });
 });
 

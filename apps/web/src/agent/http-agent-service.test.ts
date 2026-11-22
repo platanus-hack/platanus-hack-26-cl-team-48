@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { AgentProgress } from "./agent-service.ts";
 import { createHttpAgentService } from "./http-agent-service.ts";
 
 const BASE_URL = "https://agent.example.com";
@@ -48,14 +49,41 @@ const PROPOSAL = {
 const PROPOSAL_REPLY = { proposal: PROPOSAL, cards: [CARD, OTHER_CARD] };
 
 type Call = { readonly url: string; readonly init: RequestInit | undefined };
-type Reply = { readonly status: number; readonly body?: unknown; readonly raw?: string } | Error;
+type Reply =
+  | { readonly status: number; readonly body?: unknown; readonly raw?: string }
+  | { readonly ndjson: readonly unknown[]; readonly tail?: string }
+  | Error;
+
+const NDJSON_CHUNK_BYTES = 5;
 
 function urlOf(input: Parameters<typeof fetch>[0]): string {
   if (typeof input === "string") return input;
   return input instanceof URL ? input.href : input.url;
 }
 
+/** Streams the bytes in small chunks, so lines and multi-byte characters arrive split. */
+function streamOf(text: string): ReadableStream<Uint8Array> {
+  const bytes = new TextEncoder().encode(text);
+  return new ReadableStream({
+    start(controller) {
+      for (let start = 0; start < bytes.length; start += NDJSON_CHUNK_BYTES) {
+        controller.enqueue(bytes.slice(start, start + NDJSON_CHUNK_BYTES));
+      }
+      controller.close();
+    },
+  });
+}
+
+function ndjsonResponseOf(events: readonly unknown[], tail = ""): Response {
+  const text = events.map((event) => `${JSON.stringify(event)}\n`).join("") + tail;
+  return new Response(streamOf(text), {
+    status: 200,
+    headers: { "content-type": "application/x-ndjson; charset=utf-8" },
+  });
+}
+
 function responseOf(reply: Exclude<Reply, Error>): Response {
+  if ("ndjson" in reply) return ndjsonResponseOf(reply.ndjson, reply.tail);
   const text = reply.raw ?? (reply.body === undefined ? null : JSON.stringify(reply.body));
   return new Response(text, {
     status: reply.status,
@@ -269,6 +297,158 @@ describe("createHttpAgentService ask replies", () => {
     const result = await ask(service);
 
     expect(result).toEqual({ ok: false, error: { code } });
+  });
+});
+
+const TEXT_EVENT = { type: "text", delta: "Reviso el flujo de ventas…" };
+const SECOND_TEXT_EVENT = { type: "text", delta: " y encontré **atípicos**." };
+const STEP_EVENT = { type: "step" };
+const TOOL_EVENT = { type: "tool", name: "flows.get" };
+const PROGRESS_EVENTS = [TEXT_EVENT, TOOL_EVENT, STEP_EVENT, SECOND_TEXT_EVENT];
+const doneEvent = (status: number, body: unknown) => ({ type: "done", status, body });
+
+function askStreaming(service: Service) {
+  const progress: AgentProgress[] = [];
+  const result = service.ask({ goal: GOAL, flowId: FLOW_ID }, undefined, (event) => {
+    progress.push(event);
+  });
+  return result.then((value) => ({ result: value, progress }));
+}
+
+describe("createHttpAgentService ask streaming", () => {
+  it("asks for an NDJSON stream", async () => {
+    const { service, calls } = setup([{ status: 200, body: ANSWER_ONLY }]);
+
+    await ask(service);
+
+    expect(headerOf(calls[0], "accept") ?? "").toMatch(/application\/x-ndjson/);
+  });
+
+  it("reports the text, step and tool events in order", async () => {
+    const { service } = setup([{ ndjson: [...PROGRESS_EVENTS, doneEvent(200, ANSWER_ONLY)] }]);
+
+    const { progress } = await askStreaming(service);
+
+    expect(progress).toEqual(PROGRESS_EVENTS);
+  });
+
+  it("returns the answer of the done line", async () => {
+    const { service } = setup([{ ndjson: [...PROGRESS_EVENTS, doneEvent(200, ANSWER_ONLY)] }]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({ ok: true, value: { summary: ANSWER_ONLY.summary } });
+  });
+
+  it("makes a single call when the done line proposes nothing", async () => {
+    const { service, calls } = setup([{ ndjson: [TEXT_EVENT, doneEvent(200, ANSWER_ONLY)] }]);
+
+    await askStreaming(service);
+
+    expect(calls.length).toBe(1);
+  });
+
+  it("fetches the proposal with a GET when the done line proposes changes", async () => {
+    const { service, calls } = setup([
+      { ndjson: [TEXT_EVENT, doneEvent(200, ANSWER_WITH_PROPOSAL)] },
+      { status: 200, body: PROPOSAL_REPLY },
+    ]);
+
+    await askStreaming(service);
+
+    expect({ url: calls[1]?.url, method: methodOf(calls[1]) }).toEqual({
+      url: `${BASE_URL}/agent/proposals/${PROPOSAL_ID}`,
+      method: "GET",
+    });
+  });
+
+  it("returns the proposal fetched after the done line", async () => {
+    const { service } = setup([
+      { ndjson: [TEXT_EVENT, doneEvent(200, ANSWER_WITH_PROPOSAL)] },
+      { status: 200, body: PROPOSAL_REPLY },
+    ]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        summary: ANSWER_WITH_PROPOSAL.summary,
+        proposal: { id: PROPOSAL_ID, version: 7, flowId: FLOW_ID, cards: [CARD, OTHER_CARD] },
+      },
+    });
+  });
+
+  it("returns the answer of a stream read without a progress callback", async () => {
+    const { service } = setup([{ ndjson: [...PROGRESS_EVENTS, doneEvent(200, ANSWER_ONLY)] }]);
+
+    const result = await ask(service);
+
+    expect(result).toEqual({ ok: true, value: { summary: ANSWER_ONLY.summary } });
+  });
+
+  it("reads a done line that has no trailing newline", async () => {
+    const { service } = setup([
+      { ndjson: [TEXT_EVENT], tail: JSON.stringify(doneEvent(200, ANSWER_ONLY)) },
+    ]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({ ok: true, value: { summary: ANSWER_ONLY.summary } });
+  });
+
+  it("ignores events of an unknown type", async () => {
+    const { service } = setup([
+      { ndjson: [{ type: "thinking", delta: "hmm" }, TEXT_EVENT, doneEvent(200, ANSWER_ONLY)] },
+    ]);
+
+    const { result, progress } = await askStreaming(service);
+
+    expect({ result, progress }).toEqual({
+      result: { ok: true, value: { summary: ANSWER_ONLY.summary } },
+      progress: [TEXT_EVENT],
+    });
+  });
+
+  it.each([
+    [502, "upstream_unavailable", "UNAVAILABLE"],
+    [504, "timeout", "TIMEOUT"],
+    [429, "rate_limit_exceeded", "RATE_LIMITED"],
+  ])("maps a done line with %i %s to %s", async (status, error, code) => {
+    const { service } = setup([{ ndjson: [TEXT_EVENT, doneEvent(status, { error })] }]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({ ok: false, error: { code } });
+  });
+
+  it("returns UNAVAILABLE when the stream ends without a done line", async () => {
+    const { service } = setup([{ ndjson: [TEXT_EVENT, STEP_EVENT] }]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({ ok: false, error: { code: "UNAVAILABLE" } });
+  });
+
+  it("returns UNAVAILABLE when a line is not valid JSON", async () => {
+    const { service } = setup([
+      {
+        ndjson: [TEXT_EVENT],
+        tail: `{"type":"text",\n${JSON.stringify(doneEvent(200, ANSWER_ONLY))}\n`,
+      },
+    ]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({ ok: false, error: { code: "UNAVAILABLE" } });
+  });
+
+  it("returns UNAVAILABLE when the done answer has an unexpected shape", async () => {
+    const { service } = setup([{ ndjson: [doneEvent(200, { steps: 1 })] }]);
+
+    const { result } = await askStreaming(service);
+
+    expect(result).toEqual({ ok: false, error: { code: "UNAVAILABLE" } });
   });
 });
 
