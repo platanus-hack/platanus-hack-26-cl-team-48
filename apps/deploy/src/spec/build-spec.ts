@@ -38,13 +38,9 @@ function nativeBuildOf(params: NodeParams): Result<BuildSpec, DeployError> {
   const startCommand = textParam(params, "startCommand");
   const buildCommand = textParam(params, "buildCommand");
   if (!isRuntime(runtime)) return invalidSpec(`The runtime must be one of ${RUNTIMES.join(", ")}`);
+  if (buildCommand === undefined) return invalidSpec("A native build needs a build command");
   if (startCommand === undefined) return invalidSpec("A native build needs a start command");
-  return ok({
-    kind: "native",
-    runtime,
-    ...(buildCommand === undefined ? {} : { buildCommand }),
-    startCommand,
-  });
+  return ok({ kind: "native", runtime, buildCommand, startCommand });
 }
 
 const isBuildKind = (kind: string): kind is BuildKind => Object.hasOwn(BUILDERS, kind);

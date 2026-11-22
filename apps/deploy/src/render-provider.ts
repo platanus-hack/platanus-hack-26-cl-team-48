@@ -8,8 +8,12 @@ const RENDER_API_URL = "https://api.render.com/v1";
 /** Nodomics fixes plan, region and auto-deploy; users never choose them (ADR 0027 §4). */
 const FREE_PLAN = "free";
 const REGION = "oregon";
-const AUTO_DEPLOY_OFF = "no";
+const AUTO_DEPLOY_TRIGGER_OFF = "off";
+// Render rejects these in PATCH /services/{id}: they can only be chosen when the service is created.
+const CREATE_ONLY_DETAILS = { region: REGION };
 const SUSPENDED = "suspended";
+
+type CreateOnlyDetails = { readonly region?: string };
 
 const DEPLOY_STATUSES: Readonly<Record<string, DeploymentStatus>> = {
   live: "live",
@@ -54,14 +58,14 @@ export function createRenderProvider(options: {
         type: spec.build.kind === "static" ? "static_site" : "web_service",
         name,
         ownerId: options.ownerId,
-        ...serviceFieldsOf(spec),
+        ...serviceFieldsOf(spec, CREATE_ONLY_DETAILS),
         envVars: envValuesOf(spec.env, secrets),
       });
       return response.ok ? createdServiceOf(response.value) : response;
     },
     update: async (serviceId, { spec, secrets }) => {
       const path = servicePath(serviceId);
-      const patched = await call("PATCH", path, serviceFieldsOf(spec));
+      const patched = await call("PATCH", path, serviceFieldsOf(spec, {}));
       if (!patched.ok) return patched;
       const replaced = await call("PUT", `${path}/env-vars`, envValuesOf(spec.env, secrets));
       if (!replaced.ok) return replaced;
@@ -133,17 +137,17 @@ function createdServiceOf(
 
 const servicePath = (serviceId: string): string => `/services/${encodeURIComponent(serviceId)}`;
 
-function serviceFieldsOf(spec: ServiceSpec) {
+function serviceFieldsOf(spec: ServiceSpec, createOnly: CreateOnlyDetails) {
   return {
     repo: spec.repo.url,
     branch: spec.repo.branch,
     ...(spec.repo.rootDir === undefined ? {} : { rootDir: spec.repo.rootDir }),
-    autoDeploy: AUTO_DEPLOY_OFF,
-    serviceDetails: serviceDetailsOf(spec.build, spec.healthCheckPath),
+    autoDeployTrigger: AUTO_DEPLOY_TRIGGER_OFF,
+    serviceDetails: serviceDetailsOf(spec, createOnly),
   };
 }
 
-function serviceDetailsOf(build: BuildSpec, healthCheckPath: string | undefined) {
+function serviceDetailsOf({ build, healthCheckPath }: ServiceSpec, createOnly: CreateOnlyDetails) {
   if (build.kind === "static")
     return {
       ...(build.buildCommand === undefined ? {} : { buildCommand: build.buildCommand }),
@@ -152,7 +156,7 @@ function serviceDetailsOf(build: BuildSpec, healthCheckPath: string | undefined)
   return {
     runtime: build.kind === "docker" ? "docker" : build.runtime,
     plan: FREE_PLAN,
-    region: REGION,
+    ...createOnly,
     ...(healthCheckPath === undefined ? {} : { healthCheckPath }),
     envSpecificDetails: envSpecificDetailsOf(build),
   };

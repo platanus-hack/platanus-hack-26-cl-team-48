@@ -82,7 +82,11 @@ async function createService(
   { identity, request, plan }: { identity: UserIdentity; request: ApplyRequest; plan: Plan },
 ): Outcome<Deployment> {
   const created = await deps.provider.create({
-    name: serviceNameOf(identity.userId, request.nodeId),
+    name: serviceNameOf({
+      userId: identity.userId,
+      flowId: request.flowId,
+      nodeId: request.nodeId,
+    }),
     spec: plan.spec,
     secrets: request.secrets,
   });
