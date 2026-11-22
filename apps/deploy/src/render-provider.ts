@@ -12,6 +12,9 @@ const AUTO_DEPLOY_TRIGGER_OFF = "off";
 // Render rejects these in PATCH /services/{id}: they can only be chosen when the service is created.
 const CREATE_ONLY_DETAILS = { region: REGION };
 const SUSPENDED = "suspended";
+const DEFAULT_TIMEOUT_MS = 15_000;
+const HTTP_NOT_FOUND = 404;
+const HTTPS = "https:";
 
 type CreateOnlyDetails = { readonly region?: string };
 
@@ -38,11 +41,12 @@ const CreatedService = Type.Object({
 const ServiceState = Type.Object({ suspended: Type.Optional(Type.String()) });
 const DeployList = Type.Array(Type.Object({ deploy: Type.Object({ status: Type.String() }) }));
 
+type RenderError = ProviderError & { readonly status?: number };
 type RenderCall = (
   method: string,
   path: string,
   body?: unknown,
-) => Promise<Result<unknown, ProviderError>>;
+) => Promise<Result<unknown, RenderError>>;
 
 /** Adapts the Render REST API to the HostingProvider port. Never throws, never echoes the API key. */
 export function createRenderProvider(options: {
@@ -50,6 +54,7 @@ export function createRenderProvider(options: {
   readonly ownerId: string;
   readonly fetch: typeof fetch;
   readonly baseUrl?: string;
+  readonly timeoutMs?: number;
 }): HostingProvider {
   const call = renderClient(options);
   return {
@@ -75,7 +80,8 @@ export function createRenderProvider(options: {
     status: (serviceId) => statusOf(call, serviceId),
     remove: async (serviceId) => {
       const removed = await call("DELETE", servicePath(serviceId));
-      return removed.ok ? ok(undefined) : removed;
+      // A service Render no longer has is as removed as one it just deleted.
+      return removed.ok || removed.error.status === HTTP_NOT_FOUND ? ok(undefined) : removed;
     },
   };
 }
@@ -84,8 +90,10 @@ function renderClient(options: {
   readonly apiKey: string;
   readonly fetch: typeof fetch;
   readonly baseUrl?: string;
+  readonly timeoutMs?: number;
 }): RenderCall {
   const baseUrl = (options.baseUrl ?? RENDER_API_URL).replace(/\/$/, "");
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   return async (method, path, body) => {
     try {
       const response = await options.fetch(`${baseUrl}${path}`, {
@@ -96,10 +104,14 @@ function renderClient(options: {
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       // Render's error bodies may echo the request, secrets included, so they are never forwarded.
       if (!response.ok)
-        return err({ message: `Render answered ${String(response.status)} to ${method} ${path}` });
+        return err({
+          message: `Render answered ${String(response.status)} to ${method} ${path}`,
+          status: response.status,
+        });
       const text = await response.text();
       return ok(text === "" ? undefined : JSON.parse(text));
     } catch {
@@ -132,7 +144,16 @@ function createdServiceOf(
   const created = parse(CreatedService, body);
   if (!created.ok) return err({ message: "Render answered without a service id" });
   const url = created.value.service.serviceDetails?.url;
-  return ok({ serviceId: created.value.service.id, ...(url === undefined ? {} : { url }) });
+  return ok({ serviceId: created.value.service.id, ...(isHttpsUrl(url) ? { url } : {}) });
+}
+
+/** The web turns the URL into a link, so another scheme (javascript:, http:) is dropped. */
+function isHttpsUrl(url: string | undefined): url is string {
+  try {
+    return url !== undefined && new URL(url).protocol === HTTPS;
+  } catch {
+    return false;
+  }
 }
 
 const servicePath = (serviceId: string): string => `/services/${encodeURIComponent(serviceId)}`;
