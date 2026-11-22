@@ -157,12 +157,12 @@ describe("GET /feed/cards/:handle", () => {
     expect(reply).toEqual({ status: 200, body: { card } });
   });
 
-  it("replies 404 not_found when the handle has no card", async () => {
+  it("replies 404 no_profile when the handle has no card", async () => {
     const { routes } = setup();
 
     const reply = await get(routes, "ghost");
 
-    expect(reply).toEqual({ status: 404, body: { error: "not_found" } });
+    expect(reply).toEqual({ status: 404, body: { error: "no_profile" } });
   });
 
   it("replies 502 store_unavailable when the store fails", async () => {
