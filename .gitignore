@@ -25,6 +25,6 @@ test-results/
 packages/protocol/schema/
 
 # Local-only: git worktrees, a project-local pnpm store and Supabase CLI state
-.worktrees/
-.pnpm-store/
-supabase/.temp/
+/.worktrees/
+/.pnpm-store/
+/supabase/.temp/
