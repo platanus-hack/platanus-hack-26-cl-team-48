@@ -63,9 +63,9 @@ function createSender({ baseUrl, getAccessToken, fetch }: HttpDeployDeps) {
     path,
     body,
   }: Request): Promise<DeployResult<Record<string, unknown>>> => {
-    const token = await getAccessToken();
-    if (token === undefined) return err({ code: "UNAUTHORIZED" });
     try {
+      const token = await getAccessToken();
+      if (token === undefined) return err({ code: "UNAUTHORIZED" });
       const response = await fetch(`${root}${path}`, {
         method,
         headers: {

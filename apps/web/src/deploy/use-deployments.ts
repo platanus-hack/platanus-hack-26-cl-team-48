@@ -29,20 +29,29 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const [plan, setPlan] = useState<DeploymentsState["plan"]>();
   const [isBusy, setBusy] = useState(false);
   const [failure, setFailure] = useState<DeployErrorCode>();
-  // Each action bumps it, so a list sent before the action cannot overwrite what the action did.
+  // Show the newest completed refresh; actions invalidate all earlier replies.
   const listGeneration = useRef(0);
+  const lastAppliedListGeneration = useRef(0);
+  const planGeneration = useRef(0);
 
   const refreshStatus = useCallback(() => {
-    const generation = listGeneration.current;
+    const generation = ++listGeneration.current;
     void service.list(flowId).then(
       whileMounted(isMounted, (listed) => {
-        if (generation === listGeneration.current) setDeployments(listed);
+        if (generation <= lastAppliedListGeneration.current) return;
+        lastAppliedListGeneration.current = generation;
+        setDeployments(listed);
       }),
     );
   }, [service, flowId, isMounted]);
   const requestPlan = useCallback(() => {
+    const generation = ++planGeneration.current;
     setPlan(undefined);
-    void service.plan({ flowId, nodeId }).then(whileMounted(isMounted, setPlan));
+    void service.plan({ flowId, nodeId }).then(
+      whileMounted(isMounted, (planned) => {
+        if (generation === planGeneration.current) setPlan(planned);
+      }),
+    );
   }, [service, flowId, nodeId, isMounted]);
 
   const refresh = useCallback(() => {
@@ -61,13 +70,17 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const runAction = async <T>(action: Promise<DeployResult<T>>, onDone: (value: T) => void) => {
     setBusy(true);
     setFailure(undefined);
-    listGeneration.current += 1;
+    invalidateLists();
     const result = await action;
     if (!isMounted.current) return;
-    listGeneration.current += 1;
+    invalidateLists();
     setBusy(false);
     if (result.ok) onDone(result.value);
     else failWith(result.error.code);
+  };
+
+  const invalidateLists = () => {
+    lastAppliedListGeneration.current = ++listGeneration.current;
   };
 
   const failWith = (code: DeployErrorCode) => {
