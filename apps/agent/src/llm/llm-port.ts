@@ -26,6 +26,8 @@ export type LlmRequest = {
   readonly system: string;
   readonly messages: readonly LlmMessage[];
   readonly tools: readonly ToolDescriptor[];
+  /** Receives the model's text as it is written, when the caller wants it live. */
+  readonly onTextDelta?: (delta: string) => void;
 };
 
 export type LlmErrorCode = "API_ERROR" | "NETWORK" | "MALFORMED_RESPONSE";

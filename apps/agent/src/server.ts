@@ -8,6 +8,7 @@ import { createCorsGuard, type CorsGuard } from "./http/guards/cors.ts";
 import { createStructuredLogger, type StructuredLogger } from "./http/guards/logger.ts";
 import { MAX_BODY_BYTES, UPLOAD_MAX_BODY_BYTES } from "./http/guards/body-limit.ts";
 import type { Router } from "./http/router.ts";
+import type { AgentEvent } from "./loop/agent-loop.ts";
 import type { HttpReply, RequestInput } from "./requests/handle-request.ts";
 
 export type ServerDeps = {
@@ -22,6 +23,7 @@ const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_INTERNAL_ERROR = 500;
 const REQUESTS_PATH = "/agent/requests";
+const NDJSON = "application/x-ndjson";
 
 const pathOf = (request: IncomingMessage): string | undefined => request.url?.split("?", 1)[0];
 
@@ -59,8 +61,46 @@ async function serveRequests(
     sendJson(response, HTTP_BAD_REQUEST, { error: "invalid_body" });
     return;
   }
-  const reply = await deps.handleRequest({ authorization: request.headers.authorization, rawBody });
-  sendJson(response, reply.status, reply.body);
+  const authorization = request.headers.authorization;
+  if (!request.headers.accept?.includes(NDJSON)) {
+    const reply = await deps.handleRequest({ authorization, rawBody });
+    sendJson(response, reply.status, reply.body);
+    return;
+  }
+  const events = createEventStream(response);
+  const reply = await deps.handleRequest({ authorization, rawBody, onEvent: events.write });
+  if (events.hasStarted()) events.finish(reply);
+  else sendJson(response, reply.status, reply.body);
+}
+
+/**
+ * Streams the agent's events as NDJSON once the first one arrives; until then the reply can still
+ * be a plain JSON error with its own status.
+ */
+function createEventStream(response: ServerResponse) {
+  let hasStarted = false;
+  const writeLine = (value: unknown) => response.write(`${JSON.stringify(value)}\n`);
+  return {
+    hasStarted: () => hasStarted,
+    write: (event: AgentEvent) => {
+      if (!hasStarted) startStream(response);
+      hasStarted = true;
+      writeLine(event);
+    },
+    finish: (reply: HttpReply) => {
+      writeLine({ type: "done", status: reply.status, body: reply.body });
+      response.end();
+    },
+  };
+}
+
+function startStream(response: ServerResponse): void {
+  response.statusCode = HTTP_OK;
+  response.setHeader("Content-Type", `${NDJSON}; charset=utf-8`);
+  response.setHeader("Cache-Control", "no-cache");
+  // Render's proxy (nginx-like) would otherwise buffer the stream until it ends.
+  response.setHeader("X-Accel-Buffering", "no");
+  response.flushHeaders();
 }
 
 function routerBodyLimit(router: Router, request: IncomingMessage): number {

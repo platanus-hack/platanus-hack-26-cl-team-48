@@ -20,6 +20,12 @@ export type LoopErrorCode = "max_steps" | "timeout" | "llm_failed" | "mcp_unavai
 
 export type LoopError = { readonly code: LoopErrorCode; readonly message: string };
 
+/** What the agent is doing, for callers that show it live. */
+export type AgentEvent =
+  | { readonly type: "text"; readonly delta: string }
+  | { readonly type: "step" }
+  | { readonly type: "tool"; readonly name: string };
+
 export type AgentLoopInput = {
   readonly llm: LlmPort;
   readonly mcp: McpPort;
@@ -27,6 +33,7 @@ export type AgentLoopInput = {
   readonly goal: string;
   readonly allowlist: ToolAllowlist;
   readonly limits?: LoopLimits;
+  readonly onEvent?: (event: AgentEvent) => void;
 };
 
 type LoopState = {
@@ -36,6 +43,7 @@ type LoopState = {
   readonly maxSteps: number;
   readonly steps: number;
   readonly messages: readonly LlmMessage[];
+  readonly onEvent: ((event: AgentEvent) => void) | undefined;
 };
 
 const TIMEOUT_ERROR: LoopError = { code: "timeout", message: "The agent ran out of time." };
@@ -59,6 +67,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<Result<LoopOu
     maxSteps: limits.maxSteps,
     steps: 0,
     messages: [{ role: "user", text: input.goal }],
+    onEvent: input.onEvent,
   });
 }
 
@@ -78,11 +87,13 @@ async function runStep(state: LoopState): Promise<Result<LoopOutcome, LoopError>
       message: `The agent did not finish in ${String(state.maxSteps)} steps.`,
     });
   }
+  if (state.steps > 0) state.onEvent?.({ type: "step" });
   const turn = await withDeadline(state.llm.complete(toRequest(state)), state.context.deadlineAt);
   if (turn === TIMED_OUT) return err(TIMEOUT_ERROR);
   if (!turn.ok) return err({ code: "llm_failed", message: turn.error.message });
   if (turn.value.kind === "text") return ok({ text: turn.value.text, steps: state.steps + 1 });
 
+  for (const call of turn.value.calls) state.onEvent?.({ type: "tool", name: call.name });
   const results = await executeToolCalls(turn.value.calls, state.context);
   if (results === TIMED_OUT) return err(TIMEOUT_ERROR);
   return runStep({
@@ -96,8 +107,18 @@ async function runStep(state: LoopState): Promise<Result<LoopOutcome, LoopError>
   });
 }
 
-const toRequest = (state: LoopState): LlmRequest => ({
-  system: SYSTEM_PROMPT,
-  messages: state.messages,
-  tools: state.offered,
-});
+function toRequest(state: LoopState): LlmRequest {
+  const { onEvent } = state;
+  return {
+    system: SYSTEM_PROMPT,
+    messages: state.messages,
+    tools: state.offered,
+    ...(onEvent
+      ? {
+          onTextDelta: (delta: string) => {
+            onEvent({ type: "text", delta });
+          },
+        }
+      : {}),
+  };
+}

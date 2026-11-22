@@ -18,7 +18,19 @@ export type McpClientOptions = {
   readonly url: string;
   readonly transport?: TransportFactory;
   readonly fetch?: FetchLike;
+  /** How long to keep retrying while the MCP server wakes up (Render's free plan sleeps). */
+  readonly wakeTimeoutMs?: number;
+  readonly sleep?: (ms: number) => Promise<void>;
+  readonly now?: () => number;
 };
+
+const DEFAULT_WAKE_TIMEOUT_MS = 60_000;
+const WAKE_RETRY_MS = 2_000;
+
+const sleepFor = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const CLIENT_INFO = { name: "nodomics-agent", version: "0.1.0" };
 const UNAUTHORIZED_STATUSES: readonly (number | undefined)[] = [401, 403];
@@ -110,20 +122,52 @@ async function callAndRead(
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+type Wake = {
+  readonly timeoutMs: number;
+  readonly sleep: (ms: number) => Promise<void>;
+  readonly now: () => number;
+};
+
+/** Retries while the server is unavailable, so a request can wait for it to wake up. */
+async function untilAwake<T>(
+  attempt: () => Promise<Result<T, McpError>>,
+  wake: Wake,
+): Promise<Result<T, McpError>> {
+  const deadline = wake.now() + wake.timeoutMs;
+  let result = await attempt();
+  while (
+    !result.ok &&
+    result.error.code === "UNAVAILABLE" &&
+    wake.now() + WAKE_RETRY_MS <= deadline
+  ) {
+    await wake.sleep(WAKE_RETRY_MS);
+    result = await attempt();
+  }
+  return result;
+}
+
+function listToolsWith(client: Client): Promise<Result<readonly ToolDescriptor[], McpError>> {
+  return client.listTools().then(({ tools }) =>
+    ok(
+      tools.map((tool): ToolDescriptor => ({
+        name: tool.name,
+        description: tool.description ?? "",
+        inputSchema: tool.inputSchema,
+      })),
+    ),
+  );
+}
+
 export function createMcpClient(options: McpClientOptions): McpPort {
   const open = options.transport ?? httpTransport(options.fetch);
+  const wake: Wake = {
+    timeoutMs: options.wakeTimeoutMs ?? DEFAULT_WAKE_TIMEOUT_MS,
+    sleep: options.sleep ?? sleepFor,
+    now: options.now ?? Date.now,
+  };
   return {
     listTools: (identity) =>
-      withClient(open(options.url, identity ?? null), async (client) => {
-        const { tools } = await client.listTools();
-        return ok(
-          tools.map((tool): ToolDescriptor => ({
-            name: tool.name,
-            description: tool.description ?? "",
-            inputSchema: tool.inputSchema,
-          })),
-        );
-      }),
+      untilAwake(() => withClient(open(options.url, identity ?? null), listToolsWith), wake),
     call: (name, args, identity) => {
       if (!isPlainObject(args))
         return Promise.resolve(fail("INVALID_ARGS", "Tool args must be an object"));

@@ -19,6 +19,7 @@ export type LlmResponse = { readonly content: readonly ResponseBlock[] };
 /** The slice of the SDK client this adapter needs; tests inject a fake. */
 export type AnthropicClient = {
   readonly create: (params: CreateParams) => Promise<LlmResponse>;
+  readonly stream?: (params: CreateParams, onText: (delta: string) => void) => Promise<LlmResponse>;
 };
 
 export type AnthropicLlmOptions = {
@@ -34,7 +35,12 @@ export function createAnthropicLlm(options: AnthropicLlmOptions): LlmPort {
     complete: async (request) => {
       const names = createToolNames(request);
       try {
-        return parseResponse(await client.create(toParams(model, request, names)), names);
+        const params = toParams(model, request, names);
+        const response =
+          request.onTextDelta && client.stream
+            ? await client.stream(params, request.onTextDelta)
+            : await client.create(params);
+        return parseResponse(response, names);
       } catch (error) {
         return err(toLlmError(error));
       }
@@ -43,7 +49,10 @@ export function createAnthropicLlm(options: AnthropicLlmOptions): LlmPort {
 }
 
 function fromSdk(sdk: Anthropic): AnthropicClient {
-  return { create: (params) => sdk.messages.create(params) };
+  return {
+    create: (params) => sdk.messages.create(params),
+    stream: (params, onText) => sdk.messages.stream(params).on("text", onText).finalMessage(),
+  };
 }
 
 const INVALID_NAME_CHARACTERS = /[^a-zA-Z0-9_-]/g;

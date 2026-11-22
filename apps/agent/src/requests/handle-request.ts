@@ -1,6 +1,7 @@
 import type { LlmPort } from "../llm/llm-port.ts";
 import {
   runAgentLoop,
+  type AgentEvent,
   type LoopError,
   type LoopLimits,
   type LoopOutcome,
@@ -36,6 +37,8 @@ export type RequestDeps = {
 export type RequestInput = {
   readonly authorization: string | undefined;
   readonly rawBody: string;
+  /** Receives what the agent does while it works, for replies streamed to the client. */
+  readonly onEvent?: (event: AgentEvent) => void;
 };
 
 export type HttpReply = { readonly status: number; readonly body: unknown };
@@ -105,7 +108,11 @@ async function buildProposalData(
 async function runRequest(
   deps: RequestDeps,
   identity: UserIdentity,
-  request: { readonly goal: string; readonly flowId?: string | undefined },
+  request: {
+    readonly goal: string;
+    readonly flowId?: string | undefined;
+    readonly onEvent?: ((event: AgentEvent) => void) | undefined;
+  },
 ): Promise<HttpReply> {
   const userMemory = deps.memoryForUser ? deps.memoryForUser(identity) : null;
   const mcp = userMemory ? buildMemoryDeps(userMemory).wrapMcp(deps.mcp) : deps.mcp;
@@ -117,6 +124,7 @@ async function runRequest(
     goal: request.goal,
     allowlist: REQUEST_ALLOWLIST,
     ...(deps.limits ? { limits: deps.limits } : {}),
+    ...(request.onEvent ? { onEvent: request.onEvent } : {}),
   });
   if (!outcome.ok) return loopFailure(outcome.error);
   const draftId = recorder.lastDraftId();
@@ -138,6 +146,7 @@ export function createHandleRequest(deps: RequestDeps) {
     return runRequest(deps, identity.value, {
       goal: toGoalMessage(body.value),
       flowId: body.value.flowId,
+      onEvent: input.onEvent,
     });
   };
 }
