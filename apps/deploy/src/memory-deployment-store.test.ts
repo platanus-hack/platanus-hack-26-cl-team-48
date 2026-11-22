@@ -11,7 +11,7 @@ const recordOf = (overrides: Partial<DeploymentRecord> = {}): DeploymentRecord =
   url: "https://nd-alice-web.onrender.com",
   spec: {
     repo: { url: "https://github.com/nodomics/demo-app", branch: "main" },
-    build: { kind: "native", runtime: "node", startCommand: "npm start" },
+    build: { kind: "native", runtime: "node", buildCommand: "npm ci", startCommand: "npm start" },
     env: [],
   },
   specHash: "hash-1",

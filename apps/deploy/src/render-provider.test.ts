@@ -5,7 +5,7 @@ import type { ServiceSpec } from "./types.ts";
 const API_KEY = "rnd_SuperSecretApiKey123";
 const OWNER_ID = "tea-nodomics";
 const BASE_URL = "https://api.render.com/v1";
-const NAME = "nd-3f2a9c1e-web";
+const NAME = "nd-3f2a9c1e-web-a1b2c3";
 
 const NATIVE_SPEC: ServiceSpec = {
   repo: { url: "https://github.com/nodomics/demo-app", branch: "main" },
@@ -66,7 +66,7 @@ function providerWith(route: Route, baseUrl?: string) {
   return { provider, requests: fake.requests };
 }
 
-const createdService = (id = "srv-abc", url = "https://nd-3f2a9c1e-web.onrender.com") =>
+const createdService = (id = "srv-abc", url = `https://${NAME}.onrender.com`) =>
   json({ service: { id, serviceDetails: { url } }, deployId: "dep-1" }, 201);
 
 const pathOf = (request: SeenRequest | undefined): string => {
@@ -99,7 +99,7 @@ describe("createRenderProvider — create", () => {
     });
   });
 
-  it("sends a native web service on the free plan in the fixed region without auto-deploy", async () => {
+  it("sends a native web service on the free plan in the fixed region with the auto-deploy trigger off", async () => {
     const { provider, requests } = providerWith(() => createdService());
 
     await provider.create({ name: NAME, spec: NATIVE_SPEC, secrets: SECRETS });
@@ -110,7 +110,7 @@ describe("createRenderProvider — create", () => {
       ownerId: OWNER_ID,
       repo: "https://github.com/nodomics/demo-app",
       branch: "main",
-      autoDeploy: "no",
+      autoDeployTrigger: "off",
       envVars: [
         { key: "NODE_ENV", value: "production" },
         { key: "API_TOKEN", value: "ghp_resolved_secret" },
@@ -142,7 +142,7 @@ describe("createRenderProvider — create", () => {
       repo: "https://github.com/nodomics/demo-app",
       branch: "dev",
       rootDir: "api",
-      autoDeploy: "no",
+      autoDeployTrigger: "off",
       envVars: [],
       serviceDetails: {
         runtime: "docker",
@@ -170,28 +170,32 @@ describe("createRenderProvider — create", () => {
       ownerId: OWNER_ID,
       repo: "https://github.com/nodomics/site",
       branch: "main",
-      autoDeploy: "no",
+      autoDeployTrigger: "off",
       envVars: [{ key: "VITE_API", value: "https://api.example.com" }],
       serviceDetails: { buildCommand: "npm run build", publishPath: "out" },
     });
   });
 
-  it("omits the optional build command of a native service when there is none", async () => {
+  it("omits the optional build command of a static site when there is none", async () => {
     const { provider, requests } = providerWith(() => createdService());
     const spec: ServiceSpec = {
-      ...NATIVE_SPEC,
-      build: { kind: "native", runtime: "python", startCommand: "gunicorn app:app" },
+      repo: { url: "https://github.com/nodomics/site", branch: "main" },
+      build: { kind: "static", publishPath: "dist" },
+      env: [],
     };
 
-    await provider.create({ name: NAME, spec, secrets: SECRETS });
+    await provider.create({ name: NAME, spec, secrets: {} });
 
-    expect(requests[0]?.body).toMatchObject({
-      serviceDetails: {
-        runtime: "python",
-        envSpecificDetails: { startCommand: "gunicorn app:app" },
-      },
-    });
-    expect(requests[0]?.body).not.toHaveProperty("serviceDetails.envSpecificDetails.buildCommand");
+    expect(requests[0]?.body).toMatchObject({ serviceDetails: { publishPath: "dist" } });
+    expect(requests[0]?.body).not.toHaveProperty("serviceDetails.buildCommand");
+  });
+
+  it("never sends the deprecated autoDeploy field when creating", async () => {
+    const { provider, requests } = providerWith(() => createdService());
+
+    await provider.create({ name: NAME, spec: NATIVE_SPEC, secrets: SECRETS });
+
+    expect(requests[0]?.body).not.toHaveProperty("autoDeploy");
   });
 
   it("uses the base URL it was given", async () => {
@@ -240,7 +244,7 @@ describe("createRenderProvider — update", () => {
     ]);
   });
 
-  it("patches the whitelisted fields with the fixed plan, region and auto-deploy", async () => {
+  it("patches the whitelisted fields with the fixed plan and the auto-deploy trigger off", async () => {
     const { provider, requests } = providerWith(routeUpdate);
 
     await provider.update("srv-abc", { spec: NATIVE_SPEC, secrets: SECRETS });
@@ -248,14 +252,44 @@ describe("createRenderProvider — update", () => {
     expect(requests[0]?.body).toMatchObject({
       repo: "https://github.com/nodomics/demo-app",
       branch: "main",
-      autoDeploy: "no",
+      autoDeployTrigger: "off",
       serviceDetails: {
         runtime: "node",
         plan: "free",
-        region: "oregon",
         envSpecificDetails: { buildCommand: "npm ci", startCommand: "npm start" },
       },
     });
+  });
+
+  it("does not patch the region, which Render only accepts on create", async () => {
+    const { provider, requests } = providerWith(routeUpdate);
+
+    await provider.update("srv-abc", { spec: NATIVE_SPEC, secrets: SECRETS });
+
+    expect(requests[0]?.body).not.toHaveProperty("region");
+    expect(requests[0]?.body).not.toHaveProperty("serviceDetails.region");
+  });
+
+  it("does not patch the region of a Docker service either", async () => {
+    const { provider, requests } = providerWith(routeUpdate);
+    const spec: ServiceSpec = {
+      repo: { url: "https://github.com/nodomics/demo-app", branch: "main" },
+      build: { kind: "docker", dockerfilePath: "Dockerfile", dockerContext: "." },
+      env: [],
+    };
+
+    await provider.update("srv-abc", { spec, secrets: {} });
+
+    expect(requests[0]?.body).toMatchObject({ serviceDetails: { runtime: "docker" } });
+    expect(requests[0]?.body).not.toHaveProperty("serviceDetails.region");
+  });
+
+  it("never sends the deprecated autoDeploy field when patching", async () => {
+    const { provider, requests } = providerWith(routeUpdate);
+
+    await provider.update("srv-abc", { spec: NATIVE_SPEC, secrets: SECRETS });
+
+    expect(requests[0]?.body).not.toHaveProperty("autoDeploy");
   });
 
   it("does not patch the type, the owner or the variables", async () => {

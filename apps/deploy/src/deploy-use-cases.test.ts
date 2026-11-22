@@ -27,7 +27,7 @@ const ENV = [
   { name: "API_TOKEN", secret: "github-token" },
 ];
 const FLOW = deployFlow({ service: { env: ENV } });
-const EXPECTED_NAME = "nd-3f2a9c1e-web";
+const SERVICE_NAME = /^nd-3f2a9c1e-web-[0-9a-f]{6}$/;
 
 type Overrides = {
   readonly provider?: Partial<HostingProvider>;
@@ -108,7 +108,7 @@ function setup(overrides: Overrides = {}) {
 
 const SPEC: ServiceSpec = {
   repo: { url: "https://github.com/nodomics/demo-app", branch: "main" },
-  build: { kind: "native", runtime: "node", startCommand: "npm start" },
+  build: { kind: "native", runtime: "node", buildCommand: "npm ci", startCommand: "npm start" },
   env: [],
 };
 
@@ -302,7 +302,7 @@ describe("plan", () => {
 
 describe("apply — create", () => {
   it("creates the service and returns a deploying deployment", async () => {
-    const { useCases } = setup();
+    const { useCases, createdNames } = setup();
     const planHash = await planHashOf(useCases);
 
     const result = await useCases.apply(ALICE, {
@@ -318,19 +318,48 @@ describe("apply — create", () => {
         id: "dep-1",
         flowId: "flow-1",
         nodeId: "web",
-        url: `https://${EXPECTED_NAME}.onrender.com`,
+        url: `https://${createdNames[0] ?? ""}.onrender.com`,
         status: "deploying",
         updatedAt: NOW.toISOString(),
       },
     });
   });
 
-  it("names the service after a short user id and the node id", async () => {
+  it("names the service after a short user id, the node id and a short hash of the flow", async () => {
     const { useCases, createdNames } = setup();
 
     await deployOnce(useCases);
 
-    expect(createdNames).toEqual([EXPECTED_NAME]);
+    expect(createdNames).toHaveLength(1);
+    expect(createdNames[0]).toMatch(SERVICE_NAME);
+  });
+
+  it("gives the same name to the same flow and node every time", async () => {
+    const first = setup();
+    const second = setup();
+
+    await deployOnce(first.useCases);
+    await deployOnce(second.useCases);
+
+    expect(first.createdNames[0]).toMatch(SERVICE_NAME);
+    expect(second.createdNames).toEqual(first.createdNames);
+  });
+
+  it("gives different names to the same node id in two flows of the same user", async () => {
+    const { useCases, flows, createdNames } = setup();
+    flows.set(ALICE, "flow-2", FLOW);
+    await deployOnce(useCases);
+
+    await useCases.apply(ALICE, {
+      flowId: "flow-2",
+      nodeId: "web",
+      planHash: await planHashOf(useCases, ALICE, "flow-2"),
+      secrets: SECRETS,
+    });
+
+    expect(createdNames).toHaveLength(2);
+    expect(createdNames[1]).toMatch(SERVICE_NAME);
+    expect(createdNames[1]).not.toBe(createdNames[0]);
   });
 
   it("sanitizes and shortens the node id in the service name", async () => {
@@ -347,7 +376,7 @@ describe("apply — create", () => {
     });
 
     expect(createdNames).toHaveLength(1);
-    expect(createdNames[0]).toMatch(/^nd-3f2a9c1e-[a-z0-9-]{1,20}$/);
+    expect(createdNames[0]).toMatch(/^nd-3f2a9c1e-[a-z0-9-]{1,12}-[0-9a-f]{6}$/);
   });
 
   it("passes the spec with literal values and resolved secrets to the provider", async () => {
@@ -570,7 +599,7 @@ describe("apply — update and unchanged", () => {
 
 describe("list", () => {
   it("returns the user's deployments of the flow with the status refreshed", async () => {
-    const { useCases } = setup();
+    const { useCases, createdNames } = setup();
     await deployOnce(useCases);
 
     const result = await useCases.list(ALICE, "flow-1");
@@ -582,7 +611,7 @@ describe("list", () => {
           id: "dep-1",
           flowId: "flow-1",
           nodeId: "web",
-          url: `https://${EXPECTED_NAME}.onrender.com`,
+          url: `https://${createdNames[0] ?? ""}.onrender.com`,
           status: "live",
           updatedAt: NOW.toISOString(),
         },

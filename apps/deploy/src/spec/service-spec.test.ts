@@ -96,7 +96,10 @@ describe("serviceSpecOf — finding the node", () => {
 describe("serviceSpecOf — defaults", () => {
   it("builds a native Node spec with the default branch and no variables", () => {
     const flow = flowOf(
-      [repoNode(), { ...serviceNode(), params: { startCommand: "npm start" } }],
+      [
+        repoNode(),
+        { ...serviceNode(), params: { buildCommand: "npm ci", startCommand: "npm start" } },
+      ],
       [repoEdge()],
     );
 
@@ -106,7 +109,12 @@ describe("serviceSpecOf — defaults", () => {
       ok: true,
       value: {
         repo: { url: REPO_URL, branch: "main" },
-        build: { kind: "native", runtime: "node", startCommand: "npm start" },
+        build: {
+          kind: "native",
+          runtime: "node",
+          buildCommand: "npm ci",
+          startCommand: "npm start",
+        },
         env: [],
       },
     });
@@ -233,6 +241,7 @@ describe("serviceSpecOf — copying the chosen fields", () => {
     const flow = deployFlow({
       service: {
         build: "native",
+        buildCommand: "npm ci",
         startCommand: "npm start",
         publishPath: "public",
         dockerfilePath: "Dockerfile.prod",
@@ -242,7 +251,12 @@ describe("serviceSpecOf — copying the chosen fields", () => {
 
     const spec = specOf(serviceSpecOf(flow, "web"));
 
-    expect(spec.build).toEqual({ kind: "native", runtime: "node", startCommand: "npm start" });
+    expect(spec.build).toEqual({
+      kind: "native",
+      runtime: "node",
+      buildCommand: "npm ci",
+      startCommand: "npm start",
+    });
   });
 
   it("ignores params outside the whitelist such as plan, region or name", () => {
@@ -275,13 +289,13 @@ describe("serviceSpecOf — copying the chosen fields", () => {
   it("trims spaces around the repository URL and the commands", () => {
     const flow = deployFlow({
       repo: { url: `  ${REPO_URL}  ` },
-      service: { startCommand: "  npm start  " },
+      service: { buildCommand: "  npm ci  ", startCommand: "  npm start  " },
     });
 
     const spec = specOf(serviceSpecOf(flow, "web"));
 
     expect(spec.repo.url).toBe(REPO_URL);
-    expect(spec.build).toMatchObject({ startCommand: "npm start" });
+    expect(spec.build).toMatchObject({ buildCommand: "npm ci", startCommand: "npm start" });
   });
 });
 
@@ -343,7 +357,10 @@ describe("serviceSpecOf — invalid specs", () => {
           repoNode(),
           {
             ...serviceNode(),
-            params: startCommand === undefined ? { build: "native" } : { startCommand },
+            params:
+              startCommand === undefined
+                ? { build: "native", buildCommand: "npm ci" }
+                : { buildCommand: "npm ci", startCommand },
           },
         ],
         [repoEdge()],
@@ -354,6 +371,55 @@ describe("serviceSpecOf — invalid specs", () => {
       expect(errorCodeOf(result)).toBe("INVALID_SPEC");
     },
   );
+
+  it.each([[undefined], [""], ["   "]])(
+    "fails with INVALID_SPEC for a native build with the build command %j",
+    (buildCommand) => {
+      const flow = flowOf(
+        [
+          repoNode(),
+          {
+            ...serviceNode(),
+            params:
+              buildCommand === undefined
+                ? { build: "native", startCommand: "npm start" }
+                : { build: "native", buildCommand, startCommand: "npm start" },
+          },
+        ],
+        [repoEdge()],
+      );
+
+      const result = serviceSpecOf(flow, "web");
+
+      expect(errorCodeOf(result)).toBe("INVALID_SPEC");
+    },
+  );
+
+  it("fails with INVALID_SPEC for a native build without a build command when the build kind is the default", () => {
+    const flow = flowOf(
+      [repoNode(), { ...serviceNode(), params: { startCommand: "npm start" } }],
+      [repoEdge()],
+    );
+
+    const result = serviceSpecOf(flow, "web");
+
+    expect(errorCodeOf(result)).toBe("INVALID_SPEC");
+  });
+
+  it("accepts a static build without a build command", () => {
+    const flow = flowOf(
+      [repoNode(), { ...serviceNode(), params: { build: "static", publishPath: "out" } }],
+      [repoEdge()],
+    );
+
+    const result = serviceSpecOf(flow, "web");
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { build: { kind: "static", publishPath: "out" } },
+    });
+    expect(result.ok ? result.value.build : {}).not.toHaveProperty("buildCommand");
+  });
 
   it.each([["1PORT"], ["MY-VAR"], ["MY VAR"], [""], ["$HOME"], ["Ñ"]])(
     "fails with INVALID_SPEC for the variable name %j",

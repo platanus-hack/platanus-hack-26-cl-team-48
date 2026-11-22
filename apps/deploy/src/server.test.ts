@@ -22,7 +22,7 @@ const PLAN: Plan = {
   changes: [{ field: "repo", after: { url: "https://github.com/a/b", branch: "main" } }],
   spec: {
     repo: { url: "https://github.com/a/b", branch: "main" },
-    build: { kind: "native", runtime: "node", startCommand: "npm start" },
+    build: { kind: "native", runtime: "node", buildCommand: "npm ci", startCommand: "npm start" },
     env: [],
   },
 };

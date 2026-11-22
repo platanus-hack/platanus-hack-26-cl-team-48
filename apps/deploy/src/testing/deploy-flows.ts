@@ -13,11 +13,20 @@ export const repoNode = (params: Record<string, unknown> = {}, id = "repo"): Flo
   position: { x: 0, y: 0 },
 });
 
+const isNativeBuild = (params: Record<string, unknown>): boolean =>
+  params["build"] === undefined || params["build"] === "native";
+
+/** A Service node; a native build gets a default build command because Render requires one. */
 export const serviceNode = (params: Record<string, unknown> = {}, id = "web"): FlowNode => ({
   id,
   type: SERVICE_TYPE,
   version: NODE_VERSION,
-  params: { build: "native", startCommand: "npm start", ...params },
+  params: {
+    build: "native",
+    startCommand: "npm start",
+    ...(isNativeBuild(params) ? { buildCommand: "npm ci" } : {}),
+    ...params,
+  },
   position: { x: 200, y: 0 },
 });
 
