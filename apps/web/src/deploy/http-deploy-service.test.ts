@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEPLOY_ERROR_CODES } from "./deploy-service.ts";
 import { createHttpDeployService } from "./http-deploy-service.ts";
 
 const BASE_URL = "https://deploy.example.com";
@@ -50,6 +51,8 @@ const KNOWN_CODES = [
   ["DEPLOYMENT_NOT_FOUND", 404],
   ["PROVIDER_ERROR", 502],
   ["UNAVAILABLE", 503],
+  ["SERVICE_KIND_CHANGED", 409],
+  ["RATE_LIMITED", 429],
 ] as const;
 
 type Call = { readonly url: string; readonly init: RequestInit | undefined };
@@ -98,12 +101,15 @@ const methodOf = (call: Call | undefined) => call?.init?.method ?? "GET";
 const plan = (service: Service) => service.plan({ flowId: FLOW_ID, nodeId: NODE_ID });
 const apply = (service: Service) =>
   service.apply({ flowId: FLOW_ID, nodeId: NODE_ID, planHash: PLAN_HASH, secrets: SECRETS });
+const redeploy = (service: Service) =>
+  service.redeploy({ flowId: FLOW_ID, nodeId: NODE_ID, secrets: SECRETS });
 const list = (service: Service) => service.list(FLOW_ID);
 const remove = (service: Service) => service.remove("dep 1/x");
 
 const OPERATIONS = [
   ["plan", plan],
   ["apply", apply],
+  ["redeploy", redeploy],
   ["list", list],
   ["remove", remove],
 ] as const;
@@ -130,6 +136,18 @@ describe("createHttpDeployService requests", () => {
       url: `${BASE_URL}/apply`,
       method: "POST",
       body: { flowId: FLOW_ID, nodeId: NODE_ID, planHash: PLAN_HASH, secrets: SECRETS },
+    });
+  });
+
+  it("posts the flow, node and secrets to the redeploy path", async () => {
+    const { service, calls } = setup({ status: 200, body: { ok: true, deployment: DEPLOYMENT } });
+
+    await redeploy(service);
+
+    expect({ url: calls[0]?.url, method: methodOf(calls[0]), body: bodyOf(calls[0]) }).toEqual({
+      url: `${BASE_URL}/redeploy`,
+      method: "POST",
+      body: { flowId: FLOW_ID, nodeId: NODE_ID, secrets: SECRETS },
     });
   });
 
@@ -166,6 +184,7 @@ describe("createHttpDeployService requests", () => {
   it.each([
     ["plan", plan],
     ["apply", apply],
+    ["redeploy", redeploy],
   ] as const)("sends the %s body as JSON", async (_name, call) => {
     const { service, calls } = setup();
 
@@ -204,6 +223,28 @@ describe("createHttpDeployService replies", () => {
     const result = await apply(service);
 
     expect(result).toEqual({ ok: true, value: DEPLOYMENT });
+  });
+
+  it("returns the deployment that redeploy started", async () => {
+    const { service } = setup({
+      status: 200,
+      body: { ok: true, deployment: { ...DEPLOYMENT, status: "deploying" } },
+    });
+
+    const result = await redeploy(service);
+
+    expect(result).toEqual({ ok: true, value: { ...DEPLOYMENT, status: "deploying" } });
+  });
+
+  it.each([
+    ["SERVICE_KIND_CHANGED", 409],
+    ["RATE_LIMITED", 429],
+  ] as const)("returns the %s error code redeploy answers", async (code, status) => {
+    const { service } = setup({ status, body: { ok: false, error: { code, message: "?" } } });
+
+    const result = await redeploy(service);
+
+    expect(result).toEqual({ ok: false, error: { code } });
   });
 
   it("returns the deployments of the flow, with or without a URL", async () => {
@@ -323,5 +364,52 @@ describe("createHttpDeployService without a token", () => {
       result: { ok: false, error: { code: "UNAUTHORIZED" } },
       calls: 0,
     });
+  });
+});
+
+describe("createHttpDeployService unsafe deployment URLs", () => {
+  const UNSAFE_URLS = ["javascript:alert(1)", "http://x"];
+  const withUrl = (url: string) => ({ ...DEPLOYMENT, url });
+  const DEPLOYMENT_NO_URL = {
+    id: DEPLOYMENT.id,
+    flowId: DEPLOYMENT.flowId,
+    nodeId: DEPLOYMENT.nodeId,
+    status: DEPLOYMENT.status,
+    updatedAt: DEPLOYMENT.updatedAt,
+  };
+
+  it.each(UNSAFE_URLS)("returns a listed deployment with the URL %s without it", async (url) => {
+    const { service } = setup({ status: 200, body: { ok: true, deployments: [withUrl(url)] } });
+
+    const result = await list(service);
+
+    expect(result).toEqual({ ok: true, value: [DEPLOYMENT_NO_URL] });
+  });
+
+  it.each(UNSAFE_URLS)("returns an applied deployment with the URL %s without it", async (url) => {
+    const { service } = setup({ status: 200, body: { ok: true, deployment: withUrl(url) } });
+
+    const result = await apply(service);
+
+    expect(result).toEqual({ ok: true, value: DEPLOYMENT_NO_URL });
+  });
+
+  it.each(UNSAFE_URLS)(
+    "returns a redeployed deployment with the URL %s without it",
+    async (url) => {
+      const { service } = setup({ status: 200, body: { ok: true, deployment: withUrl(url) } });
+
+      const result = await redeploy(service);
+
+      expect(result).toEqual({ ok: true, value: DEPLOYMENT_NO_URL });
+    },
+  );
+});
+
+describe("DEPLOY_ERROR_CODES", () => {
+  it("includes the service kind and rate limit codes", () => {
+    expect(DEPLOY_ERROR_CODES).toEqual(
+      expect.arrayContaining(["SERVICE_KIND_CHANGED", "RATE_LIMITED"]),
+    );
   });
 });
