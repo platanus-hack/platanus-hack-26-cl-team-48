@@ -136,7 +136,9 @@ describe("MCP HTTP server", () => {
       const { url, calls } = await startServer();
       const client = await connect(url, token);
 
-      await expect(client.callTool({ name: "flows.get", arguments: {} })).rejects.toThrow(/401/);
+      await expect(client.callTool({ name: "flows.get", arguments: {} })).rejects.toMatchObject({
+        code: 401,
+      });
       expect(calls).toEqual([]);
     },
   );
@@ -145,7 +147,9 @@ describe("MCP HTTP server", () => {
     const { url, calls } = await startServer("UNAVAILABLE");
     const client = await connect(url, "valid-token");
 
-    await expect(client.callTool({ name: "flows.get", arguments: {} })).rejects.toThrow(/503/);
+    await expect(client.callTool({ name: "flows.get", arguments: {} })).rejects.toMatchObject({
+      code: 503,
+    });
     expect(calls).toEqual([]);
   });
 

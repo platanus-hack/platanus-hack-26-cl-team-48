@@ -101,6 +101,34 @@ describe("applyChanges", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("rejects a manifest update that removes a connected port without its disconnection", () => {
+    const originalManifest = { ...transformManifest, id: "code.py" };
+    const base = flowOf(
+      [node("py", "code.py"), node("sink", "t.transform")],
+      [edge("py.out", "sink.in")],
+      [originalManifest],
+    );
+    const draft = flowOf(base.nodes, [], [{ ...originalManifest, outputs: [] }]);
+
+    const result = applyChanges(base, draft, ["update_custom_node:py"]);
+
+    expect(result.ok).toBe(false);
+    expect(edgeEnds(base)).toEqual(["py.out->sink.in"]);
+  });
+
+  it("rejects a reversed connection when the previous direction was not disconnected", () => {
+    const base = flowOf(
+      [node("a", "t.transform"), node("b", "t.transform")],
+      [edge("a.out", "b.in")],
+    );
+    const draft = flowOf(base.nodes, [edge("b.out", "a.in")]);
+
+    const result = applyChanges(base, draft, ["connect:b.out->a.in"]);
+
+    expect(result.ok).toBe(false);
+    expect(edgeEnds(base)).toEqual(["a.out->b.in"]);
+  });
+
   it("does not mutate its arguments", () => {
     const [base, draft] = [deepFreeze(pipelineFlow()), deepFreeze(draftFlow())];
 
