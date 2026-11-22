@@ -63,18 +63,20 @@ describe("add_node", () => {
   });
 
   it("places each new node at a numeric position not used by another node", () => {
-    const ids = ["a", "b", "c", "d"];
+    const flow = pipelineFlow();
 
-    const result = ids.reduce(
-      (flow, id) => unwrap(applyOp(flow, addNode("t.source", id), testCatalog)),
-      pipelineFlow(),
+    const result = ["a", "b", "c", "d"].reduce(
+      (current, id) => unwrap(applyOp(current, addNode("t.source", id), testCatalog)),
+      flow,
     );
 
-    const positions = result.nodes.map((n) => `${String(n.position.x)},${String(n.position.y)}`);
-    expect(
-      result.nodes.every((n) => Number.isFinite(n.position.x) && Number.isFinite(n.position.y)),
-    ).toBe(true);
-    expect(new Set(positions).size).toBe(positions.length);
+    expect(result.nodes.slice(0, flow.nodes.length)).toEqual(flow.nodes);
+    result.nodes.slice(flow.nodes.length).forEach((added, index) => {
+      expect(Number.isFinite(added.position.x) && Number.isFinite(added.position.y)).toBe(true);
+      expect(
+        result.nodes.slice(0, flow.nodes.length + index).map((previous) => previous.position),
+      ).not.toContainEqual(added.position);
+    });
   });
 
   it("accepts a type declared in the flow's custom nodes", () => {

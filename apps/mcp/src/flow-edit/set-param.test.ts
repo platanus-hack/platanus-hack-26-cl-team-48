@@ -59,7 +59,7 @@ describe("set_param", () => {
     ["flag", "true", "a string for a boolean"],
     ["ratio", "1", "a string for a number"],
     ["tags", "a", "a string for an array"],
-  ])("rejects %s = %j (%s)", (name, value, _description) => {
+  ])("rejects %s = %j (%s)", (...[name, value]: [string, unknown, string]) => {
     const flow = pipelineFlow();
 
     const message = errorOf(applyOp(flow, setParam("tr", name, value), testCatalog));

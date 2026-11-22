@@ -151,7 +151,7 @@ describe("flows.search", () => {
   it("finds flows whose id contains the query, ignoring case", async () => {
     const harness = withTwoFlows();
 
-    const ids = await harness.callOk("flows.search", { query: "VENT" });
+    const ids = await harness.callOk("flows.search", { query: "VENTAS" });
 
     expect(ids).toEqual(["ventas"]);
   });

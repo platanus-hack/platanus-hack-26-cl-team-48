@@ -20,6 +20,6 @@ describe("Node DuckDB lifecycle", () => {
 
     database.dispose();
 
-    await expect(database.connection.query("SELECT 42 AS answer")).rejects.toThrow();
+    await expect(async () => database.connection.query("SELECT 42 AS answer")).rejects.toThrow();
   });
 });
