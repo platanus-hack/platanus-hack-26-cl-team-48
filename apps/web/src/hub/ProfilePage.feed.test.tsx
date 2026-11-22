@@ -1,5 +1,6 @@
 import type { Hub } from "@nodomics/hub";
-import { ok } from "@nodomics/protocol";
+import type { ProfileCard } from "@nodomics/profile";
+import { err, ok } from "@nodomics/protocol";
 import { screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -9,18 +10,21 @@ import type { FeedService } from "../feed/feed-service.ts";
 import { createSeededHub, renderWithHub } from "./hub-pages-fixtures.tsx";
 import { ProfilePage } from "./ProfilePage.tsx";
 
+const OWNER_INVITATION = "Cuéntanos qué haces y te conectamos con quien te complementa.";
+const VISITOR_EMPTY = "@ana todavía no completó su perfil de colaboración.";
+
 afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-function feedWithCard(card = ANA_CARD) {
+function feedWithCard(card: ProfileCard = ANA_CARD) {
   return createFakeFeed({ card: () => Promise.resolve(ok(card)) });
 }
 
-function page(handle: string, feed: FeedService): ReactNode {
+function page(feed: FeedService): ReactNode {
   return (
     <FeedContext.Provider value={feed}>
-      <ProfilePage handle={handle} />
+      <ProfilePage handle="ana" />
     </FeedContext.Provider>
   );
 }
@@ -31,123 +35,165 @@ async function signedInAs(handle: string): Promise<Hub> {
   return hub;
 }
 
-const cardSection = async () => {
-  const heading = await screen.findByRole("heading", { name: "Perfil de colaboración" });
-  const section = heading.closest("section");
-  if (section === null) throw new Error("The card heading is not inside a section");
-  return section;
-};
+async function showAnaCard(card: ProfileCard = ANA_CARD, hub?: Hub) {
+  const { feed, ...spies } = feedWithCard(card);
+  renderWithHub(page(feed), hub ?? (await createSeededHub()));
+  await screen.findByText(card.about);
+  return spies;
+}
+
+const containingAll = (...parts: ReadonlyArray<string>): unknown =>
+  expect.stringMatching(new RegExp(parts.map((part) => `(?=.*${part})`).join("")));
+
+const itemTexts = (name: string) =>
+  within(screen.getByRole("list", { name }))
+    .getAllByRole("listitem")
+    .map((item) => item.textContent);
 
 describe("ProfilePage collaboration card", () => {
   it("loads the card of the page handle", async () => {
-    const { feed, card } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
-
-    await screen.findByText(ANA_CARD.about);
+    const { card } = await showAnaCard();
 
     expect(card).toHaveBeenCalledWith("ana");
   });
 
-  it("shows the about text", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
+  it("shows the display name as the main heading next to the card", async () => {
+    await showAnaCard();
 
-    expect(await screen.findByText("Veterinaria que estudia brotes en ganado.")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Ana Pérez" })).toBeTruthy();
   });
 
-  it("shows each domain with its depth label", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
+  it.each([
+    ["uses", "Usa flujos"],
+    ["builds", "Arma flujos"],
+    ["codes", "Programa nodos"],
+  ] as const)("shows the technical pill for %s", async (technical, label) => {
+    await showAnaCard({ ...MINIMAL_CARD, technical });
 
-    const section = await cardSection();
-    await within(section).findByText(ANA_CARD.about);
+    expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it("lists what the person can help with", async () => {
+    await showAnaCard();
+
+    expect(itemTexts("Puede ayudarte con")).toEqual(ANA_CARD.offers);
+  });
+
+  it("lists what the person is looking for", async () => {
+    await showAnaCard();
+
+    expect(itemTexts("Está buscando")).toEqual(ANA_CARD.seeks);
+  });
+
+  it("lists each domain with its level label", async () => {
+    await showAnaCard();
+
+    const items = itemTexts("Sabe de");
+
+    expect(items).toEqual([
+      containingAll("epidemiología veterinaria", "Experto/a"),
+      containingAll("estadística", "Lo practica"),
+      containingAll("teoría de grafos", "Le interesa"),
+    ]);
+  });
+
+  it("does not render empty lists", async () => {
+    await showAnaCard(MINIMAL_CARD);
 
     expect(
-      ["epidemiología veterinaria", "estadística", "teoría de grafos", "Experto", "Práctica"].map(
-        (text) => within(section).queryAllByText(new RegExp(text)).length > 0,
+      ["Puede ayudarte con", "Está buscando", "Sabe de"].map(
+        (name) => screen.queryByRole("list", { name }) !== null,
       ),
-    ).toEqual([true, true, true, true, true]);
-    expect(within(section).queryAllByText(/Curiosidad/).length).toBeGreaterThan(0);
+    ).toEqual([false, false, false]);
   });
 
-  it("shows the technical label", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
-
-    expect(await screen.findByText("Arma flujos")).toBeTruthy();
-  });
-
-  it("lists what the person offers and seeks", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
-
-    const offers = await screen.findByRole("list", { name: "Ofrece" });
-    const seeks = screen.getByRole("list", { name: "Busca" });
-
-    expect({
-      offers: within(offers)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-      seeks: within(seeks)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    }).toEqual({ offers: ANA_CARD.offers, seeks: ANA_CARD.seeks });
-  });
-
-  it("shows the links as anchors", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
-
-    const section = await cardSection();
-    await within(section).findByRole("link", { name: "LinkedIn" });
+  it("links to the card URLs", async () => {
+    await showAnaCard();
 
     expect(
       ["LinkedIn", "GitHub", "Sitio web"].map((name) =>
-        within(section).getByRole("link", { name }).getAttribute("href"),
+        screen.getByRole("link", { name }).getAttribute("href"),
       ),
     ).toEqual(["https://linkedin.com/in/ana", "https://github.com/ana", "https://ana.example.com"]);
   });
 
-  it("omits the links the card does not have", async () => {
-    const { feed } = feedWithCard(MINIMAL_CARD);
-    renderWithHub(page("ana", feed), await createSeededHub());
+  it("opens the card links in a new tab without opener access", async () => {
+    await showAnaCard();
 
-    await screen.findByText(MINIMAL_CARD.about);
+    const link = screen.getByRole("link", { name: "GitHub" });
 
-    expect(screen.queryByRole("link", { name: "LinkedIn" })).toBeNull();
+    expect({
+      target: link.getAttribute("target"),
+      noopener: (link.getAttribute("rel") ?? "").split(" ").includes("noopener"),
+    }).toEqual({ target: "_blank", noopener: true });
   });
 
-  it("says there is no collaboration profile when the card is missing", async () => {
-    const { feed } = createFakeFeed();
-    renderWithHub(page("ana", feed), await createSeededHub());
+  it("omits the links the card does not have", async () => {
+    await showAnaCard(MINIMAL_CARD);
 
-    expect(await screen.findByText("Todavía no hay perfil de colaboración.")).toBeTruthy();
+    expect(
+      ["LinkedIn", "GitHub", "Sitio web"].map((name) => screen.queryByRole("link", { name })),
+    ).toEqual([null, null, null]);
+  });
+
+  it("keeps listing the publications of the profile", async () => {
+    await showAnaCard();
+
+    expect(await screen.findByRole("link", { name: "Ventas por región" })).toBeTruthy();
+  });
+
+  it("says the card could not be loaded when the feed fails", async () => {
+    const { feed } = createFakeFeed({
+      card: () => Promise.resolve(err({ code: "UNAVAILABLE" })),
+    });
+    renderWithHub(page(feed), await createSeededHub());
+
+    expect(await screen.findByText("No pudimos cargar el perfil de colaboración.")).toBeTruthy();
   });
 });
 
 describe("ProfilePage edit button", () => {
   it("shows Editar perfil to the owner", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await signedInAs("ana"));
+    await showAnaCard(ANA_CARD, await signedInAs("ana"));
 
     expect(await screen.findByRole("button", { name: "Editar perfil" })).toBeTruthy();
   });
 
   it("hides Editar perfil from other signed-in users", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await signedInAs("beto"));
-
-    await screen.findByText(ANA_CARD.about);
+    await showAnaCard(ANA_CARD, await signedInAs("beto"));
 
     expect(screen.queryByRole("button", { name: "Editar perfil" })).toBeNull();
   });
 
   it("hides Editar perfil from visitors", async () => {
-    const { feed } = feedWithCard();
-    renderWithHub(page("ana", feed), await createSeededHub());
-
-    await screen.findByText(ANA_CARD.about);
+    await showAnaCard();
 
     expect(screen.queryByRole("button", { name: "Editar perfil" })).toBeNull();
+  });
+});
+
+describe("ProfilePage without a card", () => {
+  it("invites the owner to build the profile", async () => {
+    const { feed } = createFakeFeed();
+    renderWithHub(page(feed), await signedInAs("ana"));
+
+    expect(await screen.findByText(OWNER_INVITATION)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Armar mi perfil" })).toBeTruthy();
+  });
+
+  it("tells visitors the profile is not complete yet", async () => {
+    const { feed } = createFakeFeed();
+    renderWithHub(page(feed), await createSeededHub());
+
+    expect(await screen.findByText(VISITOR_EMPTY)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Armar mi perfil" })).toBeNull();
+  });
+
+  it("tells other signed-in users the profile is not complete yet", async () => {
+    const { feed } = createFakeFeed();
+    renderWithHub(page(feed), await signedInAs("beto"));
+
+    expect(await screen.findByText(VISITOR_EMPTY)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Armar mi perfil" })).toBeNull();
   });
 });
