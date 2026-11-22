@@ -1,10 +1,7 @@
 export type RateLimit = { readonly maxRequests: number; readonly windowMs: number };
 
 /** Counts each key's requests in a fixed window that starts with its first request (ADR 0029 §3). */
-export function createRateLimiter(
-  limit: RateLimit,
-  now: () => number,
-): (key: string) => boolean {
+export function createRateLimiter(limit: RateLimit, now: () => number): (key: string) => boolean {
   const windows = new Map<string, { readonly startedAt: number; readonly count: number }>();
   return (key) => {
     const current = windows.get(key);

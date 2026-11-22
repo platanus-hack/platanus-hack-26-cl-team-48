@@ -11,6 +11,7 @@ import {
 import type { EngineState, NodeRun } from "../engine/engine-state.ts";
 import { toUiEngine, toUiExecState } from "../engine/ui-types.ts";
 import { outputType } from "./connect-ports.ts";
+import { isResourceManifest, resourceState } from "./resource-nodes.ts";
 
 type NodeVariant = NonNullable<NodeProps["variant"]>;
 
@@ -104,7 +105,7 @@ function describeNode(
     variant: manifest === undefined ? "transform" : variantOf(manifest, node.params),
     inputs: describePorts(sources.flow, node, ports.inputs),
     outputs: describePorts(sources.flow, node, ports.outputs),
-    ...describeRun(sources.engine.nodes[node.id]),
+    ...describeRun(sources.engine.nodes[node.id], isResourceManifest(manifest)),
     ...describeIssues(sources.engine, node, manifest),
     ...describeResult(sources.engine, node),
     ...describeEngine(sources.engine, node.id),
@@ -154,9 +155,9 @@ function describePorts(flow: Flow, node: FlowNode, ports: ReadonlyArray<PortSpec
   }));
 }
 
-function describeRun(run: NodeRun | undefined): Partial<NodeProps> {
+function describeRun(run: NodeRun | undefined, isResource: boolean): Partial<NodeProps> {
   return {
-    state: toUiExecState(run?.state),
+    state: toUiExecState(isResource ? resourceState(run?.state) : run?.state),
     ...(run?.progress === undefined ? {} : { progress: run.progress }),
     ...(run?.error === undefined ? {} : { errorMessage: run.error.message }),
   };

@@ -1,4 +1,5 @@
 import type { DisplayRef, ResultRef } from "@nodomics/protocol";
+import { isResourceManifest } from "../canvas/resource-nodes.ts";
 import { formatNumber } from "@nodomics/ui";
 import { useState, type ReactNode } from "react";
 import { useCatalog, useEngineState, useFlowState, useSelectedIds } from "../app-context.ts";
@@ -53,7 +54,9 @@ function NodePreview({
     return (
       <>
         <PreviewHeader actions={actions} subject={subject} />
-        <p className="web-panel-hint web-preview-hint">{MESSAGES.preview.noResult}</p>
+        <p className="web-panel-hint web-preview-hint">
+          {isResourceManifest(manifest) ? MESSAGES.preview.resource : MESSAGES.preview.noResult}
+        </p>
       </>
     );
   return (
