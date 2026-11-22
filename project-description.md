@@ -1,8 +1,8 @@
-# Nodomics
+# Nodomic
 
 **Análisis de datos que se arma con nodos como LEGO, se comparte como código y lo construye un agente contigo.**
 
-La mayoría de quienes analizan datos no programan: viven en Excel, con análisis frágiles, difíciles de auditar y de compartir. Nodomics les da un lienzo visual donde conectan fuentes, transformaciones y vistas con nodos, sin escribir código.
+La mayoría de quienes analizan datos no programan: viven en Excel, con análisis frágiles, difíciles de auditar y de compartir. Nodomic les da un lienzo visual donde conectan fuentes, transformaciones y vistas con nodos, sin escribir código.
 
 ## Qué se puede hacer
 
