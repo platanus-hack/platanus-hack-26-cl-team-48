@@ -3,6 +3,7 @@ import { parse } from "@nodomics/protocol";
 import type { Route, RouteReply, RouteRequest } from "../http/route.ts";
 import type { GithubSummaryPort } from "./github-summary.ts";
 import type { ExtractionSource, ProfileExtractorPort } from "./profile-extractor.ts";
+import { UPLOAD_MAX_BODY_BYTES } from "../http/guards/body-limit.ts";
 import { parseJson } from "./parse-json.ts";
 
 export type RegistrationRouteDeps = {
@@ -27,6 +28,7 @@ export function createRegistrationRoute(deps: RegistrationRouteDeps): Route {
   return {
     method: "POST",
     path: FEED_PATHS.registration,
+    maxBodyBytes: UPLOAD_MAX_BODY_BYTES,
     handle: (request) => handleRegistration(deps, request),
   };
 }
