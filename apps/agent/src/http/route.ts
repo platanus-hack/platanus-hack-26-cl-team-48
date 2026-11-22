@@ -14,4 +14,6 @@ export type Route = {
   readonly path: string;
   readonly handle: (request: RouteRequest) => Promise<RouteReply>;
   readonly maxBodyBytes?: number;
+  /** Answers without a session too: public data that row level security already lets anyone read. */
+  readonly isPublic?: boolean;
 };
