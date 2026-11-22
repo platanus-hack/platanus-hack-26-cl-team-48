@@ -51,8 +51,8 @@ export const MESSAGES = {
     tags: "Etiquetas",
     results: "Resultados",
     kind: "Tipo",
-    kinds: { all: "Todo", flow: "Flujos", node: "Nodos" },
-    kindLabel: { flow: "Flujo", node: "Nodo" },
+    kinds: { all: "Todo", app: "Apps", flow: "Flujos", node: "Nodos" },
+    kindLabel: { app: "App", flow: "Flujo", node: "Nodo" },
     noResults: "No hay publicaciones que coincidan",
     failed: "No se pudo cargar el hub. Intenta de nuevo en un momento.",
     noPublications: "Todavía no publicó nada",
@@ -72,6 +72,7 @@ export const MESSAGES = {
     license: "Licencia",
     published: "Publicada",
     use: "Usar",
+    appHint: "Se abre como una aplicación completa en tu editor con todas sus vistas y dashboards.",
     flowHint: "Se abre como un flujo nuevo en tu editor; el original no cambia.",
     forYou: "Para ti",
     nodeHint:
@@ -83,7 +84,7 @@ export const MESSAGES = {
     forYouFailed: "No pudimos cargar tus recomendaciones.",
     loading: "Cargando…",
     people: "Personas",
-    kindLabel: { profile: "Persona", node: "Nodo", flow: "Flujo" },
+    kindLabel: { profile: "Persona", app: "App", node: "Nodo", flow: "Flujo" },
     invite: {
       text: "Cuéntanos qué haces y te conectamos con quien te complementa.",
       start: "Armar mi perfil",

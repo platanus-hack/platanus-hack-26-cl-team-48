@@ -1,7 +1,7 @@
 import type { Flow, NodeManifest, Result } from "@nodomics/protocol";
 import type { Snapshot } from "./snapshot.ts";
 
-export type PublicationKind = "flow" | "node";
+export type PublicationKind = "app" | "flow" | "node";
 export type OAuthProvider = "github" | "google";
 
 export type SignInMethod =

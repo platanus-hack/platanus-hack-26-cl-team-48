@@ -10,6 +10,9 @@ import {
   type NodeManifest,
 } from "@nodomics/protocol";
 import type { Hub, HubProfile, PublicationDraft } from "@nodomics/hub";
+import { AREA_APP_SPECS, AREA_MODULE_SPECS } from "./demo-pipeline-specs-areas.ts";
+import { COMMUNITY_APP_SPECS } from "./demo-pipeline-specs-community.ts";
+import { enrichDraft, type PipelineSpec } from "./demo-pipelines.ts";
 import { SNAPSHOT_FORMAT, type Snapshot, type SnapshotState } from "@nodomics/hub";
 
 /* ----------------------------------------------------------------------------------
@@ -3400,7 +3403,7 @@ export type SeedEntry = {
   readonly draft: PublicationDraft;
 };
 
-export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = [
+const BASE_DRAFTS: ReadonlyArray<SeedEntry> = [
   // 1. Agronomía
   { handle: MATEO_PROFILE.handle, draft: DRAFT_AGRO_APP },
   { handle: MATEO_PROFILE.handle, draft: DRAFT_AGRO_NODE },
@@ -3455,6 +3458,20 @@ export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = [
   { handle: RODRIGO_PROFILE.handle, draft: DRAFT_GLOBAL_DRAINAGE },
   { handle: VALENTINA_PROFILE.handle, draft: DRAFT_GLOBAL_AI_AUDIT },
 ];
+
+const PIPELINE_SPECS: Readonly<Record<string, PipelineSpec>> = {
+  ...AREA_APP_SPECS,
+  ...AREA_MODULE_SPECS,
+  ...COMMUNITY_APP_SPECS,
+};
+
+/** Apps and flows grown into full pipelines (demo-pipelines.ts); nodes stay the minimal unit. */
+export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = BASE_DRAFTS.map(
+  ({ handle, draft }) => ({
+    handle,
+    draft: enrichDraft(draft, PIPELINE_SPECS[draft.slug]),
+  }),
+);
 
 /* ----------------------------------------------------------------------------------
  * Feed Hits for the Feed/Match Service
