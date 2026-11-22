@@ -23,11 +23,13 @@ El agente (`apps/agent`) es cliente MCP y hasta hoy corre contra un MCP falso (`
    - Aplicar escribe solo `document.flow` y `updatedAt` en `flows`, y conserva `files`, `node` y `published`.
    - El editor recalcula esos campos en su siguiente guardado.
 5. **Núcleo puro** (`apps/mcp/src/flow-edit/`): operaciones sobre `Flow`, validación, diff con el formato de cambios del falso (`{id, kind, target, before, after}`) y aplicación parcial por `changeIds`. Los nodos de código viajan como manifiestos en `flow.customNodes`.
-6. **Ejecución dentro del servicio.** Por ejecución se arma un coordinador con DuckDB (Node) y Pyodide, con el catálogo de `nodes-core`.
-   - El código generado corre en el mismo proceso, que no tiene secretos.
-   - Las muestras son de 20 filas como máximo.
+6. **Ejecución aislada en un worker, solo SQL.**
+   - Cada ejecución corre en un `worker_threads` aparte, con un coordinador con DuckDB (Node) y el catálogo de `nodes-core`.
+   - El worker solo recibe flujos, nunca tokens. Si pasa el tope de tiempo (60 s), se termina y se crea otro, así una ejecución pesada no congela el servicio.
+   - **Python no se ejecuta en el MCP por ahora.** La revisión mostró que Pyodide en el proceso compartido deja que el código de un usuario reemplace el `fetch` global y lea el JWT y los datos de otros usuarios. Los nodos Python se crean y validan, pero al ejecutarlos el nodo queda en error.
+   - Las muestras son de 20 filas y 64 KB como máximo.
 7. **Dependencias permitidas** de `apps/mcp`: `protocol`, `coordinator`, `executor-duckdb-wasm`, `executor-pyodide`, `nodes-core`. Nada importa `apps/mcp`.
-   - `executor-duckdb-wasm` exporta su apertura de DuckDB para Node.
+   - `executor-duckdb-wasm` exporta su apertura de DuckDB para Node, y `executor-pyodide` la carga de Pyodide para Node (para cuando Python vuelva, aislado).
    - Dependencias de runtime nuevas: `@modelcontextprotocol/sdk` (servidor) y `@supabase/supabase-js`, ya usadas en el repo.
 
 8. **Se arma con Vite** (`vite build --ssr`, `apps/mcp/dist/start.js`), porque los paquetes del monorepo son TypeScript con importaciones solo de Vite (`?raw`). DuckDB-WASM, Pyodide y apache-arrow quedan fuera del bundle: leen sus archivos de `node_modules`.
@@ -37,6 +39,8 @@ El agente (`apps/agent`) es cliente MCP y hasta hoy corre contra un MCP falso (`
 | Opción | A favor | En contra |
 |---|---|---|
 | Ejecutar en Render Sandboxes | Aislamiento fuerte | Más lento de construir; no probado |
+| Pyodide en el proceso del servicio | Python sin infraestructura extra | Un usuario puede robar el JWT y los datos de otros; un bucle congela el servicio |
+| Pyodide nuevo por ejecución en un worker | Aislamiento real con Python | Carga de 10 a 30 s y unos 300 MB por ejecución: no cabe en el plan gratis |
 | Solo SQL | Liviano, sin código arbitrario | El agente no puede probar nodos Python |
 | Borradores en memoria | Sin migración | Se pierden si el servicio se duerme antes de aceptar |
 | Cambiar el contrato al `Flow` real y adaptar el agente | Un solo modelo | Reescribe código del agente que ya funciona |
