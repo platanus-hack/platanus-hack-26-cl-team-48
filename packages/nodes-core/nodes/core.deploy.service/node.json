@@ -72,7 +72,7 @@
       "buildCommand": {
         "type": "string",
         "title": "Comando de build",
-        "description": "Para Nativo y Estático. Por ejemplo: npm install && npm run build"
+        "description": "Obligatorio en Nativo; opcional en Estático. Por ejemplo: npm install && npm run build"
       },
       "startCommand": {
         "type": "string",
