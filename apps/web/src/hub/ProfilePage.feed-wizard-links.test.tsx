@@ -1,3 +1,4 @@
+import { MAX_LINK_LENGTH } from "@nodomics/profile";
 import { waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { MINIMAL_CARD } from "../feed/feed-fixtures.ts";
@@ -130,6 +131,63 @@ describe("ProfilePage wizard links that are not web addresses", () => {
         error: within(wizard()).queryByText(LINK_ERROR) !== null,
         disabled: isButtonDisabled("Siguiente"),
       }).toEqual({ error: false, disabled: false });
+    });
+  });
+});
+
+describe("ProfilePage wizard links that are too long", () => {
+  const tooLong = `https://example.com/${"a".repeat(MAX_LINK_LENGTH)}`;
+
+  it("shows the link error", async () => {
+    await typeLinkOnStep3("Sitio web", tooLong);
+
+    const error = await within(wizard()).findByText(LINK_ERROR);
+
+    expect(error).toBeTruthy();
+  });
+
+  it("disables Siguiente", async () => {
+    await typeLinkOnStep3("Sitio web", tooLong);
+
+    const disabled = isButtonDisabled("Siguiente");
+
+    expect(disabled).toBe(true);
+  });
+});
+
+describe("ProfilePage wizard on a card with a saved link the wizard rejects", () => {
+  const localhostCard = { ...MINIMAL_CARD, links: { website: "https://localhost" } };
+
+  it("keeps Siguiente enabled on steps 1 and 2", async () => {
+    const { user } = await editCard(localhostCard);
+    const onStep1 = isButtonDisabled("Siguiente");
+
+    await clickNext(user);
+
+    expect({ onStep1, onStep2: isButtonDisabled("Siguiente") }).toEqual({
+      onStep1: false,
+      onStep2: false,
+    });
+  });
+
+  it("shows the link error on step 3", async () => {
+    const { user } = await editCard(localhostCard);
+
+    await clickNext(user, 2);
+
+    expect(await within(wizard()).findByText(LINK_ERROR)).toBeTruthy();
+  });
+
+  it("disables Siguiente on step 3", async () => {
+    const { user } = await editCard(localhostCard);
+
+    await clickNext(user, 2);
+
+    await waitFor(() => {
+      expect({
+        onStep3: within(wizard()).queryByRole("heading", { name: "¿Qué estás buscando?" }) !== null,
+        disabled: isButtonDisabled("Siguiente"),
+      }).toEqual({ onStep3: true, disabled: true });
     });
   });
 });
