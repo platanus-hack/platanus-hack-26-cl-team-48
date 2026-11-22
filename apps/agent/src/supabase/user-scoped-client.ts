@@ -34,6 +34,20 @@ function jwtRole(key: string): unknown {
   }
 }
 
+const NO_SESSION_OPTIONS = {
+  global: { headers: {} },
+  auth: { persistSession: false, autoRefreshToken: false },
+} as const;
+
+/** A client that acts as a visitor without a session: only rows public to `anon` can be read. */
+export function createAnonClient(
+  config: Omit<UserScopedClientConfig, "accessToken">,
+  factory: ClientFactory = createClient,
+): Result<SupabaseClient, UserScopedClientError> {
+  if (jwtRole(config.anonKey) === SERVICE_ROLE) return err({ code: "SERVICE_ROLE_KEY" });
+  return ok(factory(config.url, config.anonKey, NO_SESSION_OPTIONS));
+}
+
 /** A client that acts as the user, so row level security applies and never a service key. */
 export function createUserScopedClient(
   config: UserScopedClientConfig,

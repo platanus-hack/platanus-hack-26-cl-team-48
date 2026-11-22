@@ -14,4 +14,6 @@ export type Route = {
   readonly path: string;
   readonly handle: (request: RouteRequest) => Promise<RouteReply>;
   readonly maxBodyBytes?: number;
+  /** Answers visitors without a session too, as the shared anonymous identity. */
+  readonly isPublic?: boolean;
 };

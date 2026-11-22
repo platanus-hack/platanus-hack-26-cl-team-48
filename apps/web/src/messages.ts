@@ -159,6 +159,7 @@ export const MESSAGES = {
     },
     card: {
       failed: "No pudimos cargar el perfil de colaboración.",
+      signIn: (handle: string) => `Entra para ver con qué puede ayudarte @${handle}.`,
       edit: "Editar perfil",
       offers: "Puede ayudarte con",
       seeks: "Está buscando",

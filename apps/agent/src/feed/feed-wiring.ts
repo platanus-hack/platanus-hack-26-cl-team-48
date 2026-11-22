@@ -2,7 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { AgentConfig } from "../config.ts";
 import type { Route } from "../http/route.ts";
 import { createVoyageEmbeddings } from "../memory/embeddings.ts";
-import { createUserScopedClient, type ClientFactory } from "../supabase/user-scoped-client.ts";
+import {
+  createAnonClient,
+  createUserScopedClient,
+  type ClientFactory,
+} from "../supabase/user-scoped-client.ts";
 import { createAnthropicProfileExtractor } from "./anthropic-profile-extractor.ts";
 import { createFeedRoutes } from "./feed-routes.ts";
 import { FEED_EMBEDDING_MODEL } from "./feed-service.ts";
@@ -18,12 +22,20 @@ export type FeedWiringOptions = {
 
 const UNAUTHORIZED = { status: 401, body: { error: "unauthorized" } } as const;
 
-/** An identity without a token cannot act under row level security, so it never reaches the store. */
-const requireAccessToken = (route: Route): Route => ({
-  ...route,
-  handle: (request) =>
-    request.identity.accessToken === "" ? Promise.resolve(UNAUTHORIZED) : route.handle(request),
-});
+/**
+ * An identity without a token cannot act under row level security, so it never reaches the store;
+ * public routes read as `anon` instead.
+ */
+const requireAccessToken = (route: Route): Route =>
+  route.isPublic === true
+    ? route
+    : {
+        ...route,
+        handle: (request) =>
+          request.identity.accessToken === ""
+            ? Promise.resolve(UNAUTHORIZED)
+            : route.handle(request),
+      };
 
 export function buildFeedRoutes(
   config: AgentConfig,
@@ -38,12 +50,14 @@ export function buildFeedRoutes(
       fetch: fetchImpl,
     });
   const storeFor = (identity: UserIdentity): FeedStorePort => {
-    const scope = {
-      url: config.supabaseUrl,
-      anonKey: config.supabaseAnonKey,
-      accessToken: identity.accessToken,
-    };
-    const client = createUserScopedClient(scope, options.clientFactory);
+    const project = { url: config.supabaseUrl, anonKey: config.supabaseAnonKey };
+    const client =
+      identity.accessToken === ""
+        ? createAnonClient(project, options.clientFactory)
+        : createUserScopedClient(
+            { ...project, accessToken: identity.accessToken },
+            options.clientFactory,
+          );
     // The token guard runs first, so only a service role key in the config gets here.
     if (!client.ok) throw new Error(`Feed store unavailable: ${client.error.code}`);
     return createSupabaseFeedStore(client.value);

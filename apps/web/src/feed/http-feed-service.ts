@@ -22,6 +22,8 @@ type Request = {
   readonly path: string;
   readonly method?: "POST";
   readonly body?: unknown;
+  /** Sent without a session when there is none; the agent answers it to visitors too. */
+  readonly isPublic?: boolean;
 };
 
 const UNAUTHORIZED = 401;
@@ -47,6 +49,7 @@ export function createHttpFeedService(deps: HttpFeedDeps): FeedService {
     card: async (handle) => {
       const reply = await send({
         path: FEED_PATHS.card.replace(":handle", encodeURIComponent(handle)),
+        isPublic: true,
       });
       if (!reply.ok && reply.error.code === "NO_PROFILE") return ok(undefined);
       return cardOf(reply);
@@ -61,14 +64,14 @@ export function createHttpFeedService(deps: HttpFeedDeps): FeedService {
 /** Sends a request with the user's token and returns the JSON of a successful reply. */
 function createSender({ baseUrl, getAccessToken, fetch }: HttpFeedDeps) {
   const root = baseUrl.replace(/\/+$/, "");
-  return async ({ path, method, body }: Request): Promise<FeedResult<unknown>> => {
+  return async ({ path, method, body, isPublic }: Request): Promise<FeedResult<unknown>> => {
     const token = await getAccessToken();
-    if (token === undefined) return feedFailure("UNAUTHENTICATED");
+    if (token === undefined && isPublic !== true) return feedFailure("UNAUTHENTICATED");
     try {
       const response = await fetch(`${root}${path}`, {
         method: method ?? "GET",
         headers: {
-          authorization: `Bearer ${token}`,
+          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),
           ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
