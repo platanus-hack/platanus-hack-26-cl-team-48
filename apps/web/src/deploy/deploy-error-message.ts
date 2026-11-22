@@ -13,6 +13,8 @@ const ERROR_MESSAGES: Readonly<Record<DeployErrorCode, string>> = {
   MISSING_SECRET: errors.MISSING_SECRET,
   UNAUTHORIZED: errors.UNAUTHORIZED,
   UNAVAILABLE: errors.UNAVAILABLE,
+  SERVICE_KIND_CHANGED: errors.SERVICE_KIND_CHANGED,
+  RATE_LIMITED: errors.RATE_LIMITED,
   NOT_CONFIGURED: MESSAGES.deploy.notAvailable,
   BAD_REQUEST: errors.generic,
   FLOW_NOT_FOUND: errors.generic,
