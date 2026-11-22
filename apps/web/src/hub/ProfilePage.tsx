@@ -1,11 +1,9 @@
-import type { HubProfile } from "@nodomics/hub";
 import { ok } from "@nodomics/protocol";
 import { Notice } from "@nodomics/ui";
-import { useCallback } from "react";
+import { useCallback, useId, type ComponentProps } from "react";
 import { ProfileCardSection } from "../feed/ProfileCardSection.tsx";
 import { MESSAGES } from "../messages.ts";
 import { useHub } from "./hub-context.ts";
-import { Avatar } from "./Avatar.tsx";
 import { EmptyState, PublicationList } from "./PublicationCard.tsx";
 import { useQuery } from "../async/use-query.ts";
 
@@ -26,34 +24,25 @@ export function ProfilePage({ handle }: { readonly handle: string }) {
         <EmptyState text={MESSAGES.hub.noProfile(handle)} />
       ) : (
         <>
-          <ProfileHeader profile={profile} count={publications.length} />
-          <ProfileCardSection handle={profile.handle} />
-          <PublicationList publications={publications} empty={MESSAGES.hub.noPublications} />
+          <ProfileCardSection profile={profile} publicationCount={publications.length} />
+          <PublicationsSection publications={publications} />
         </>
       )}
     </main>
   );
 }
 
-function ProfileHeader({
-  profile,
-  count,
+function PublicationsSection({
+  publications,
 }: {
-  readonly profile: HubProfile;
-  readonly count: number;
+  readonly publications: ComponentProps<typeof PublicationList>["publications"];
 }) {
+  const heading = useId();
   return (
-    <div className="web-hub-profile">
-      <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
-      <div>
-        <h1>{profile.displayName}</h1>
-        <p className="web-hub-muted">
-          <span>{`@${profile.handle}`}</span>
-          <span aria-hidden="true">·</span>
-          <span>{MESSAGES.hub.publications(count)}</span>
-        </p>
-      </div>
-    </div>
+    <section className="web-feed-publications" aria-labelledby={heading}>
+      <h2 id={heading}>{MESSAGES.feed.card.publications}</h2>
+      <PublicationList publications={publications} empty={MESSAGES.hub.noPublications} />
+    </section>
   );
 }
 

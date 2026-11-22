@@ -5,58 +5,91 @@ import { CardTextArea } from "./CardTextArea.tsx";
 import { PdfInput } from "./PdfInput.tsx";
 import { hasSources, type RegistrationSources } from "./extract-card.ts";
 
+const TEXT = MESSAGES.feed.wizard.cv;
+
 type RegistrationFieldsProps = {
   readonly isGenerating: boolean;
-  readonly isSaving: boolean;
   readonly onGenerate: (sources: RegistrationSources) => void;
 };
 
-/** "Generar desde mi CV": the sources the registration agent reads (ADR 0022 §6). */
-export function RegistrationFields({
-  isGenerating,
-  isSaving,
-  onGenerate,
-}: RegistrationFieldsProps) {
+/** "Sube tu CV": the sources the registration agent reads (ADR 0022 §6). */
+export function RegistrationFields({ isGenerating, onGenerate }: RegistrationFieldsProps) {
   const [sources, setSources] = useState<RegistrationSources>({
     pdf: undefined,
     text: "",
     githubLogin: "",
   });
+  const update = (patch: Partial<RegistrationSources>) => {
+    setSources((current) => ({ ...current, ...patch }));
+  };
   return (
-    <fieldset className="web-feed-registration">
-      <legend>{MESSAGES.feed.registration.title}</legend>
-      <Field label={MESSAGES.feed.registration.pdf}>
+    <div className="web-feed-step-body">
+      <Field label={TEXT.pdf}>
         <PdfInput
+          hint={TEXT.pdfHint}
           onChange={(pdf) => {
-            setSources({ ...sources, pdf });
+            update({ pdf });
           }}
         />
       </Field>
       <CardTextArea
-        label={MESSAGES.feed.registration.text}
+        label={TEXT.text}
         value={sources.text}
         onChange={(text) => {
-          setSources({ ...sources, text });
+          update({ text });
         }}
       />
-      <Field label={MESSAGES.feed.registration.github}>
-        <Input
-          value={sources.githubLogin}
-          onChange={(githubLogin) => {
-            setSources({ ...sources, githubLogin });
-          }}
-        />
-      </Field>
-      <Button
-        icon="sparkles"
-        loading={isGenerating}
-        disabled={isSaving || !hasSources(sources)}
-        onClick={() => {
-          onGenerate(sources);
+      <GithubField
+        value={sources.githubLogin}
+        onChange={(githubLogin) => {
+          update({ githubLogin });
         }}
-      >
-        {MESSAGES.feed.registration.generate}
-      </Button>
-    </fieldset>
+      />
+      {isGenerating && <p className="web-feed-reading">{TEXT.reading}</p>}
+      <div className="web-feed-step-cta">
+        <Button
+          variant="primary"
+          size="lg"
+          icon="sparkles"
+          loading={isGenerating}
+          disabled={!hasSources(sources)}
+          onClick={() => {
+            onGenerate(sources);
+          }}
+        >
+          {TEXT.build}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Folded by default: most people don't program, so GitHub is an opt-in extra. */
+function GithubField({
+  value,
+  onChange,
+}: {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}) {
+  const [isOpen, setOpen] = useState(false);
+  if (!isOpen)
+    return (
+      <div>
+        <Button
+          variant="ghost"
+          icon="code"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          {TEXT.showGithub}
+        </Button>
+      </div>
+    );
+  return (
+    <Field label={TEXT.github}>
+      <Input value={value} onChange={onChange} />
+    </Field>
   );
 }
