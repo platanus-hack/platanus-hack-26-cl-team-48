@@ -79,6 +79,34 @@ export const MESSAGES = {
     use: "Usar",
     flowHint: "Se abre como un flujo nuevo en tu editor; el original no cambia.",
     forYou: "Para ti",
+    landing: {
+      title:
+        "Convierte el conocimiento de tu oficio en herramientas que otros pueden probar, entender y mejorar.",
+      subtitle:
+        "Para expertos que no programan. Describe un problema con tus palabras y tu agente te ayuda a encontrar una solución que ya le funcionó a alguien, adaptarla a tu contexto o construirla si todavía hace falta.",
+      searchLabel: "Describe tu problema",
+      searchPlaceholder: "Describe tu problema con tus palabras…",
+      threadLabel: "Cómo se trabaja",
+      thread: [
+        {
+          title: "Encuentra lo que ya funcionó",
+          text: "Soluciones, piezas y personas con experiencia en tu problema.",
+        },
+        {
+          title: "Adáptalo a tu contexto",
+          text: "Tu agente ajusta las reglas contigo y las pruebas con un ejemplo.",
+        },
+        {
+          title: "Recibe las mejoras",
+          text: "Cuando alguien mejora la herramienta, decides qué incorporar.",
+        },
+      ],
+      closing: "Un espacio de colaboración real entre expertos.",
+    },
+    sections: "Secciones del hub",
+    tabs: { "for-you": "Para ti", flows: "Mis flujos", people: "Personas" },
+    openEditor: "Abrir editor",
+    recent: "Recientes",
     nodeHint:
       "Se agrega a «Mis nodos» y lo usas como cualquier otro nodo, también como copia editable.",
   },
