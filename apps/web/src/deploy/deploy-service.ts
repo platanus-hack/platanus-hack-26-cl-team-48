@@ -17,6 +17,8 @@ export const DEPLOY_ERROR_CODES = [
   "DEPLOYMENT_NOT_FOUND",
   "PROVIDER_ERROR",
   "UNAVAILABLE",
+  "SERVICE_KIND_CHANGED",
+  "RATE_LIMITED",
 ] as const;
 
 export type DeployErrorCode = (typeof DEPLOY_ERROR_CODES)[number] | "NOT_CONFIGURED";
@@ -56,15 +58,17 @@ export type Deployment = {
 
 export type DeployRequest = { readonly flowId: string; readonly nodeId: string };
 
-export type ApplyRequest = DeployRequest & {
-  readonly planHash: string;
+export type RedeployRequest = DeployRequest & {
   readonly secrets: Readonly<Record<string, string>>;
 };
+
+export type ApplyRequest = RedeployRequest & { readonly planHash: string };
 
 /** The hosting service of ADR 0027 (apps/deploy), as the Despliegue tab uses it. */
 export interface DeployService {
   plan(request: DeployRequest): Promise<DeployResult<DeployPlan>>;
   apply(request: ApplyRequest): Promise<DeployResult<Deployment>>;
+  redeploy(request: RedeployRequest): Promise<DeployResult<Deployment>>;
   list(flowId: string): Promise<DeployResult<readonly Deployment[]>>;
   remove(deploymentId: string): Promise<DeployResult<void>>;
 }

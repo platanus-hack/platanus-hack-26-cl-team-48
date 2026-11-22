@@ -7,6 +7,7 @@ import {
   type PlanChange,
 } from "./deploy-service.ts";
 
+const HTTPS = "https:";
 const PLAN_ACTIONS: ReadonlyArray<DeployPlan["action"]> = ["create", "update", "unchanged"];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -59,7 +60,17 @@ export function parseDeployment(value: unknown): Deployment | undefined {
     !(url === undefined || isString(url))
   )
     return undefined;
-  return { id, flowId, nodeId, status, updatedAt, ...(isString(url) ? { url } : {}) };
+  return { id, flowId, nodeId, status, updatedAt, ...(isHttpsUrl(url) ? { url } : {}) };
+}
+
+/** Only https links are drawn: another scheme (javascript:, http:) is dropped as if there were none. */
+export function isHttpsUrl(value: unknown): value is string {
+  if (!isString(value)) return false;
+  try {
+    return new URL(value).protocol === HTTPS;
+  } catch {
+    return false;
+  }
 }
 
 function parseChange(value: unknown): PlanChange | undefined {

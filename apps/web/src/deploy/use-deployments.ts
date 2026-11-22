@@ -7,6 +7,7 @@ import { withDeployment, withoutDeployment } from "./deploy-view.ts";
 /** The provider refreshes a service's status on its own; the tab follows it while open. */
 const REFRESH_INTERVAL_MS = 5000;
 
+type Secrets = Readonly<Record<string, string>>;
 type Target = { readonly flowId: string; readonly nodeId: string };
 
 export type DeploymentsState = {
@@ -15,7 +16,8 @@ export type DeploymentsState = {
   readonly isBusy: boolean;
   readonly failure: DeployErrorCode | undefined;
   readonly refresh: () => void;
-  readonly deploy: (secrets: Readonly<Record<string, string>>) => void;
+  readonly deploy: (secrets: Secrets) => void;
+  readonly redeploy: (secrets: Secrets) => void;
   readonly remove: (deploymentId: string) => void;
 };
 
@@ -27,32 +29,56 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
   const [plan, setPlan] = useState<DeploymentsState["plan"]>();
   const [isBusy, setBusy] = useState(false);
   const [failure, setFailure] = useState<DeployErrorCode>();
+  // Each action bumps it, so a list sent before the action cannot overwrite what the action did.
+  const listGeneration = useRef(0);
 
-  const refresh = useCallback(() => {
-    void service.list(flowId).then(whileMounted(isMounted, setDeployments));
+  const refreshStatus = useCallback(() => {
+    const generation = listGeneration.current;
+    void service.list(flowId).then(
+      whileMounted(isMounted, (listed) => {
+        if (generation === listGeneration.current) setDeployments(listed);
+      }),
+    );
   }, [service, flowId, isMounted]);
   const requestPlan = useCallback(() => {
     setPlan(undefined);
     void service.plan({ flowId, nodeId }).then(whileMounted(isMounted, setPlan));
   }, [service, flowId, nodeId, isMounted]);
 
+  const refresh = useCallback(() => {
+    refreshStatus();
+    requestPlan();
+  }, [refreshStatus, requestPlan]);
+
   useEffect(() => {
     refresh();
-    requestPlan();
-    const timer = setInterval(refresh, REFRESH_INTERVAL_MS);
+    const timer = setInterval(refreshStatus, REFRESH_INTERVAL_MS);
     return () => {
       clearInterval(timer);
     };
-  }, [refresh, requestPlan]);
+  }, [refresh, refreshStatus]);
 
   const runAction = async <T>(action: Promise<DeployResult<T>>, onDone: (value: T) => void) => {
     setBusy(true);
     setFailure(undefined);
+    listGeneration.current += 1;
     const result = await action;
     if (!isMounted.current) return;
+    listGeneration.current += 1;
     setBusy(false);
     if (result.ok) onDone(result.value);
-    else setFailure(result.error.code);
+    else failWith(result.error.code);
+  };
+
+  const failWith = (code: DeployErrorCode) => {
+    setFailure(code);
+    if (code === "PLAN_CHANGED") requestPlan();
+  };
+
+  const showDeployment = (deployment: Deployment) => {
+    setDeployments((current) =>
+      ok(withDeployment(current?.ok === true ? current.value : [], deployment)),
+    );
   };
 
   return {
@@ -66,12 +92,13 @@ export function useDeployments({ flowId, nodeId }: Target): DeploymentsState {
       void runAction(
         service.apply({ flowId, nodeId, planHash: plan.value.hash, secrets }),
         (created) => {
-          setDeployments((current) =>
-            ok(withDeployment(current?.ok === true ? current.value : [], created)),
-          );
+          showDeployment(created);
           requestPlan();
         },
       );
+    },
+    redeploy: (secrets) => {
+      void runAction(service.redeploy({ flowId, nodeId, secrets }), showDeployment);
     },
     remove: (deploymentId) => {
       void runAction(service.remove(deploymentId), () => {
