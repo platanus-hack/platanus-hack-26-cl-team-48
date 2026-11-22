@@ -1,8 +1,9 @@
 import { useId } from "react";
+import { Field, Select } from "@nodomics/ui";
 import { MESSAGES } from "../messages.ts";
 import { ALL_KINDS, type HubView, type KindFilter } from "./hub-filters.ts";
 
-const KIND_OPTIONS = ([ALL_KINDS, "flow", "node"] as const).map((value) => ({
+const KIND_OPTIONS = ([ALL_KINDS, "app", "flow", "node"] as const).map((value) => ({
   value,
   label: MESSAGES.hub.kinds[value],
 }));
@@ -21,10 +22,33 @@ type HubFiltersProps = {
   readonly onView: (view: HubView) => void;
   readonly onKind: (kind: KindFilter) => void;
   readonly onTag: (tag: string) => void;
+  readonly onCategorySelect?: (category: string) => void;
 };
 
 /** The hub's sidebar: what to explore, which kind and which tags. */
-export function HubFilters({ filters, views, tags, onView, onKind, onTag }: HubFiltersProps) {
+export function HubFilters({
+  filters,
+  views,
+  tags,
+  onView,
+  onKind,
+  onTag,
+  onCategorySelect,
+}: HubFiltersProps) {
+  const selectedCategory = [...filters.pressedTags][0] ?? "";
+  const handleCategory = (category: string) => {
+    if (onCategorySelect !== undefined) {
+      onCategorySelect(category);
+    } else {
+      if (category === "") {
+        for (const t of filters.pressedTags) onTag(t);
+      } else {
+        for (const t of filters.pressedTags) if (t !== category) onTag(t);
+        if (!filters.pressedTags.has(category)) onTag(category);
+      }
+    }
+  };
+
   return (
     <aside className="web-hub-filters" aria-label={MESSAGES.hub.filters}>
       <RadioList
@@ -39,6 +63,13 @@ export function HubFilters({ filters, views, tags, onView, onKind, onTag }: HubF
         value={filters.kind}
         onChange={onKind}
       />
+      {tags.length > 0 && (
+        <CategoryDropdown
+          tags={tags}
+          selected={selectedCategory}
+          onSelect={handleCategory}
+        />
+      )}
       {tags.length > 0 && <TagToggles tags={tags} pressed={filters.pressedTags} onTag={onTag} />}
     </aside>
   );
@@ -72,6 +103,34 @@ function RadioList<T extends string>(props: {
       ))}
     </fieldset>
   );
+}
+
+function CategoryDropdown(props: {
+  readonly tags: ReadonlyArray<string>;
+  readonly selected: string;
+  readonly onSelect: (category: string) => void;
+}) {
+  const options = [
+    { value: "", label: MESSAGES.hub.allCategories },
+    ...props.tags.map((tag) => ({
+      value: tag,
+      label: formatCategory(tag),
+    })),
+  ];
+  return (
+    <div className="web-hub-filter web-hub-category-select">
+      <Field label={MESSAGES.hub.categories}>
+        <Select options={options} value={props.selected} onChange={props.onSelect} />
+      </Field>
+    </div>
+  );
+}
+
+function formatCategory(tag: string): string {
+  return tag
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function TagToggles(props: {

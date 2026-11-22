@@ -6,4 +6,5 @@ export * from "./profile-change.ts";
 export * from "./session-token.ts";
 export * from "./snapshot.ts";
 export * from "./supabase-hub.ts";
+export * from "./testing/demo-seeds.ts";
 export * from "./versions.ts";

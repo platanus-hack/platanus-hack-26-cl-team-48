@@ -22,6 +22,7 @@ type StoredPublication = Omit<PublicationSummary, "owner"> & {
 export type MemoryHubOptions = {
   readonly profiles: ReadonlyArray<HubProfile>;
   readonly now: () => string;
+  readonly initialDrafts?: ReadonlyArray<{ readonly handle: string; readonly draft: PublicationDraft }>;
 };
 
 /**
@@ -31,11 +32,20 @@ export type MemoryHubOptions = {
 export function createMemoryHub({
   profiles,
   now,
+  initialDrafts,
 }: MemoryHubOptions): Hub & FlowStore & SessionToken {
   const state = {
     current: undefined as HubProfile | undefined,
     publications: [] as StoredPublication[],
   };
+  if (initialDrafts !== undefined) {
+    for (const { handle, draft } of initialDrafts) {
+      const owner = profiles.find((profile) => profile.handle === handle);
+      if (owner !== undefined) {
+        state.publications.push(withVersion(undefined, { draft, ownerId: owner.id, createdAt: now() }));
+      }
+    }
+  }
   const listeners = new Set<(profile: HubProfile | undefined) => void>();
   const setCurrent = (profile: HubProfile | undefined) => {
     state.current = profile;

@@ -10,7 +10,12 @@ export const FEED_PATHS = {
 } as const;
 
 export const FeedHitSchema = Type.Object({
-  kind: Type.Union([Type.Literal("profile"), Type.Literal("node"), Type.Literal("flow")]),
+  kind: Type.Union([
+    Type.Literal("profile"),
+    Type.Literal("node"),
+    Type.Literal("flow"),
+    Type.Literal("app"),
+  ]),
   /** The handle for a profile, the component id otherwise. */
   id: Type.String(),
   title: Type.String(),

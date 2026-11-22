@@ -1,6 +1,8 @@
 import {
   createMemoryHub,
   createSupabaseHub,
+  DEMO_INITIAL_DRAFTS,
+  DEMO_PROFILES,
   type FlowStore,
   type Hub,
   type HubProfile,
@@ -23,7 +25,11 @@ export function createAppHub(environment: HubEnvironment): Hub & FlowStore & Ses
   const url = environment.VITE_SUPABASE_URL;
   const publishableKey = environment.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (url === undefined || url === "" || publishableKey === undefined || publishableKey === "")
-    return createMemoryHub({ profiles: [LOCAL_PROFILE], now: () => new Date().toISOString() });
+    return createMemoryHub({
+      profiles: [LOCAL_PROFILE, ...DEMO_PROFILES],
+      now: () => new Date().toISOString(),
+      initialDrafts: DEMO_INITIAL_DRAFTS,
+    });
   return createSupabaseHub({
     url,
     publishableKey,

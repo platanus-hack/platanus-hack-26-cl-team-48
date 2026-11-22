@@ -62,6 +62,9 @@ export function HubPage({ text, onOpenEditor }: HubPageProps) {
         onTag={(tag) => {
           change((current) => ({ pressedTags: toggled(current.pressedTags, tag) }));
         }}
+        onCategorySelect={(category) => {
+          change(() => ({ pressedTags: category === "" ? new Set() : new Set([category]) }));
+        }}
       />
       <main className="web-hub-page">
         <h1 className="web-visually-hidden">{MESSAGES.hub.title}</h1>

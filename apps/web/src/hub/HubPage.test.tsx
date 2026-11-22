@@ -150,19 +150,25 @@ describe("HubPage", () => {
     }).toEqual({ searchbox: null, labelled: null });
   });
 
-  it("offers the kinds Todo, Flujos and Nodos as chips", async () => {
+  it("offers the kinds Todo, Apps, Flujos and Nodos as chips", async () => {
     renderHubPage(await createSeededHub());
 
     const radios = within(kindChips()).getAllByRole("radio");
 
-    expect(radios).toEqual([kindChip("Todo"), kindChip("Flujos"), kindChip("Nodos")]);
+    expect(radios).toEqual([
+      kindChip("Todo"),
+      kindChip("Apps"),
+      kindChip("Flujos"),
+      kindChip("Nodos"),
+    ]);
   });
 
   it("starts with Todo chosen", async () => {
     renderHubPage(await createSeededHub());
 
-    expect(["Todo", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
+    expect(["Todo", "Apps", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
       true,
+      false,
       false,
       false,
     ]);
@@ -174,7 +180,8 @@ describe("HubPage", () => {
 
     await user.click(kindChip("Nodos"));
 
-    expect(["Todo", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
+    expect(["Todo", "Apps", "Flujos", "Nodos"].map((name) => isChecked(kindChip(name)))).toEqual([
+      false,
       false,
       false,
       true,
@@ -251,6 +258,45 @@ describe("HubPage", () => {
       expect(screen.queryByRole("link", { name: "Limpiar texto" })).toBeNull();
     });
     expect(screen.getAllByRole("article")).toHaveLength(2);
+  });
+
+  it("shows only app publications when Apps is chosen", async () => {
+    const user = userEvent.setup();
+    const hub = await createSeededHub();
+    await publishAs(hub, ANA.handle, [
+      draftOf({
+        slug: "mi-app",
+        kind: "app",
+        title: "Mi Aplicación Completa",
+        description: "Dashboard E2E",
+        tags: ["app"],
+      }),
+    ]);
+    renderHubPage(hub);
+    await cardTitled("Mi Aplicación Completa");
+
+    await user.click(kindChip("Apps"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Mi Aplicación Completa" })).toBeTruthy();
+      expect(screen.queryByRole("link", { name: "Limpiar texto" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Clima diario" })).toBeNull();
+    });
+  });
+
+  it("offers a category dropdown selector and filters by category", async () => {
+    const user = userEvent.setup();
+    renderHubPage(await createTaggedHub());
+    await cardTitled("Clima diario");
+
+    const categorySelect = screen.getByRole("combobox", { name: "Categorías" });
+    expect(categorySelect).toBeTruthy();
+
+    await user.selectOptions(categorySelect, "mensual");
+
+    await waitFor(() => {
+      expect(cardTitles()).toEqual(["Clima diario", "Ventas por región"]);
+    });
   });
 
   it("says nothing matches when the search finds no publication", async () => {

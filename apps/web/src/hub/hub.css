@@ -328,6 +328,10 @@
   color: var(--type-chart);
 }
 
+.web-kind-tag[data-kind="app"] {
+  color: var(--type-table);
+}
+
 .web-kind-art {
   width: 100%;
   height: 100%;
@@ -349,6 +353,11 @@
 [data-kind="node"] .web-kind-art .web-kind-art-accent {
   fill: var(--surface-300);
   stroke: var(--type-chart);
+}
+
+[data-kind="app"] .web-kind-art .web-kind-art-accent {
+  fill: var(--surface-300);
+  stroke: var(--type-table);
 }
 
 .web-hub-empty {
