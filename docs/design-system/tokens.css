@@ -1,0 +1,4 @@
+/* The preview pages read the real tokens: packages/ui is the source of truth, nothing is copied here. */
+@import "../../packages/ui/src/tokens.css";
+@import "../../packages/ui/src/fonts.css";
+@import "../../packages/ui/src/components.css";

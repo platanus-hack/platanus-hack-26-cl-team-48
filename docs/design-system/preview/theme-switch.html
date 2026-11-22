@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Selector de tema</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="preview.css" />
+    <script src="theme-toggle.js" defer></script>
+  </head>
+  <body>
+    <header class="bar">
+      <a href="index.html">Sistema de diseño</a>
+      <button type="button" class="toggle" data-theme-toggle>Claro / Oscuro</button>
+    </header>
+    <main>
+      <h1>Selector de tema</h1>
+      <p class="lead">
+        Dos opciones, con ícono y etiqueta. En pantallas angostas queda solo el ícono.
+      </p>
+      <div class="theme-switch" role="group" aria-label="Tema">
+        <button type="button" data-set-theme="light" aria-pressed="true">
+          <svg
+            class="icon"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            style="width: var(--icon-sm); height: var(--icon-sm)"
+          >
+            <path
+              d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
+              tag="path"
+              d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0"
+            />
+          </svg>
+          Claro</button
+        ><button type="button" data-set-theme="dark" aria-pressed="false">
+          <svg
+            class="icon"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            style="width: var(--icon-sm); height: var(--icon-sm)"
+          >
+            <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+            <path d="M4 3h16a2 2 0 0 1 2 2v12H2V5a2 2 0 0 1 2-2Z" />
+            <path d="M8 21h8m-4-4v4" />
+          </svg>
+          Oscuro
+        </button>
+      </div>
+      <p class="note">
+        La opción presionada es el tema activo. En la app, la elección se guarda y se comparte con
+        el editor.
+      </p>
+    </main>
+  </body>
+</html>
