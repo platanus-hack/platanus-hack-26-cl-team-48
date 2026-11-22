@@ -108,10 +108,8 @@ function openCopy(flow: Flow) {
   window.location.assign(`${pathOf({ page: "workspace" })}${encodeSharedFlow(flow)}`);
 }
 
-// The hub port does not expose the Supabase access token yet, so the agent service sees no session.
-const getNoAccessTokenYet = () => Promise.resolve(undefined);
 const feed = createAppFeed(import.meta.env, {
-  getAccessToken: getNoAccessTokenYet,
+  getAccessToken: () => hub.accessToken(),
   currentHandle: async () => (await hub.currentProfile())?.handle,
 });
 

@@ -4,6 +4,7 @@ import {
   type FlowStore,
   type Hub,
   type HubProfile,
+  type SessionToken,
 } from "@nodomics/hub";
 
 type HubEnvironment = {
@@ -18,7 +19,7 @@ const LOCAL_PROFILE: HubProfile = { id: "local", handle: "local", displayName: "
  * The real hub when Supabase is configured (ADR 0018); otherwise an in-memory hub with one local account, so the
  * editor still runs for anyone who clones the repository without the hub's keys.
  */
-export function createAppHub(environment: HubEnvironment): Hub & FlowStore {
+export function createAppHub(environment: HubEnvironment): Hub & FlowStore & SessionToken {
   const url = environment.VITE_SUPABASE_URL;
   const publishableKey = environment.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (url === undefined || url === "" || publishableKey === undefined || publishableKey === "")

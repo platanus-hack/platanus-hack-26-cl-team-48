@@ -14,6 +14,7 @@ import { toProfile, toSummaries, toVersion, toVersionSummaries } from "./hub-row
 import { profileChangeOf } from "./profile-change.ts";
 import { parseSnapshot, type Snapshot } from "./snapshot.ts";
 import type { FlowStore } from "./flow-store.ts";
+import type { SessionToken } from "./session-token.ts";
 import { createHubClient, fromPostgrest, type HubClient } from "./supabase-client.ts";
 import { createSupabaseFlowStore } from "./supabase-flow-store.ts";
 import { isNewerVersion } from "./versions.ts";
@@ -34,14 +35,18 @@ export type SupabaseHubOptions = {
 };
 
 /** The hub on Supabase: Auth, Postgres with row level security and Storage (ADR 0018). */
-export const createSupabaseHub = (options: SupabaseHubOptions): Hub & FlowStore =>
+export const createSupabaseHub = (options: SupabaseHubOptions): Hub & FlowStore & SessionToken =>
   createHubOnClient(createHubClient(options.url, options.publishableKey), options.redirectTo);
 
 /** The same hub on a client created elsewhere, e.g. one already signed in by a script. */
-export function createHubOnClient(client: HubClient, redirectTo: () => string): Hub & FlowStore {
+export function createHubOnClient(
+  client: HubClient,
+  redirectTo: () => string,
+): Hub & FlowStore & SessionToken {
   return {
     ...createSupabaseFlowStore(client),
     currentProfile: () => currentProfile(client),
+    accessToken: async () => (await client.auth.getSession()).data.session?.access_token,
     onProfileChange: (listener) => {
       const { data } = client.auth.onAuthStateChange((_event, session) => {
         // Supabase forbids awaiting its own calls inside this callback, hence the deferral.
