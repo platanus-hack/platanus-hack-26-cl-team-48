@@ -8,6 +8,8 @@ import { FILTER, flowOf, nodeOf, SAMPLE } from "../canvas/canvas-fixtures.ts";
 import type { EngineEntry } from "../engine/engine-entry.ts";
 import { HubContext } from "../hub/hub-context.ts";
 import { ANA, createTestHub } from "../hub/hub-pages-fixtures.tsx";
+import { RouteLinkTargetContext, type RouteLinkTarget } from "../routing/route-link-target.ts";
+import { pathOf } from "../routing/routes.ts";
 import { startFakeEngine } from "../testing/fake-engine.ts";
 import { recordDownloads } from "../testing/record-downloads.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
@@ -31,17 +33,24 @@ const IMPORTED_FLOW: Flow = { ...flowOf([nodeOf("imported", FILTER.id)]), name: 
 type Setup = {
   readonly hub?: Hub;
   readonly stores?: AppStores;
+  readonly linkTarget?: RouteLinkTarget;
 };
 
-function renderToolbar({ hub = createTestHub(), stores = createAppStores() }: Setup = {}) {
+function renderToolbar({
+  hub = createTestHub(),
+  stores = createAppStores(),
+  linkTarget = "same-tab",
+}: Setup = {}) {
   const picked: EngineEntry[] = [];
   const rendered = renderWithStores(
     <HubContext value={hub}>
-      <Toolbar
-        engines={ENGINES}
-        engine={ENGINES[0] ?? entry("none", "")}
-        onEngineChange={(engine) => picked.push(engine)}
-      />
+      <RouteLinkTargetContext value={linkTarget}>
+        <Toolbar
+          engines={ENGINES}
+          engine={ENGINES[0] ?? entry("none", "")}
+          onEngineChange={(engine) => picked.push(engine)}
+        />
+      </RouteLinkTargetContext>
     </HubContext>,
     stores,
   );
@@ -96,6 +105,21 @@ describe("Toolbar layout", () => {
     renderToolbar();
 
     expect(within(header()).getByRole("heading", { level: 1, name: "Nodomics" })).toBeTruthy();
+  });
+
+  it("opens the Hub home in a new tab when the Nodomics link is clicked from the editor", async () => {
+    const editorPath = pathOf({ page: "workspace" });
+    window.history.replaceState(null, "", editorPath);
+    renderToolbar({ linkTarget: "new-tab" });
+    const link = within(header()).getByRole("link", { name: /Nodomics/i });
+
+    await userEvent.click(link);
+
+    expect({
+      href: link.getAttribute("href"),
+      target: link.getAttribute("target"),
+      path: window.location.pathname,
+    }).toEqual({ href: pathOf({ page: "hub" }), target: "_blank", path: editorPath });
   });
 
   it("orders its controls from the flow to the account", async () => {

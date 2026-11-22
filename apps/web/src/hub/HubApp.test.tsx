@@ -200,6 +200,24 @@ describe("HubApp header", () => {
   });
 });
 
+describe("HubApp home link", () => {
+  it.each<{ route: HubRoute; heading: string }>([
+    { route: { page: "profile", handle: "ana" }, heading: "Ana Pérez" },
+    { route: { page: "publication", handle: "ana", slug: "ventas" }, heading: "Ventas por región" },
+  ])(
+    "opens the Hub home when the Nodomics link is clicked from $route.page",
+    async ({ route, heading }) => {
+      await renderHubApp(route);
+      await screen.findByRole("heading", { level: 1, name: heading });
+
+      await userEvent.click(within(hubHeader()).getByRole("link", { name: /Nodomics/i }));
+
+      expect(await screen.findByRole("heading", { level: 1, name: "Hub" })).toBeTruthy();
+      expect(window.location.pathname).toBe(pathOf({ page: "hub" }));
+    },
+  );
+});
+
 describe("HubApp profile link", () => {
   async function openProfileLink() {
     window.history.replaceState(null, "", pathOf({ page: "hub" }));

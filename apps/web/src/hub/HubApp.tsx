@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Input } from "@nodomics/ui";
 import { useAppStores } from "../app-context.ts";
 import { MESSAGES } from "../messages.ts";
+import { RouteLink } from "../routing/RouteLink.tsx";
 import type { EditorOpening, Route } from "../routing/routes.ts";
 import { navigate, useRoute } from "../routing/use-route.ts";
 import { AccountButton } from "./AccountButton.tsx";
@@ -52,11 +53,11 @@ function HubBar({
 }) {
   return (
     <header className="web-hub-bar">
-      <p className="web-brand">
+      <RouteLink className="web-brand" route={{ page: "hub" }}>
         <span className="web-brand-mark" aria-hidden="true" />
         {MESSAGES.app.title}
         <span className="web-hub-bar-section">{MESSAGES.hub.title}</span>
-      </p>
+      </RouteLink>
       <search className="web-hub-bar-search">
         <Input
           type="search"

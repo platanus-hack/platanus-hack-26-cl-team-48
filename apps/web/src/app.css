@@ -231,6 +231,12 @@ body {
   margin: 0;
   font: var(--text-title-sm);
   white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.web-toolbar-title {
+  margin: 0;
 }
 
 .web-brand-mark {
