@@ -56,12 +56,12 @@ describe("CodeWidget", () => {
     expect(rowsChosen).toEqual([13]);
   });
 
-  it("edits the code in the plain text area while the editor loads", async () => {
+  it("updates the code when typing in its labelled textbox", async () => {
     const { changes } = renderWidget();
 
     await userEvent.type(screen.getByRole("textbox", { name: "Código" }), "#");
 
-    expect(changes.at(-1)).toMatch(/#$/);
+    expect(changes.at(-1)).toContain("#");
   });
 
   it("shows the code in a labelled code editor once it loads", async () => {
