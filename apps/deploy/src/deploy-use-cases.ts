@@ -4,6 +4,7 @@ import type { FlowReader } from "./flow-reader.ts";
 import type { HostingProvider, Secrets } from "./hosting-provider.ts";
 import { checkQuota } from "./limits.ts";
 import { serviceNameOf } from "./service-name.ts";
+import { canonicalJson } from "./spec/canonical-json.ts";
 import { planDeployment } from "./spec/plan.ts";
 import { failure } from "./spec/node-params.ts";
 import { serviceSpecOf } from "./spec/service-spec.ts";
@@ -194,7 +195,8 @@ async function listDeployments(
 /**
  * Best effort: when the provider or the store fails, the last known status is kept. The status is
  * written in turn with the actions, and only if the record did not change since it was read: a
- * status observed before an apply, a redeploy or a remove must not undo it.
+ * status observed before an apply, a redeploy or a remove must not undo it. Then the current
+ * record is returned instead.
  */
 async function refreshStatus(
   { deps, oneAtATime }: Serialized,
@@ -204,15 +206,13 @@ async function refreshStatus(
   if (!status.ok || status.value === record.status) return record;
   const refreshed = { ...record, status: status.value, updatedAt: deps.now().toISOString() };
   return oneAtATime(async () => {
-    if (!(await isUnchangedSince(deps, record))) return record;
+    const current = await deps.deployments.get(record.ownerId, record.id);
+    if (!current.ok || current.value === undefined) return record;
+    // The whole record is compared: two writes in the same millisecond share their updatedAt.
+    if (canonicalJson(current.value) !== canonicalJson(record)) return current.value;
     await deps.deployments.updateStatus(refreshed.id, refreshed.status, refreshed.updatedAt);
     return refreshed;
   });
-}
-
-async function isUnchangedSince(deps: DeployDeps, record: DeploymentRecord): Promise<boolean> {
-  const current = await deps.deployments.get(record.ownerId, record.id);
-  return current.ok && current.value?.updatedAt === record.updatedAt;
 }
 
 async function removeDeployment(
