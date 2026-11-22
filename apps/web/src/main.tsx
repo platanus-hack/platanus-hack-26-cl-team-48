@@ -92,7 +92,9 @@ async function startEditorFlow() {
   });
   followFlowSession({ hub, stores, saving, initialProfileId: profile?.id });
   keepUnsavedFlowOnLeave();
-  if (pending !== undefined && profile !== undefined) await saving.saveCurrent();
+  // A copy opened from the hub is the person's own flow from the start, so the agent can work on it.
+  const isGivenFlow = pending !== undefined || shared?.ok === true;
+  if (isGivenFlow && profile !== undefined) await saving.saveCurrent();
 }
 
 function keepUnsavedFlowOnLeave() {
