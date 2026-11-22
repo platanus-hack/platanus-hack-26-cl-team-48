@@ -11,6 +11,7 @@ import type { EngineSession } from "../engine/engine-session.ts";
 import { createEngineState } from "../engine/engine-state.ts";
 import { HubContext } from "../hub/hub-context.ts";
 import { ANA, createTestHub } from "../hub/hub-pages-fixtures.tsx";
+import { startFlowSaving } from "../library/flow-saving.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
 import { ShareMenu } from "./ShareMenu.tsx";
 
@@ -329,5 +330,86 @@ describe("ShareMenu Publicar en el hub…", () => {
     await publishFrom(dialog);
 
     expect((await latestVersionOf(hub, "ventas")).summary.hasState).toBe(true);
+  });
+});
+
+describe("ShareMenu publication link", () => {
+  async function publishSavedFlow() {
+    const { hub, stores } = await setup({ isSignedIn: true, savedName: "Ventas" });
+    await publishFrom(await openPublishDialog());
+    const { detail } = await latestVersionOf(hub, "ventas");
+    return { stores, publicationId: detail.id };
+  }
+
+  const savedPublication = async (stores: AppStores) =>
+    (await stores.savedFlowStore.getState().library.readFlow("one")).value?.published;
+
+  async function autosaveRenamed(stores: AppStores, name: string) {
+    const saving = startFlowSaving({
+      stores,
+      timers: { set: () => 0, clear: () => undefined },
+      createId: () => "flow_other",
+      now: () => 2,
+    });
+    act(() => {
+      stores.flowStore.getState().dispatch({ type: "flow.rename", name });
+    });
+    await saving.flush();
+    saving.close();
+  }
+
+  it("links the open saved flow to the new publication", async () => {
+    const { stores, publicationId } = await publishSavedFlow();
+
+    await waitFor(async () => {
+      expect(await savedPublication(stores)).toMatchObject({
+        publicationId,
+        handle: ANA.handle,
+        slug: "ventas",
+        version: "0.1.0",
+        hasChanges: false,
+      });
+    });
+  });
+
+  it("records a fingerprint of the published flow", async () => {
+    const { stores } = await publishSavedFlow();
+
+    await waitFor(async () => {
+      expect((await savedPublication(stores))?.fingerprint).toEqual(expect.any(String));
+    });
+  });
+
+  it("shows the publication link in the listed saved flows", async () => {
+    const { stores, publicationId } = await publishSavedFlow();
+
+    await waitFor(() => {
+      expect(
+        stores.savedFlowStore.getState().flows.map(({ published }) => published?.publicationId),
+      ).toEqual([publicationId]);
+    });
+  });
+
+  it("marks the published flow as changed once an edit is autosaved", async () => {
+    const { stores } = await publishSavedFlow();
+    await waitFor(async () => {
+      expect(await savedPublication(stores)).toBeDefined();
+    });
+
+    await autosaveRenamed(stores, "Editado");
+
+    expect((await savedPublication(stores))?.hasChanges).toBe(true);
+  });
+
+  it("marks the published flow as unchanged once the edit is undone and autosaved", async () => {
+    const { stores } = await publishSavedFlow();
+    await waitFor(async () => {
+      expect(await savedPublication(stores)).toBeDefined();
+    });
+    await autosaveRenamed(stores, "Editado");
+
+    await autosaveRenamed(stores, "Ventas");
+
+    expect((await savedPublication(stores))?.hasChanges).toBe(false);
   });
 });

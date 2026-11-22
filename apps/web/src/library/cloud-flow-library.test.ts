@@ -9,7 +9,7 @@ import {
   signedInHub,
 } from "./cloud-flow-fixtures.ts";
 import { createCloudFlowLibrary } from "./cloud-flow-library.ts";
-import type { FlowLibrary } from "./flow-library.ts";
+import type { FlowLibrary, SavedFlow } from "./flow-library.ts";
 import { createMemoryFlowLibrary } from "./memory-flow-library.ts";
 
 const cloudLibrary = (flows: FlowStore, local: FlowLibrary = createMemoryFlowLibrary()) =>
@@ -23,6 +23,15 @@ const rowOf = (document: unknown, overrides: Partial<StoredFlow> = {}): StoredFl
   updatedAt: "2026-11-21T10:00:00Z",
   ...overrides,
 });
+
+const PUBLISHED: NonNullable<SavedFlow["published"]> = {
+  publicationId: "pub_1",
+  handle: "ana",
+  slug: "ventas",
+  version: "0.1.0",
+  fingerprint: "abc",
+  hasChanges: true,
+};
 
 /** A flow store that lists and reads back exactly the given rows. */
 function flowsWithRows(rows: ReadonlyArray<StoredFlow>): FlowStore {
@@ -62,19 +71,24 @@ describe("createCloudFlowLibrary listFlows", () => {
     expect(listed).toEqual({ value: [], issue: "unavailable" });
   });
 
-  it("lists the account's saved flows with their visibility", async () => {
+  it("lists the account's saved flows, newest first", async () => {
     const library = cloudLibrary(await signedInHub());
     await library.saveFlow(savedFlowOf("first"));
-    await library.saveFlow(savedFlowOf("second", { visibility: "public" }));
+    await library.saveFlow(savedFlowOf("second"));
 
     const listed = await library.listFlows();
 
-    expect(listed).toEqual({
-      value: [
-        { ...savedFlowOf("second"), visibility: "public" },
-        { ...savedFlowOf("first"), visibility: "private" },
-      ],
-    });
+    expect(listed).toEqual({ value: [savedFlowOf("second"), savedFlowOf("first")] });
+  });
+
+  it("lists flows without a visibility, even when the row is public", async () => {
+    const library = cloudLibrary(
+      flowsWithRows([rowOf(savedFlowOf("one"), { id: "one", visibility: "public" })]),
+    );
+
+    const listed = await library.listFlows();
+
+    expect(listed.value.map((flow) => "visibility" in flow)).toEqual([false]);
   });
 
   it("keeps the hub's order instead of sorting by the flow's own time", async () => {
@@ -94,16 +108,13 @@ describe("createCloudFlowLibrary listFlows", () => {
     const library = cloudLibrary(
       flowsWithRows([
         rowOf({ id: "bad", flow: {} }, { id: "bad" }),
-        rowOf(savedFlowOf("good"), { id: "good", visibility: "public" }),
+        rowOf(savedFlowOf("good"), { id: "good" }),
       ]),
     );
 
     const listed = await library.listFlows();
 
-    expect(listed).toEqual({
-      value: [{ ...savedFlowOf("good"), visibility: "public" }],
-      issue: "invalid",
-    });
+    expect(listed).toEqual({ value: [savedFlowOf("good")], issue: "invalid" });
   });
 
   it("does not show flows kept in the local library", async () => {
@@ -118,9 +129,9 @@ describe("createCloudFlowLibrary listFlows", () => {
 });
 
 describe("createCloudFlowLibrary readFlow", () => {
-  it("reads back a saved flow equal to what was saved, visibility included", async () => {
+  it("reads back a saved flow equal to what was saved", async () => {
     const library = cloudLibrary(await signedInHub());
-    const saved = savedFlowOf("one", { visibility: "public", files: { source: "csv" } });
+    const saved = savedFlowOf("one", { files: { source: "csv" } });
     await library.saveFlow(saved);
 
     const read = await library.readFlow("one");
@@ -128,23 +139,36 @@ describe("createCloudFlowLibrary readFlow", () => {
     expect(read).toEqual({ value: saved });
   });
 
-  it("reads a row whose document has no visibility with the row's visibility", async () => {
+  it("reads back a saved flow with its publication link", async () => {
+    const library = cloudLibrary(await signedInHub());
+    const saved = savedFlowOf("one", { published: PUBLISHED });
+    await library.saveFlow(saved);
+
+    const read = await library.readFlow("one");
+
+    expect(read).toEqual({ value: saved });
+  });
+
+  it("reads a public row without a visibility", async () => {
     const library = cloudLibrary(
       flowsWithRows([rowOf(savedFlowOf("one"), { id: "one", visibility: "public" })]),
     );
 
     const read = await library.readFlow("one");
 
-    expect(read.value?.visibility).toBe("public");
+    expect(read).toEqual({ value: savedFlowOf("one") });
   });
 
-  it("reads a flow saved without visibility as private", async () => {
-    const library = cloudLibrary(await signedInHub());
-    await library.saveFlow(savedFlowOf("one"));
+  it("returns undefined with the invalid issue when the publication link is malformed", async () => {
+    const library = cloudLibrary(
+      flowsWithRows([
+        rowOf({ ...savedFlowOf("one"), published: { publicationId: 3 } }, { id: "one" }),
+      ]),
+    );
 
     const read = await library.readFlow("one");
 
-    expect(read.value?.visibility).toBe("private");
+    expect(read).toEqual({ value: undefined, issue: "invalid" });
   });
 
   it("returns undefined for an unknown flow", async () => {
@@ -181,16 +205,25 @@ describe("createCloudFlowLibrary readFlow", () => {
 });
 
 describe("createCloudFlowLibrary saveFlow", () => {
-  it("sends the saved flow as the document, without its visibility", async () => {
+  it("sends the saved flow as the document", async () => {
     const { flows, drafts } = recordingFlows();
     const library = cloudLibrary(flows);
 
-    await library.saveFlow(savedFlowOf("one", { visibility: "public" }));
+    await library.saveFlow(savedFlowOf("one"));
 
-    expect(drafts).toEqual([{ id: "one", visibility: "public", document: savedFlowOf("one") }]);
+    expect(drafts).toEqual([{ id: "one", document: savedFlowOf("one") }]);
   });
 
-  it("sends no visibility for a flow without one", async () => {
+  it("sends the publication link inside the document", async () => {
+    const { flows, drafts } = recordingFlows();
+    const library = cloudLibrary(flows);
+
+    await library.saveFlow(savedFlowOf("one", { published: PUBLISHED }));
+
+    expect(drafts).toEqual([{ id: "one", document: savedFlowOf("one", { published: PUBLISHED }) }]);
+  });
+
+  it("never sends a visibility", async () => {
     const { flows, drafts } = recordingFlows();
     const library = cloudLibrary(flows);
 
@@ -199,18 +232,6 @@ describe("createCloudFlowLibrary saveFlow", () => {
     expect(drafts.map((draft) => ({ id: draft.id, hasVisibility: "visibility" in draft }))).toEqual(
       [{ id: "one", hasVisibility: false }],
     );
-  });
-
-  it("keeps a public flow public when a flow without visibility is saved over it", async () => {
-    const library = cloudLibrary(await signedInHub());
-    await library.saveFlow(savedFlowOf("one", { visibility: "public" }));
-
-    await library.saveFlow(savedFlowOf("one", { name: "Editado" }));
-
-    expect((await library.readFlow("one")).value).toMatchObject({
-      name: "Editado",
-      visibility: "public",
-    });
   });
 
   it("reports signed-out when there is no session", async () => {

@@ -10,7 +10,6 @@ import { stubResizeObserver } from "./testing/stub-resize-observer.ts";
 
 const SECTIONS = [
   { button: "Nodos", panel: "Biblioteca de nodos", heading: "Nodos", id: "nodes" },
-  { button: "Mis flujos", panel: "Mis flujos", heading: "Mis flujos", id: "flows" },
   { button: "Mis nodos", panel: "Mis nodos", heading: "Mis nodos", id: "my-nodes" },
   { button: "Datos", panel: "Datos", heading: "Datos", id: "data" },
   { button: "Credenciales", panel: "Credenciales", heading: "Credenciales", id: "secrets" },
@@ -57,7 +56,7 @@ async function signedInHub() {
   return hub;
 }
 
-/** Mis flujos and Agente need an account, so the sections that use them render signed in. */
+/** Agente needs an account, so the sections that use it render signed in. */
 async function renderSignedIn(options: Parameters<typeof renderApp>[0] = {}) {
   const rendered = renderApp({ ...options, hub: await signedInHub() });
   await within(rail()).findByRole("button", { name: "Agente" });
@@ -128,7 +127,7 @@ describe("App activity rail", () => {
       href: link.getAttribute("href"),
       target: link.getAttribute("target"),
       isNoopener: link.getAttribute("rel")?.split(" ").includes("noopener"),
-    }).toEqual({ href: "/hub", target: "_blank", isNoopener: true });
+    }).toEqual({ href: "/", target: "_blank", isNoopener: true });
   });
 
   it("offers the light, dark and system themes in its Tema menu", async () => {
@@ -249,12 +248,16 @@ describe("App side panel", () => {
     expect(screen.getByRole("complementary", { name: "Parámetros" })).toBeTruthy();
   });
 
-  it("has no Mis flujos dialog", async () => {
+  it("does not offer Mis flujos in the rail, since saved flows live in the hub", async () => {
     await renderSignedIn();
 
-    await userEvent.click(railButton("Mis flujos"));
+    expect(within(rail()).queryByRole("button", { name: "Mis flujos" })).toBeNull();
+  });
 
-    expect(screen.queryByRole("dialog", { name: "Mis flujos" })).toBeNull();
+  it("shows no Mis flujos panel when signed in", async () => {
+    await renderSignedIn();
+
+    expect(screen.queryByRole("complementary", { name: "Mis flujos" })).toBeNull();
   });
 });
 
@@ -319,11 +322,11 @@ describe("App side panel preferences", () => {
   });
 
   it("reopens on the remembered section after being hidden", async () => {
-    await renderSignedIn({ preferences: { sideSection: "flows", isSidePanelOpen: false } });
+    await renderSignedIn({ preferences: { sideSection: "agent", isSidePanelOpen: false } });
 
-    await userEvent.click(railButton("Mis flujos"));
+    await userEvent.click(railButton("Agente"));
 
-    expect(shownPanels()).toEqual(["Mis flujos"]);
+    expect(shownPanels()).toEqual(["Agente"]);
   });
 });
 
@@ -367,7 +370,7 @@ describe("App hub links", () => {
 
     await userEvent.click(link);
 
-    expect(window.location.pathname).toBe("/");
+    expect(window.location.pathname).toBe("/editor");
   });
 
   it("opens the new publication in another tab", async () => {
@@ -385,7 +388,7 @@ describe("App hub links", () => {
 
     await userEvent.click(link);
 
-    expect(window.location.pathname).toBe("/");
+    expect(window.location.pathname).toBe("/editor");
   });
 });
 

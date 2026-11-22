@@ -6,11 +6,11 @@ import type { SideSection } from "./layout/workspace-preferences.ts";
 import { renderApp } from "./testing/render-app.tsx";
 import { stubResizeObserver } from "./testing/stub-resize-observer.ts";
 
-const ACCOUNT_SECTIONS = ["Mis flujos", "Agente"];
+const ACCOUNT_SECTIONS = ["Agente"];
 
 const OPEN_SECTIONS = ["Nodos", "Mis nodos", "Datos", "Credenciales"];
 
-const ALL_SECTIONS = ["Nodos", "Mis flujos", "Mis nodos", "Datos", "Credenciales", "Agente"];
+const ALL_SECTIONS = ["Nodos", "Mis nodos", "Datos", "Credenciales", "Agente"];
 
 const SIDE_PANELS = [
   "Biblioteca de nodos",
@@ -69,7 +69,7 @@ afterAll(() => {
 });
 
 describe("App activity rail without an account", () => {
-  it("does not offer Mis flujos or Agente when signed out", async () => {
+  it("does not offer Agente when signed out", async () => {
     await renderSignedOut();
 
     expect(
@@ -89,7 +89,16 @@ describe("App activity rail without an account", () => {
     expect(offeredSections()).toEqual(ALL_SECTIONS);
   });
 
-  it("offers Mis flujos and Agente once the user signs in with the editor open", async () => {
+  it.each([
+    { account: "signed out", render: renderSignedOut },
+    { account: "signed in", render: renderSignedIn },
+  ])("never offers Mis flujos when $account", async ({ render }) => {
+    await render();
+
+    expect(within(rail()).queryByRole("button", { name: "Mis flujos" })).toBeNull();
+  });
+
+  it("offers Agente once the user signs in with the editor open", async () => {
     const hub = await renderSignedOut();
 
     await act(async () => {
@@ -101,7 +110,7 @@ describe("App activity rail without an account", () => {
     });
   });
 
-  it("stops offering Mis flujos and Agente once the user signs out with the editor open", async () => {
+  it("stops offering Agente once the user signs out with the editor open", async () => {
     const hub = await renderSignedIn();
 
     await act(async () => {
@@ -115,46 +124,34 @@ describe("App activity rail without an account", () => {
 });
 
 describe("App side panel without an account", () => {
-  it.each<{ readonly section: SideSection; readonly name: string }>([
-    { section: "flows", name: "Mis flujos" },
-    { section: "agent", name: "Agente" },
-  ])(
-    "shows the node library instead of the remembered $name section when signed out",
-    async ({ section }) => {
-      await renderSignedOut(section);
+  it("shows the node library instead of the remembered Agente section when signed out", async () => {
+    await renderSignedOut("agent");
 
+    expect({ pressed: pressedSections(), shown: shownPanels() }).toEqual({
+      pressed: ["Nodos"],
+      shown: ["Biblioteca de nodos"],
+    });
+  });
+
+  it("shows the remembered Agente section when signed in", async () => {
+    await renderSignedIn("agent");
+
+    expect(await screen.findByRole("complementary", { name: "Agente" })).toBeTruthy();
+  });
+
+  it("shows the node library instead of the Agente section when the user signs out", async () => {
+    const hub = await renderSignedIn("agent");
+    await screen.findByRole("complementary", { name: "Agente" });
+
+    await act(async () => {
+      await hub.signOut();
+    });
+
+    await waitFor(() => {
       expect({ pressed: pressedSections(), shown: shownPanels() }).toEqual({
         pressed: ["Nodos"],
         shown: ["Biblioteca de nodos"],
       });
-    },
-  );
-
-  it("shows the remembered Mis flujos section when signed in", async () => {
-    await renderSignedIn("flows");
-
-    expect(await screen.findByRole("complementary", { name: "Mis flujos" })).toBeTruthy();
+    });
   });
-
-  it.each<{ readonly section: SideSection; readonly name: string }>([
-    { section: "flows", name: "Mis flujos" },
-    { section: "agent", name: "Agente" },
-  ])(
-    "shows the node library instead of the $name section when the user signs out",
-    async ({ section, name }) => {
-      const hub = await renderSignedIn(section);
-      await screen.findByRole("complementary", { name });
-
-      await act(async () => {
-        await hub.signOut();
-      });
-
-      await waitFor(() => {
-        expect({ pressed: pressedSections(), shown: shownPanels() }).toEqual({
-          pressed: ["Nodos"],
-          shown: ["Biblioteca de nodos"],
-        });
-      });
-    },
-  );
 });

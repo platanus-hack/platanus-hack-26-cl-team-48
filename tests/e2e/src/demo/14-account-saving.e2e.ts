@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   accountMenuButton,
@@ -18,18 +18,14 @@ import {
 import { dropCsvOnCanvas } from "../support/csv-drop.ts";
 import { chooseFlowOption, openEmptyApp } from "../support/flow-files.ts";
 import { showPreview } from "../support/preview.ts";
-import { railButton, showSidePanel, sidePanelOf } from "../support/side-panel.ts";
+import { railButton } from "../support/side-panel.ts";
 
 const FLOW_NAME = "Ventas";
-const UNTITLED = "Flujo sin título";
 const SIGNED_OUT_STATUS = "Entra para guardar";
 const PUBLISH = "Publicar en el hub…";
 
 const flowNameOf = (page: Page): Locator =>
   toolbarOf(page).getByRole("textbox", { name: "Nombre del flujo" });
-
-const cardOf = (flows: Locator, name: string): Locator =>
-  flows.getByRole("article", { name, exact: true });
 
 const shareOption = (page: Page, name: string): Locator =>
   page.getByRole("menu", { name: "Compartir" }).getByRole("menuitem", { name, exact: true });
@@ -37,15 +33,22 @@ const shareOption = (page: Page, name: string): Locator =>
 const button = (scope: Locator, name: string): Locator =>
   scope.getByRole("button", { name, exact: true });
 
-/** A two-node flow named `name`, saved by signing in, with "Mis flujos" shown. */
-async function openSavedFlow(page: Page, name = FLOW_NAME): Promise<Locator> {
+/** A two-node flow named `name`, saved by signing in. */
+async function openSavedFlow(page: Page, name = FLOW_NAME): Promise<void> {
   await openEmptyApp(page);
   await addNodeFromLibrary(page, "Datos de ejemplo");
   await addNodeFromLibrary(page, "Filtrar");
   await flowNameOf(page).fill(name);
   await signInLocally(page);
   await expect(flowStatus(page, "Guardado")).toBeVisible();
-  return showSidePanel(page, "Mis flujos");
+}
+
+/** Signs out and back in on an empty canvas, which opens the account's last flow. */
+async function reopenLastFlow(page: Page): Promise<void> {
+  await signOut(page);
+  await chooseFlowOption(page, "Nuevo flujo");
+  await expect(nodeOnCanvas(page, "Datos de ejemplo")).toHaveCount(0);
+  await signInLocally(page);
 }
 
 test.describe("saving flows in the account (ADR 0023)", () => {
@@ -59,10 +62,9 @@ test.describe("saving flows in the account (ADR 0023)", () => {
     await expect(flowStatus(page, "Guardado")).toHaveCount(0);
   });
 
-  test("hides Mis flujos, Agente and publishing until signing in", async ({ page }) => {
+  test("hides Agente and publishing until signing in", async ({ page }) => {
     await openEmptyApp(page);
     await expect(railButton(page, "Nodos")).toBeVisible();
-    await expect(railButton(page, "Mis flujos")).toHaveCount(0);
     await expect(railButton(page, "Agente")).toHaveCount(0);
     await button(toolbarOf(page), "Compartir").click();
     await expect(shareOption(page, "Copiar enlace")).toBeVisible();
@@ -71,7 +73,6 @@ test.describe("saving flows in the account (ADR 0023)", () => {
 
     await signInLocally(page);
 
-    await expect(railButton(page, "Mis flujos")).toBeVisible();
     await expect(railButton(page, "Agente")).toBeVisible();
     await button(toolbarOf(page), "Compartir").click();
     await expect(shareOption(page, PUBLISH)).toBeVisible();
@@ -95,10 +96,7 @@ test.describe("saving flows in the account (ADR 0023)", () => {
     await signInLocally(page);
 
     await expect(flowStatus(page, "Guardado")).toBeVisible();
-    const card = cardOf(await showSidePanel(page, "Mis flujos"), UNTITLED);
-    await expect(card).toBeVisible();
-    await expect(card.getByText("Privado", { exact: true })).toBeVisible();
-    await expect(button(card, "Hacer público")).toBeVisible();
+    await expect(flowStatus(page, SIGNED_OUT_STATUS)).toHaveCount(0);
   });
 
   test("saves later edits of the open flow while signed in", async ({ page }) => {
@@ -109,107 +107,22 @@ test.describe("saving flows in the account (ADR 0023)", () => {
     await flowNameOf(page).fill(FLOW_NAME);
 
     await expect(flowStatus(page, "Guardado")).toBeVisible();
-    await expect(cardOf(await showSidePanel(page, "Mis flujos"), FLOW_NAME)).toBeVisible();
     await expect(page.getByText("Sin guardar en este navegador")).toHaveCount(0);
   });
 
-  test("makes a saved flow public", async ({ page }) => {
-    const card = cardOf(await openSavedFlow(page), FLOW_NAME);
-
-    await button(card, "Hacer público").click();
-
-    await expect(card.getByText("Público", { exact: true })).toBeVisible();
-    await expect(button(card, "Hacer privado")).toBeVisible();
-  });
-
-  test("makes a public flow private again", async ({ page }) => {
-    const card = cardOf(await openSavedFlow(page), FLOW_NAME);
-    await button(card, "Hacer público").click();
-
-    await button(card, "Hacer privado").click();
-
-    await expect(card.getByText("Privado", { exact: true })).toBeVisible();
-    await expect(button(card, "Hacer público")).toBeVisible();
-  });
-
-  test("opens a saved flow again after starting a new one", async ({ page }) => {
-    const flows = await openSavedFlow(page);
-    await button(flows, "Nuevo flujo").click();
-    await expect(nodeOnCanvas(page, "Datos de ejemplo")).toHaveCount(0);
-
-    await button(cardOf(flows, FLOW_NAME), "Abrir").click();
-
-    await expect(nodeOnCanvas(page, "Datos de ejemplo")).toBeVisible();
-    await expect(nodeOnCanvas(page, "Filtrar")).toBeVisible();
-    await expect(flowNameOf(page)).toHaveValue(FLOW_NAME);
-    await expect(sidePanelOf(page, "Mis flujos")).toBeVisible();
-  });
-
-  test("duplicates a saved flow", async ({ page }) => {
-    const flows = await openSavedFlow(page);
-
-    await button(cardOf(flows, FLOW_NAME), "Duplicar").click();
-
-    await expect(cardOf(flows, `${FLOW_NAME} (copia)`)).toBeVisible();
-    await expect(cardOf(flows, FLOW_NAME)).toBeVisible();
-  });
-
-  test("renames a saved flow from its card", async ({ page }) => {
-    const flows = await openSavedFlow(page);
-    const card = cardOf(flows, FLOW_NAME);
-    await button(card, "Renombrar").click();
-
-    await card.getByRole("textbox", { name: "Nombre del flujo" }).fill("Ventas 2026");
-    await button(card, "Guardar nombre").click();
-
-    await expect(cardOf(flows, "Ventas 2026")).toBeVisible();
-    await expect(cardOf(flows, FLOW_NAME)).toHaveCount(0);
-  });
-
-  test("exports a saved flow as a file", async ({ page }, testInfo) => {
-    const flows = await openSavedFlow(page);
-    const path = testInfo.outputPath("ventas.nodo.json");
-
-    const [download] = await Promise.all([
-      page.waitForEvent("download"),
-      button(cardOf(flows, FLOW_NAME), "Exportar").click(),
-    ]);
-    await download.saveAs(path);
-
-    expect(download.suggestedFilename()).toMatch(/\.nodo\.json$/);
-    const exported = JSON.parse(await readFile(path, "utf8")) as { readonly nodes: unknown[] };
-    expect(exported).toMatchObject({ name: FLOW_NAME });
-    expect(exported.nodes).toHaveLength(2);
-  });
-
-  test("deletes a saved flow after confirming", async ({ page }) => {
-    const flows = await openSavedFlow(page);
-    const card = cardOf(flows, FLOW_NAME);
-
-    await button(card, "Borrar").click();
-    await button(card, "Confirmar borrado").click();
-
-    await expect(cardOf(flows, FLOW_NAME)).toHaveCount(0);
-  });
-
-  test("hides Mis flujos and asks to sign in again after signing out", async ({ page }) => {
-    const flows = await openSavedFlow(page);
-    await expect(cardOf(flows, FLOW_NAME)).toBeVisible();
+  test("hides Agente and asks to sign in again after signing out", async ({ page }) => {
+    await openSavedFlow(page);
 
     await signOut(page);
 
-    await expect(sidePanelOf(page, "Mis flujos")).toHaveCount(0);
-    await expect(railButton(page, "Mis flujos")).toHaveCount(0);
+    await expect(railButton(page, "Agente")).toHaveCount(0);
     await expect(flowStatus(page, SIGNED_OUT_STATUS)).toBeVisible();
   });
 
   test("opens the account's last flow when signing in with an empty canvas", async ({ page }) => {
     await openSavedFlow(page);
-    await signOut(page);
-    await chooseFlowOption(page, "Nuevo flujo");
-    await expect(nodeOnCanvas(page, "Datos de ejemplo")).toHaveCount(0);
 
-    await signInLocally(page);
+    await reopenLastFlow(page);
 
     await expect(nodeOnCanvas(page, "Datos de ejemplo")).toBeVisible();
     await expect(flowNameOf(page)).toHaveValue(FLOW_NAME);
@@ -223,10 +136,9 @@ test.describe("saving flows in the account (ADR 0023)", () => {
     await dropCsvOnCanvas(page, { name: "ventas.csv", path });
     await flowNameOf(page).fill("CSV local");
     await expect(flowStatus(page, "Guardado")).toBeVisible();
-    const flows = await showSidePanel(page, "Mis flujos");
-    await button(flows, "Nuevo flujo").click();
+    await reopenLastFlow(page);
+    await expect(flowNameOf(page)).toHaveValue("CSV local");
 
-    await button(cardOf(flows, "CSV local"), "Abrir").click();
     await runButton(page).click();
 
     await waitForAllNodesReady(page, 1);

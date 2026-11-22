@@ -39,10 +39,10 @@ describe("useRoute", () => {
     expect(shownRoute()).toEqual({ page: "profile", handle: "ana" });
   });
 
-  it("gives the workspace at the root", () => {
+  it("gives the hub at the root", () => {
     render(<CurrentRoute label="Ruta" />);
 
-    expect(shownRoute()).toEqual({ page: "workspace" });
+    expect(shownRoute()).toEqual({ page: "hub" });
   });
 
   it("follows the browser back to the previous route", async () => {

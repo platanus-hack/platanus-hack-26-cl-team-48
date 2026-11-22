@@ -80,7 +80,7 @@ describe("RouteLink", () => {
         path: window.location.pathname,
         shown: screen.getByRole("status").textContent,
         prevented: stopWatching(),
-      }).toEqual({ path: "/", shown: "workspace", prevented: false });
+      }).toEqual({ path: "/", shown: "hub", prevented: false });
     },
   );
 

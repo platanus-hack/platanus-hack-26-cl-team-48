@@ -1,12 +1,11 @@
 import { FLOW_FORMAT, type NodeManifest } from "@nodomics/protocol";
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createAppStores, type AppStores } from "./app-stores.ts";
 import { CATALOG, flowOf, nodeOf, SAMPLE } from "./canvas/canvas-fixtures.ts";
 import { ANA, createTestHub } from "./hub/hub-pages-fixtures.tsx";
 import type { WorkspacePreferences } from "./layout/workspace-preferences.ts";
-import { recordDownloads } from "./testing/record-downloads.ts";
 import { renderApp } from "./testing/render-app.tsx";
 import { stubResizeObserver } from "./testing/stub-resize-observer.ts";
 
@@ -38,7 +37,6 @@ async function seededStores(): Promise<AppStores> {
 
 const PANEL_NAMES: Record<WorkspacePreferences["sideSection"], string> = {
   nodes: "Biblioteca de nodos",
-  flows: "Mis flujos",
   "my-nodes": "Mis nodos",
   data: "Datos",
   secrets: "Credenciales",
@@ -51,7 +49,7 @@ async function signedInHub() {
   return hub;
 }
 
-/** Signed in, because Mis flujos and Agente are only offered with an account. */
+/** Signed in, because Agente is only offered with an account. */
 async function renderSection(sideSection: WorkspacePreferences["sideSection"], stores?: AppStores) {
   const rendered = renderApp({
     stores: stores ?? (await seededStores()),
@@ -64,8 +62,6 @@ async function renderSection(sideSection: WorkspacePreferences["sideSection"], s
 }
 
 const panel = (name: string) => screen.getByRole("complementary", { name });
-
-const flowCard = (name: string) => within(panel("Mis flujos")).getByRole("article", { name });
 
 beforeAll(stubResizeObserver);
 
@@ -114,123 +110,6 @@ describe("Nodos section", () => {
     expect(stores.flowStore.getState().state.flow.nodes.map(({ type }) => type)).toEqual([
       "core.filter",
     ]);
-  });
-});
-
-describe("Mis flujos section", () => {
-  it("lists the saved flows", async () => {
-    await renderSection("flows");
-
-    expect(flowCard("Ventas")).toBeTruthy();
-  });
-
-  it("opens a saved flow", async () => {
-    const { stores } = await renderSection("flows");
-
-    await userEvent.click(within(flowCard("Ventas")).getByRole("button", { name: "Abrir" }));
-
-    await waitFor(() => {
-      expect(stores.savedFlowStore.getState().currentId).toBe("one");
-    });
-  });
-
-  it("keeps the panel open after opening a flow", async () => {
-    const { stores } = await renderSection("flows");
-
-    await userEvent.click(within(flowCard("Ventas")).getByRole("button", { name: "Abrir" }));
-    await waitFor(() => {
-      expect(stores.savedFlowStore.getState().currentId).toBe("one");
-    });
-
-    expect(panel("Mis flujos")).toBeTruthy();
-  });
-
-  it("creates and opens a new empty flow", async () => {
-    const stores = await seededStores();
-    await stores.savedFlowStore.getState().openFlow("one");
-    await renderSection("flows", stores);
-
-    await userEvent.click(within(panel("Mis flujos")).getByRole("button", { name: "Nuevo flujo" }));
-
-    await waitFor(() => {
-      expect({
-        currentId: stores.savedFlowStore.getState().currentId,
-        nodes: stores.flowStore.getState().state.flow.nodes,
-      }).toEqual({ currentId: undefined, nodes: [] });
-    });
-  });
-
-  it("duplicates a saved flow", async () => {
-    await renderSection("flows");
-
-    await userEvent.click(within(flowCard("Ventas")).getByRole("button", { name: "Duplicar" }));
-
-    expect(
-      await within(panel("Mis flujos")).findByRole("article", { name: "Ventas (copia)" }),
-    ).toBeTruthy();
-  });
-
-  it("renames a saved flow", async () => {
-    await renderSection("flows");
-    const card = flowCard("Ventas");
-    await userEvent.click(within(card).getByRole("button", { name: "Renombrar" }));
-    fireEvent.change(within(card).getByRole("textbox"), { target: { value: "Compras" } });
-
-    await userEvent.click(within(card).getByRole("button", { name: "Guardar nombre" }));
-
-    expect(
-      await within(panel("Mis flujos")).findByRole("article", { name: "Compras" }),
-    ).toBeTruthy();
-  });
-
-  it("asks for confirmation before deleting a saved flow", async () => {
-    const { stores } = await renderSection("flows");
-
-    await userEvent.click(within(flowCard("Ventas")).getByRole("button", { name: "Borrar" }));
-
-    expect((await stores.savedFlowStore.getState().library.listFlows()).value).toHaveLength(1);
-  });
-
-  it("deletes a saved flow once confirmed", async () => {
-    const { stores } = await renderSection("flows");
-    const card = flowCard("Ventas");
-    await userEvent.click(within(card).getByRole("button", { name: "Borrar" }));
-
-    await userEvent.click(within(card).getByRole("button", { name: "Confirmar borrado" }));
-    await act(async () => {
-      await stores.savedFlowStore.getState().refresh();
-    });
-
-    expect(within(panel("Mis flujos")).queryByRole("article", { name: "Ventas" })).toBeNull();
-  });
-
-  it("shows a flow another tab saved once the window gets focus", async () => {
-    const stores = await seededStores();
-    await renderSection("flows", stores);
-    await stores.savedFlowStore.getState().library.saveFlow({
-      id: "two",
-      name: "Compras",
-      flow: { ...flowOf([nodeOf("s", SAMPLE.id)]), name: "Compras" },
-      files: {},
-      updatedAt: 2,
-    });
-
-    fireEvent.focus(window);
-
-    expect(
-      await within(panel("Mis flujos")).findByRole("article", { name: "Compras" }),
-    ).toBeTruthy();
-  });
-
-  it("exports a saved flow as a file", async () => {
-    const downloads = recordDownloads();
-    await renderSection("flows");
-
-    await userEvent.click(within(flowCard("Ventas")).getByRole("button", { name: "Exportar" }));
-
-    await waitFor(() => {
-      expect(downloads.map(({ name }) => name)).toEqual(["Ventas.nodo.json"]);
-    });
   });
 });
 

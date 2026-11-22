@@ -277,12 +277,10 @@ describe("followFlowSession with real saving", () => {
     await vi.waitFor(async () => {
       expect({
         saved: (await library.readFlow("flow_new")).value?.name,
-        visibility: (await library.readFlow("flow_new")).value?.visibility,
         status: stores.savedFlowStore.getState().status,
         currentId: stores.savedFlowStore.getState().currentId,
       }).toEqual({
         saved: "Sin cuenta",
-        visibility: "private",
         status: "saved",
         currentId: "flow_new",
       });

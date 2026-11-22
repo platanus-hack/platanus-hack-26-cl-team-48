@@ -2,8 +2,10 @@ import type { Hub } from "@nodomics/hub";
 import { err } from "@nodomics/protocol";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import type { Flow } from "@nodomics/protocol";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppStoresContext } from "../app-context.ts";
+import type { EditorOpening } from "../routing/routes.ts";
 import { HubContext } from "./hub-context.ts";
 import {
   ANA,
@@ -48,12 +50,16 @@ const sectionHeading = (name: string) => screen.queryByRole("heading", { level: 
 
 /** Renders the page and hands back a way to change the text the header would send. */
 function renderHubPage(hub: Hub, text = "") {
-  const rendered = renderWithHub(<HubPage text={text} />, hub);
+  const navigation = {
+    onOpenEditor: vi.fn<(opening: EditorOpening) => void>(),
+    onOpenCopy: vi.fn<(flow: Flow) => void>(),
+  };
+  const rendered = renderWithHub(<HubPage text={text} {...navigation} />, hub);
   const showText = (next: string) => {
     rendered.rerender(
       <AppStoresContext value={rendered.stores}>
         <HubContext value={hub}>
-          <HubPage text={next} />
+          <HubPage text={next} {...navigation} />
         </HubContext>
       </AppStoresContext>,
     );
@@ -283,7 +289,7 @@ describe("HubPage", () => {
 });
 
 describe("HubPage Explorar filter", () => {
-  it("offers Para ti, Recientes and Mis publicaciones when signed in", async () => {
+  it("offers Para ti, Recientes, Mis flujos and Mis publicaciones when signed in", async () => {
     renderHubPage(await signedInAs(await createSeededHub(), ANA.handle));
     await findExploreOption("Mis publicaciones");
 
@@ -292,6 +298,7 @@ describe("HubPage Explorar filter", () => {
     expect(radios).toEqual([
       exploreOption("Para ti"),
       exploreOption("Recientes"),
+      exploreOption("Mis flujos"),
       exploreOption("Mis publicaciones"),
     ]);
   });

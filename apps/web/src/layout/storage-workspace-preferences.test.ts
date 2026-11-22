@@ -92,7 +92,7 @@ describe("workspace preferences storage", () => {
       isOpen: preferences.isSidePanelOpen,
     }).toEqual({ section: "nodes", isOpen: true });
   });
-  it.each(["nodes", "flows", "my-nodes", "data", "secrets", "agent"] as const)(
+  it.each(["nodes", "my-nodes", "data", "secrets", "agent"] as const)(
     "restores the %s side section",
     (sideSection) => {
       const preferences = readStored(JSON.stringify({ ...STORED, sideSection }));
@@ -100,7 +100,7 @@ describe("workspace preferences storage", () => {
       expect(preferences.sideSection).toBe(sideSection);
     },
   );
-  it.each([undefined, "hub", 3, null])(
+  it.each([undefined, "hub", "flows", 3, null])(
     "falls back to the nodes section for the stored side section %s",
     (sideSection) => {
       const preferences = readStored(JSON.stringify({ ...STORED, theme: "dark", sideSection }));

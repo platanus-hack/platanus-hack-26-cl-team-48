@@ -9,8 +9,9 @@ export async function openSharedFlow(page: Page, flow: unknown): Promise<void> {
   await waitForEngineReady(page);
 }
 
+/** Opens the editor, which starts on an empty canvas while signed out; `/` is the hub (ADR 0024). */
 export async function openEmptyApp(page: Page): Promise<void> {
-  await page.goto("/");
+  await page.goto("/editor");
   await waitForEngineReady(page);
 }
 

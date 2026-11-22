@@ -36,7 +36,7 @@ type RenderAppOptions = {
 
 /** Renders the whole editor connected to a fake engine, as main.tsx composes it. */
 export function renderApp(options: RenderAppOptions = {}) {
-  window.history.replaceState(null, "", options.path ?? "/");
+  window.history.replaceState(null, "", options.path ?? "/editor");
   const engine: EngineEntry = {
     id: "fake",
     label: "Simulado",

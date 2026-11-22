@@ -3,7 +3,6 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /** The aside each button of the activity rail shows. */
 const PANEL_OF_SECTION = {
   Nodos: "Biblioteca de nodos",
-  "Mis flujos": "Mis flujos",
   "Mis nodos": "Mis nodos",
   Datos: "Datos",
   Credenciales: "Credenciales",
@@ -14,7 +13,7 @@ export type SideSection = keyof typeof PANEL_OF_SECTION;
 
 export const SIDE_SECTIONS = Object.keys(PANEL_OF_SECTION) as ReadonlyArray<SideSection>;
 
-const SECTIONS_NEEDING_ACCOUNT: ReadonlyArray<SideSection> = ["Mis flujos", "Agente"];
+const SECTIONS_NEEDING_ACCOUNT: ReadonlyArray<SideSection> = ["Agente"];
 
 /** The sections the rail shows while signed out; the rest need an account (ADR 0023). */
 export const SIGNED_OUT_SECTIONS = SIDE_SECTIONS.filter(

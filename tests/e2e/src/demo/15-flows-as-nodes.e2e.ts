@@ -8,7 +8,12 @@ import {
   runButton,
   waitForAllNodesReady,
 } from "../support/canvas.ts";
-import { openEmptyApp } from "../support/flow-files.ts";
+import {
+  chooseFlowOption,
+  exportFlow,
+  importFlowFile,
+  openEmptyApp,
+} from "../support/flow-files.ts";
 import { showPreview } from "../support/preview.ts";
 import { showSidePanel } from "../support/side-panel.ts";
 import { SALES_COLUMNS, salesAbove } from "../support/sample-sales.ts";
@@ -38,11 +43,12 @@ async function chooseColumn(page: Page) {
     .click();
 }
 
-async function openSaved(page: Page, name: string) {
-  const flows = await showSidePanel(page, "Mis flujos");
-  await flows
+/** Opens a saved node flow from "Mis nodos"; the editor no longer lists every flow (ADR 0024). */
+async function openNodeFlow(page: Page, name: string) {
+  const nodes = await showSidePanel(page, "Mis nodos");
+  await nodes
     .getByRole("article", { name, exact: true })
-    .getByRole("button", { name: "Abrir", exact: true })
+    .getByRole("button", { name: "Abrir flujo", exact: true })
     .click();
 }
 
@@ -74,7 +80,9 @@ async function createDefinition(page: Page) {
   await connectNodes(page, "Filtrar", "Salida de nodo");
 }
 
-test("creates, reuses and explicitly updates a saved flow as a node", async ({ page }) => {
+test("creates, reuses and explicitly updates a saved flow as a node", async ({
+  page,
+}, testInfo) => {
   await openEmptyApp(page);
   // Flows are saved only in the account (ADR 0023); without signing in nothing is saved.
   await signInLocally(page);
@@ -82,8 +90,7 @@ test("creates, reuses and explicitly updates a saved flow as a node", async ({ p
   await runButton(page).click();
   await waitForAllNodesReady(page, 4);
   await expect(saved(page)).toBeVisible();
-  const flows = await showSidePanel(page, "Mis flujos");
-  await flows.getByRole("button", { name: "Nuevo flujo" }).click();
+  await chooseFlowOption(page, "Nuevo flujo");
   await page.getByRole("textbox", { name: "Nombre del flujo" }).fill(CONSUMER);
   await addNodeFromLibrary(page, "Datos de ejemplo");
   await addSpacedNode(page, NODE_NAME);
@@ -97,13 +104,16 @@ test("creates, reuses and explicitly updates a saved flow as a node", async ({ p
     `${String(salesAbove(MINIMUM))} filas · 5 col.`,
   );
   await expect(saved(page)).toBeVisible();
-  await openSaved(page, ORIGINAL);
+  // Mis flujos lives in the hub, which keeps the in-memory account only until the page reloads,
+  // so the consumer comes back as a file once its node has a newer version.
+  const consumer = await exportFlow(page, testInfo.outputPath("consumidor.nodo.json"));
+  await openNodeFlow(page, ORIGINAL);
   await nodeOnCanvas(page, "Entrada de nodo").locator(".web-node-title").click();
   await parameters(page)
     .getByRole("textbox", { name: /^Descripción/ })
     .fill("Ventas filtradas por unidades");
   await expect(saved(page)).toBeVisible();
-  await openSaved(page, CONSUMER);
+  await importFlowFile(page, consumer.path);
   await nodeOnCanvas(page, NODE_NAME).locator(".web-node-title").click();
   await page.getByRole("button", { name: "Actualizar a la versión 0.1.1" }).click();
   await runButton(page).click();

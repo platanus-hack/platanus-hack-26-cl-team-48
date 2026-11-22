@@ -11,8 +11,10 @@ import {
   manifestOf,
   nodeOf,
 } from "../canvas/canvas-fixtures.ts";
+import type { EditorOpening } from "../routing/routes.ts";
 import {
   ANA,
+  BETO,
   CLEAN_NODE_MANIFEST,
   createTestHub,
   draftOf,
@@ -179,18 +181,22 @@ async function seededHub(): Promise<Hub> {
 
 type PageProps = Partial<Parameters<typeof PublicationPage>[0]>;
 
+/** Signed in as someone else: Abrir una copia and Agregar a Mis nodos need an account. */
 async function renderPage(props: PageProps = {}) {
+  const hub = await seededHub();
+  await hub.signIn({ kind: "email", email: BETO.handle });
   const onOpenCopy = vi.fn<(flow: Flow) => void>();
   const onInstall = vi.fn<(manifests: ReadonlyArray<NodeManifest>) => void>();
   renderWithHub(
     <PublicationPage
       handle="ana"
       slug="ventas"
+      onOpenEditor={vi.fn<(opening: EditorOpening) => void>()}
       onOpenCopy={onOpenCopy}
       onInstall={onInstall}
       {...props}
     />,
-    await seededHub(),
+    hub,
   );
   return { onOpenCopy, onInstall };
 }

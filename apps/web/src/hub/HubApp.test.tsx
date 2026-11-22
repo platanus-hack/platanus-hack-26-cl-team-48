@@ -4,16 +4,19 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { FILTER, edgeOf, flowOf, manifestOf, nodeOf } from "../canvas/canvas-fixtures.ts";
-import { decodeSharedFlow } from "../flow/flow-file.ts";
-import { pathOf, type Route } from "../routing/routes.ts";
+import { cloudStores, createFlowsHub } from "../library/cloud-flow-fixtures.ts";
+import { pathOf, type EditorOpening, type Route } from "../routing/routes.ts";
+import { renderWithStores } from "../testing/render-with-stores.tsx";
 import {
   ANA,
+  BETO,
   CLEAN_NODE_MANIFEST,
   createTestHub,
   draftOf,
   publishAs,
   renderWithHub,
 } from "./hub-pages-fixtures.tsx";
+import { HubContext } from "./hub-context.ts";
 import { stubResizeObserver } from "../testing/stub-resize-observer.ts";
 import { HubApp } from "./HubApp.tsx";
 
@@ -61,24 +64,49 @@ async function seededHub(): Promise<Hub> {
   return hub;
 }
 
+const navigationSpies = () => ({
+  onOpenEditor: vi.fn<(opening: EditorOpening) => void>(),
+  onOpenCopy: vi.fn<(flow: Flow) => void>(),
+});
+
 async function renderHubApp(route: HubRoute) {
   window.history.replaceState(null, "", pathOf(route));
-  return renderWithHub(<HubApp />, await seededHub());
+  const navigation = navigationSpies();
+  return { ...renderWithHub(<HubApp {...navigation} />, await seededHub()), ...navigation };
 }
 
-/** Records the tabs the page opens instead of letting jsdom try to open them. */
+/** Ana's publications seen by Beto, signed in: copying and adding need an account. */
+async function renderHubAppAsVisitor(route: HubRoute) {
+  window.history.replaceState(null, "", pathOf(route));
+  const hub = await seededHub();
+  await hub.signIn({ kind: "email", email: BETO.handle });
+  const navigation = navigationSpies();
+  return { ...renderWithHub(<HubApp {...navigation} />, hub), ...navigation };
+}
+
+/** Ana's Ventas in a hub that also keeps flows, with Ana signed in. */
+async function renderSignedInHubApp(route: HubRoute) {
+  window.history.replaceState(null, "", pathOf(route));
+  const hub = createFlowsHub();
+  await publishAs(hub, ANA.handle, [
+    draftOf({
+      flow: PUBLISHED_FLOW,
+      snapshot: { format: SNAPSHOT_FORMAT, catalog: [LOCAL_FILE, FILTER] },
+    }),
+  ]);
+  await hub.signIn({ kind: "email", email: ANA.handle });
+  const navigation = navigationSpies();
+  renderWithStores(
+    <HubContext value={hub}>
+      <HubApp {...navigation} />
+    </HubContext>,
+    cloudStores(hub).stores,
+  );
+  return navigation;
+}
+
+/** Records the tabs the page would open instead of letting jsdom try to open them. */
 const recordOpenedTabs = () => vi.spyOn(window, "open").mockReturnValue(null);
-
-const openedUrl = (open: ReturnType<typeof recordOpenedTabs>) => {
-  const [url] = open.mock.calls[0] ?? [];
-  return typeof url === "string" ? url : "";
-};
-
-const sharedFlowIn = (url: string) => {
-  const flow = decodeSharedFlow(url.slice(1));
-  if (flow?.ok !== true) throw new Error(`The url ${url} does not carry a shared flow`);
-  return flow.value;
-};
 
 const hubHeader = () => screen.getByRole("banner");
 
@@ -132,16 +160,15 @@ describe("HubApp header", () => {
     }).toEqual({ nodomics: true, hub: true });
   });
 
-  it("opens the editor in another tab", async () => {
+  it("does not offer to open the editor", async () => {
     await renderHubApp({ page: "hub" });
 
-    const link = within(hubHeader()).getByRole("link", { name: "Abrir el editor" });
+    await screen.findByRole("heading", { level: 1, name: "Hub" });
 
     expect({
-      href: link.getAttribute("href"),
-      target: link.getAttribute("target"),
-      isNoopener: link.getAttribute("rel")?.split(" ").includes("noopener"),
-    }).toEqual({ href: "/", target: "_blank", isNoopener: true });
+      link: within(hubHeader()).queryByRole("link", { name: "Abrir el editor" }),
+      button: within(hubHeader()).queryByRole("button", { name: "Abrir el editor" }),
+    }).toEqual({ link: null, button: null });
   });
 
   it("offers to sign in when signed out", async () => {
@@ -150,12 +177,15 @@ describe("HubApp header", () => {
     expect(await within(hubHeader()).findByRole("button", { name: "Entrar" })).toBeTruthy();
   });
 
-  it("keeps the header on a publication page", async () => {
+  it("does not offer to open the editor on a publication page", async () => {
     await renderHubApp({ page: "publication", handle: "ana", slug: "ventas" });
 
     await screen.findByRole("heading", { level: 1, name: "Ventas por región" });
 
-    expect(within(hubHeader()).getByRole("link", { name: "Abrir el editor" })).toBeTruthy();
+    expect({
+      link: within(hubHeader()).queryByRole("link", { name: "Abrir el editor" }),
+      button: within(hubHeader()).queryByRole("button", { name: "Abrir el editor" }),
+    }).toEqual({ link: null, button: null });
   });
 
   it("does not show the editor", async () => {
@@ -175,7 +205,7 @@ describe("HubApp profile link", () => {
     window.history.replaceState(null, "", pathOf({ page: "hub" }));
     const hub = await seededHub();
     await hub.signIn({ kind: "email", email: ANA.handle });
-    renderWithHub(<HubApp />, hub);
+    renderWithHub(<HubApp {...navigationSpies()} />, hub);
     await userEvent.click(
       await within(hubHeader()).findByRole("button", { name: "Cuenta de Ana Pérez" }),
     );
@@ -224,51 +254,50 @@ describe("HubApp pages", () => {
 });
 
 describe("HubApp opening a flow", () => {
-  it("opens a copy of the published flow in a new editor tab", async () => {
-    const open = recordOpenedTabs();
-    await renderHubApp({ page: "publication", handle: "ana", slug: "ventas" });
-
-    await pressUntil("Abrir una copia", () => {
-      expect(open).toHaveBeenCalledTimes(1);
+  it("hands the published flow without private params to onOpenCopy", async () => {
+    const { onOpenCopy } = await renderHubAppAsVisitor({
+      page: "publication",
+      handle: "ana",
+      slug: "ventas",
     });
 
-    expect(open).toHaveBeenCalledWith(expect.stringMatching(/^\/#flow=/), "_blank", "noopener");
-  });
-
-  it("carries the published flow in the opened link", async () => {
-    const open = recordOpenedTabs();
-    await renderHubApp({ page: "publication", handle: "ana", slug: "ventas" });
-
     await pressUntil("Abrir una copia", () => {
-      expect(open).toHaveBeenCalled();
+      expect(onOpenCopy).toHaveBeenCalledTimes(1);
     });
 
-    expect(sharedFlowIn(openedUrl(open)).nodes.map(({ id, type }) => ({ id, type }))).toEqual([
-      { id: "file", type: LOCAL_FILE.id },
-      { id: "f", type: FILTER.id },
+    expect(
+      onOpenCopy.mock.calls[0]?.[0].nodes.map(({ id, type, params }) => ({ id, type, params })),
+    ).toEqual([
+      { id: "file", type: LOCAL_FILE.id, params: { delimiter: ";" } },
+      { id: "f", type: FILTER.id, params: { op: ">", value: "10" } },
     ]);
   });
 
-  it("leaves the published file references out of the opened link", async () => {
+  it("leaves opening the copy to the composition root instead of opening a tab", async () => {
     const open = recordOpenedTabs();
-    await renderHubApp({ page: "publication", handle: "ana", slug: "ventas" });
+    const { onOpenCopy } = await renderHubAppAsVisitor({
+      page: "publication",
+      handle: "ana",
+      slug: "ventas",
+    });
 
     await pressUntil("Abrir una copia", () => {
-      expect(open).toHaveBeenCalled();
+      expect(onOpenCopy).toHaveBeenCalled();
     });
 
-    expect(sharedFlowIn(openedUrl(open)).nodes.find(({ id }) => id === "file")?.params).toEqual({
-      delimiter: ";",
-    });
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("does not load the flow into this tab", async () => {
-    const open = recordOpenedTabs();
-    const { stores } = await renderHubApp({ page: "publication", handle: "ana", slug: "ventas" });
+    const { stores, onOpenCopy } = await renderHubAppAsVisitor({
+      page: "publication",
+      handle: "ana",
+      slug: "ventas",
+    });
     const before = stores.flowStore.getState().state.flow;
 
     await pressUntil("Abrir una copia", () => {
-      expect(open).toHaveBeenCalled();
+      expect(onOpenCopy).toHaveBeenCalled();
     });
 
     expect({
@@ -278,9 +307,45 @@ describe("HubApp opening a flow", () => {
   });
 });
 
+describe("HubApp opening the editor", () => {
+  it("hands a new flow to onOpenEditor from Nuevo flujo in Mis flujos", async () => {
+    const { onOpenEditor } = await renderSignedInHubApp({ page: "hub" });
+    await userEvent.click(
+      await within(screen.getByRole("radiogroup", { name: "Explorar" })).findByRole("radio", {
+        name: "Mis flujos",
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Nuevo flujo" }));
+
+    expect(onOpenEditor.mock.calls).toEqual([[{ kind: "new" }]]);
+  });
+
+  it("hands my publication's flow to onOpenEditor from Entrar", async () => {
+    const { onOpenEditor } = await renderSignedInHubApp({
+      page: "publication",
+      handle: "ana",
+      slug: "ventas",
+    });
+    await screen.findByRole("region", { name: "Vista previa del flujo" });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Entrar" }));
+
+    await waitFor(() => {
+      expect(onOpenEditor.mock.calls).toEqual([
+        [{ kind: "flow", id: expect.any(String) as unknown }],
+      ]);
+    });
+  });
+});
+
 describe("HubApp adding a node", () => {
   it("adds the published node to Mis nodos", async () => {
-    const { stores } = await renderHubApp({ page: "publication", handle: "ana", slug: "limpiar" });
+    const { stores } = await renderHubAppAsVisitor({
+      page: "publication",
+      handle: "ana",
+      slug: "limpiar",
+    });
 
     await pressUntil("Agregar a Mis nodos", () => {
       expect(stores.personalLibraryStore.getState().nodes.map(({ id }) => id)).toContain(
@@ -290,7 +355,11 @@ describe("HubApp adding a node", () => {
   });
 
   it("stays on the publication after adding the node", async () => {
-    const { stores } = await renderHubApp({ page: "publication", handle: "ana", slug: "limpiar" });
+    const { stores } = await renderHubAppAsVisitor({
+      page: "publication",
+      handle: "ana",
+      slug: "limpiar",
+    });
 
     await pressUntil("Agregar a Mis nodos", () => {
       expect(stores.personalLibraryStore.getState().nodes).not.toHaveLength(0);
@@ -303,7 +372,11 @@ describe("HubApp adding a node", () => {
   });
 
   it("leaves the editor's flow untouched when adding a node", async () => {
-    const { stores } = await renderHubApp({ page: "publication", handle: "ana", slug: "limpiar" });
+    const { stores } = await renderHubAppAsVisitor({
+      page: "publication",
+      handle: "ana",
+      slug: "limpiar",
+    });
     const before = stores.flowStore.getState().state.flow;
 
     await pressUntil("Agregar a Mis nodos", () => {
@@ -366,7 +439,7 @@ describe("HubApp search", () => {
       await userEvent.type(hubSearch(), "limpiar");
 
       await waitFor(() => {
-        expect(window.location.pathname).toBe("/hub");
+        expect(window.location.pathname).toBe("/");
       });
     },
   );

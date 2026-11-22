@@ -34,7 +34,7 @@ test.describe("step 5: share by link", () => {
       page.getByRole("status").filter({ hasText: "Enlace listo para compartir" }),
     ).toContainText("Copiamos el enlace del flujo al portapapeles.");
     const link = await page.evaluate(() => navigator.clipboard.readText());
-    expect(link.startsWith(`${APP_ORIGIN}/#flow=`)).toBe(true);
+    expect(link.startsWith(`${APP_ORIGIN}/editor#flow=`)).toBe(true);
     // A new context shares no storage, cookies or engine with the first one, like a private window.
     const incognito = await browser.newContext();
     const shared = await incognito.newPage();

@@ -1,7 +1,11 @@
-import type { FlowDraft, FlowStore, StoredFlow } from "@nodomics/hub";
+import type { FlowStore } from "@nodomics/hub";
 import { expect, it, vi } from "vitest";
-import { FLOW_FORMAT, ok, type Flow } from "@nodomics/protocol";
+import { FLOW_FORMAT, type Flow } from "@nodomics/protocol";
 import { createAppStores } from "../app-stores.ts";
+import { CATALOG, flowOf, manifestOf, nodeOf } from "../canvas/canvas-fixtures.ts";
+import { withoutPrivateParams } from "../hub/hub-flow.ts";
+import { flowFingerprint } from "./flow-fingerprint.ts";
+import type { SavedFlow } from "./flow-library.ts";
 import { createMemoryPersonalLibrary } from "./memory-personal-library.ts";
 import { createMemoryFlowLibrary } from "./memory-flow-library.ts";
 import { startFlowSaving, AUTO_SAVE_DELAY_MS } from "./flow-saving.ts";
@@ -13,6 +17,9 @@ const flow: Flow = {
   nodes: [{ version: "0.1.0", id: "one", type: "sample", params: {}, position: { x: 0, y: 0 } }],
   edges: [],
 };
+const LATEST = { opening: { kind: "latest" }, hasGivenFlow: false } as const;
+const GIVEN = { opening: { kind: "latest" }, hasGivenFlow: true } as const;
+
 function setup() {
   const library = createMemoryFlowLibrary();
   const stores = createAppStores(undefined, createMemoryPersonalLibrary(), library);
@@ -53,10 +60,10 @@ it("debounces edits, skips empty flows and persists source references", async ()
 it("restores the most recent flow and leaves shared flows without identity", async () => {
   const { stores, library, saving } = setup();
   await library.saveFlow({ id: "old", name: "Ventas", flow, files: {}, updatedAt: 1 });
-  await stores.savedFlowStore.getState().initialize(false);
+  await stores.savedFlowStore.getState().initialize(LATEST);
   expect(stores.flowStore.getState().state.flow).toEqual(flow);
   expect(stores.savedFlowStore.getState().currentId).toBe("old");
-  await stores.savedFlowStore.getState().initialize(true);
+  await stores.savedFlowStore.getState().initialize(GIVEN);
   expect(stores.savedFlowStore.getState().currentId).toBeUndefined();
   saving.close();
 });
@@ -81,7 +88,7 @@ it("keeps unavailable status and only reports storage failure once", async () =>
   );
   const show = vi.fn();
   stores.noticeStore.setState({ show });
-  await stores.savedFlowStore.getState().initialize(false);
+  await stores.savedFlowStore.getState().initialize(LATEST);
   await stores.savedFlowStore.getState().refresh();
   expect(stores.savedFlowStore.getState().status).toBe("unavailable");
   expect(show).toHaveBeenCalledTimes(1);
@@ -114,7 +121,7 @@ it("leaves a shared flow untouched until its first edit and keeps the original s
     createMemoryPersonalLibrary(),
     library,
   );
-  await stores.savedFlowStore.getState().initialize(true);
+  await stores.savedFlowStore.getState().initialize(GIVEN);
   const callbacks: Array<() => void> = [];
   const saving = startFlowSaving({
     stores,
@@ -245,28 +252,6 @@ it("does not show saving while signed out and editing", async () => {
   saving.close();
 });
 
-it("keeps a public flow public when an edit is autosaved", async () => {
-  const { stores, library, saving } = cloudSetup(await signedInHub());
-  await library.saveFlow({
-    id: "old",
-    name: "Ventas",
-    flow,
-    files: {},
-    updatedAt: 1,
-    visibility: "public",
-  });
-  await stores.savedFlowStore.getState().openFlow("old");
-  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
-
-  await saving.flush();
-
-  expect((await library.readFlow("old")).value).toMatchObject({
-    name: "Editado",
-    visibility: "public",
-  });
-  saving.close();
-});
-
 it("sends no visibility when an edit is autosaved", async () => {
   const { flows, drafts } = recordingFlows();
   const { stores, saving } = cloudSetup(flows);
@@ -280,81 +265,143 @@ it("sends no visibility when an edit is autosaved", async () => {
   saving.close();
 });
 
-it("sends no visibility when an open public flow is autosaved", async () => {
-  const hub = await signedInHub();
-  const drafts: Array<FlowDraft> = [];
-  const { stores, library, saving } = cloudSetup({
-    ...delegateTo(hub),
-    saveOwnFlow: (draft) => {
-      drafts.push(draft);
-      return hub.saveOwnFlow(draft);
+const LOCAL_FILE = manifestOf("core.source.file", {
+  category: "Fuentes",
+  inputs: [],
+  params: {
+    type: "object",
+    properties: {
+      sourceId: { type: "string", "x-nodomics": { widget: "source" } },
+      delimiter: { type: "string" },
     },
-  });
-  await library.saveFlow({
+  },
+});
+
+/** A flow whose file node points to a local source, which a publication never carries. */
+const fileFlow: Flow = {
+  ...flowOf([{ ...nodeOf("file", LOCAL_FILE.id), params: { sourceId: "src_1", delimiter: ";" } }]),
+  name: "Ventas",
+};
+
+function publishedLinkOf(published: Flow): NonNullable<SavedFlow["published"]> {
+  return {
+    publicationId: "pub_1",
+    handle: "ana",
+    slug: "ventas",
+    version: "0.1.0",
+    fingerprint: flowFingerprint(published),
+    hasChanges: false,
+  };
+}
+
+/** Signed in, with the engine's catalog known and `saved` open in the editor. */
+async function openPublishedFlow(saved: Flow, published: Flow) {
+  const setupResult = cloudSetup(await signedInHub());
+  setupResult.stores.engineStore
+    .getState()
+    .dispatch({ type: "catalog.loaded", nodes: [...CATALOG, LOCAL_FILE] });
+  await setupResult.library.saveFlow({
     id: "old",
     name: "Ventas",
-    flow,
+    flow: saved,
     files: {},
     updatedAt: 1,
-    visibility: "public",
+    published: publishedLinkOf(published),
   });
-  await stores.savedFlowStore.getState().openFlow("old");
-  drafts.length = 0;
-  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
+  await setupResult.stores.savedFlowStore.getState().openFlow("old");
+  return setupResult;
+}
+
+const rename = (stores: ReturnType<typeof cloudSetup>["stores"], name: string) => {
+  stores.flowStore.getState().dispatch({ type: "flow.rename", name });
+};
+
+it("marks a published flow as changed when an edit is autosaved", async () => {
+  const { stores, library, saving } = await openPublishedFlow(flow, flow);
+  rename(stores, "Editado");
 
   await saving.flush();
 
-  expect(drafts.map((draft) => "visibility" in draft)).toEqual([false]);
+  expect((await library.readFlow("old")).value?.published).toEqual({
+    ...publishedLinkOf(flow),
+    hasChanges: true,
+  });
   saving.close();
 });
 
-it("does not undo a visibility change made after the open flow was read", async () => {
-  const hub = await signedInHub();
-  const { library: writer } = cloudStores(hub);
-  await writer.saveFlow({ id: "old", name: "Ventas", flow, files: {}, updatedAt: 1 });
-  const { stores, saving } = cloudSetup(seenAsPrivate(hub));
-  await stores.savedFlowStore.getState().openFlow("old");
-  await writer.saveFlow({
-    id: "old",
-    name: "Ventas",
-    flow,
-    files: {},
-    updatedAt: 1,
-    visibility: "public",
-  });
-  stores.flowStore.getState().dispatch({ type: "flow.rename", name: "Editado" });
+it("marks a published flow as unchanged when an edit is undone back to the published content", async () => {
+  const { stores, library, saving } = await openPublishedFlow(flow, flow);
+  rename(stores, "Editado");
+  await saving.flush();
+  rename(stores, "Ventas");
 
   await saving.flush();
 
-  expect((await writer.readFlow("old")).value).toMatchObject({
+  expect((await library.readFlow("old")).value?.published).toEqual(publishedLinkOf(flow));
+  saving.close();
+});
+
+it("keeps the publication link while autosaving a published flow", async () => {
+  const { stores, library, saving } = await openPublishedFlow(flow, flow);
+  rename(stores, "Editado");
+
+  await saving.flush();
+
+  expect((await library.readFlow("old")).value).toMatchObject({
     name: "Editado",
-    visibility: "public",
+    published: { publicationId: "pub_1", handle: "ana", slug: "ventas", version: "0.1.0" },
   });
   saving.close();
 });
 
-/** A flow store that forwards every call to `store`, so a test can override one method. */
-function delegateTo(store: FlowStore): FlowStore {
-  return {
-    listOwnFlows: () => store.listOwnFlows(),
-    readFlow: (id) => store.readFlow(id),
-    saveOwnFlow: (draft) => store.saveOwnFlow(draft),
-    deleteOwnFlow: (id) => store.deleteOwnFlow(id),
-  };
-}
+it("compares the flow without its private params against the published fingerprint", async () => {
+  const published = withoutPrivateParams(fileFlow, [...CATALOG, LOCAL_FILE]);
+  const { stores, library, saving } = await openPublishedFlow(fileFlow, published);
+  rename(stores, "Editado");
+  await saving.flush();
+  rename(stores, "Ventas");
 
-/** Reads `store`'s flows as they were before another writer made them public. */
-function seenAsPrivate(store: FlowStore): FlowStore {
-  const asPrivate = (flow: StoredFlow): StoredFlow => ({ ...flow, visibility: "private" });
-  return {
-    ...delegateTo(store),
-    listOwnFlows: async () => {
-      const listed = await store.listOwnFlows();
-      return listed.ok ? ok(listed.value.map(asPrivate)) : listed;
-    },
-    readFlow: async (id) => {
-      const read = await store.readFlow(id);
-      return read.ok && read.value ? ok(asPrivate(read.value)) : read;
-    },
-  };
-}
+  await saving.flush();
+
+  expect((await library.readFlow("old")).value?.published?.hasChanges).toBe(false);
+  saving.close();
+});
+
+it("fingerprints the autosaved flow without its private params", async () => {
+  const { stores, library, saving } = await openPublishedFlow(fileFlow, fileFlow);
+  rename(stores, "Editado");
+  await saving.flush();
+  rename(stores, "Ventas");
+
+  await saving.flush();
+
+  expect((await library.readFlow("old")).value?.published?.hasChanges).toBe(true);
+  saving.close();
+});
+
+it("saves a flow without a publication link without one", async () => {
+  const { stores, library, saving } = cloudSetup(await signedInHub());
+  await library.saveFlow({ id: "old", name: "Ventas", flow, files: {}, updatedAt: 1 });
+  await stores.savedFlowStore.getState().openFlow("old");
+  rename(stores, "Editado");
+
+  await saving.flush();
+
+  const saved = (await library.readFlow("old")).value;
+  expect({ name: saved?.name, hasPublished: saved !== undefined && "published" in saved }).toEqual({
+    name: "Editado",
+    hasPublished: false,
+  });
+  saving.close();
+});
+
+it("saves a new flow without a publication link", async () => {
+  const { stores, library, saving } = cloudSetup(await signedInHub());
+  stores.flowStore.getState().dispatch({ type: "flow.load", flow });
+
+  await saving.flush();
+
+  const saved = (await library.readFlow("flow_test")).value;
+  expect(saved !== undefined && "published" in saved).toBe(false);
+  saving.close();
+});
