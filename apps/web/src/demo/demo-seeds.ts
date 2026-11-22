@@ -12,7 +12,7 @@ import {
 import type { Hub, HubProfile, PublicationDraft } from "@nodomics/hub";
 import { AREA_APP_SPECS, AREA_MODULE_SPECS } from "./demo-pipeline-specs-areas.ts";
 import { COMMUNITY_APP_SPECS } from "./demo-pipeline-specs-community.ts";
-import { enrichDraft, type PipelineSpec } from "./demo-pipelines.ts";
+import { enrichDraft, withOwnNodes, type PipelineSpec } from "./demo-pipelines.ts";
 import { SNAPSHOT_FORMAT, type Snapshot, type SnapshotState } from "@nodomics/hub";
 
 /* ----------------------------------------------------------------------------------
@@ -3469,7 +3469,7 @@ const PIPELINE_SPECS: Readonly<Record<string, PipelineSpec>> = {
 export const DEMO_INITIAL_DRAFTS: ReadonlyArray<SeedEntry> = BASE_DRAFTS.map(
   ({ handle, draft }) => ({
     handle,
-    draft: enrichDraft(draft, PIPELINE_SPECS[draft.slug]),
+    draft: withOwnNodes(enrichDraft(draft, PIPELINE_SPECS[draft.slug])),
   }),
 );
 

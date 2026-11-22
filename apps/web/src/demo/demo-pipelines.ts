@@ -61,6 +61,35 @@ function laidOut(nodes: ReadonlyArray<FlowNode>, edges: ReadonlyArray<FlowEdge>)
   });
 }
 
+/** The engine ships every `core.` node, so only the others need to travel with the flow. */
+const CORE_PREFIX = "core.";
+
+/**
+ * The seed's own nodes travel in the flow, not only in the preview snapshot, so a copy opened in the
+ * editor runs them. A patch bump lets the seed script publish the fixed flow over the old one.
+ */
+export function withOwnNodes(draft: PublicationDraft): PublicationDraft {
+  const used = new Set(draft.flow.nodes.map(({ type }) => type));
+  const carried = new Set((draft.flow.customNodes ?? []).map(({ id }) => id));
+  const missing = draft.snapshot.catalog.filter(
+    ({ id }) => used.has(id) && !id.startsWith(CORE_PREFIX) && !carried.has(id),
+  );
+  if (missing.length === 0) return draft;
+  return {
+    ...draft,
+    version: nextPatch(draft.version),
+    flow: { ...draft.flow, customNodes: [...(draft.flow.customNodes ?? []), ...missing] },
+  };
+}
+
+/** Patch bump that keeps a prerelease tag: `1.1.0-broken` → `1.1.1-broken`. */
+function nextPatch(version: string): string {
+  const [core = "0.0.0", ...tag] = version.split("-");
+  const [major = "0", minor = "0", patch = "0"] = core.split(".");
+  const bumped = `${major}.${minor}.${String(Number(patch) + 1)}`;
+  return tag.length > 0 ? `${bumped}-${tag.join("-")}` : bumped;
+}
+
 /** Minor bump that keeps a prerelease tag: `1.1.0-conflict` → `1.2.0-conflict`. */
 export function nextMinor(version: string): string {
   const [core = "0.0.0", ...tag] = version.split("-");
