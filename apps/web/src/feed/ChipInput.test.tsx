@@ -146,4 +146,17 @@ describe("ChipInput", () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it("removes exactly one entry when a value is repeated", async () => {
+    const { user, onChange } = renderChipInput(["modelos", "modelos", "datos"]);
+    const [firstRemove] = screen.getAllByRole("button", { name: "Quitar modelos" });
+    if (firstRemove === undefined) throw new Error("No Quitar button for modelos");
+
+    await user.click(firstRemove);
+
+    expect({ values: onChange.mock.lastCall?.[0], chips: chipCount() }).toEqual({
+      values: ["modelos", "datos"],
+      chips: 2,
+    });
+  });
 });
