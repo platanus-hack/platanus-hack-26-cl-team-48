@@ -15,10 +15,10 @@ const { tableToIPC: tableToIpcWithCommonJsArrow } = require("apache-arrow") as {
   tableToIPC: (table: Table, format: "stream") => Uint8Array;
 };
 
-/** Test support: an in-process DuckDB-WASM for Node, where the browser worker bundles do not run. */
 export async function openNodeDuckDb(): Promise<{
   readonly files: DuckDbFiles;
   readonly connection: DuckDbConnection;
+  readonly dispose: () => void;
 }> {
   const db = await createDuckDB(
     {
@@ -37,6 +37,10 @@ export async function openNodeDuckDb(): Promise<{
       insertArrowFromIPCStream: (bytes, options) => {
         connection.insertArrowFromIPCStream(bytes, options);
       },
+    },
+    dispose: () => {
+      connection.close();
+      db.reset();
     },
   };
 }

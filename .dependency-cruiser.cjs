@@ -155,6 +155,7 @@ module.exports = {
           "^packages/$2/",
           "^packages/ui/src/(tokens|fonts|components)\\.css$",
           "^packages/engine-[^/]+/src/worker\\.ts$",
+          "^packages/executor-duckdb-wasm/src/node\\.ts$",
         ],
       },
     },
