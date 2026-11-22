@@ -22,7 +22,7 @@ function opTool(op: DraftOp): FakeTool {
   return defineTool({
     name: `flows.${op.name}`,
     description: op.description,
-    schema: Type.Intersect([DraftRef, op.schema]),
+    schema: Type.Composite([DraftRef, op.schema]),
     handler: (state, args) => {
       const draft = state.drafts[args.draftId];
       if (!draft) return toolFailed(`Draft "${args.draftId}" does not exist`);
