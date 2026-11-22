@@ -28,7 +28,7 @@ function saveFailedNotice({ code, issues }: FeedError): EditorNotice {
   return {
     tone: "error",
     title: TEXT.invalid,
-    ...(issues === undefined ? {} : { detail: TEXT.checkFields(fieldLabelsOf(issues)) }),
+    detail: TEXT.checkFields(fieldLabelsOf(issues ?? [])),
   };
 }
 

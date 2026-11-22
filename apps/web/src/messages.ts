@@ -170,9 +170,9 @@ export const MESSAGES = {
         save: "Guardar perfil",
         edit: "Volver a editar",
       },
-      invalid: "Revisa los campos marcados.",
+      invalid: "No pudimos guardar tu perfil. Revisa estos datos:",
       checkFields: (labels: ReadonlyArray<string>) =>
-        labels.length === 0 ? "Revisa tus datos." : `Revisa: ${labels.join(", ")}.`,
+        labels.length === 0 ? "Revisa tus datos e intenta de nuevo." : `${labels.join(", ")}.`,
       saveFailed: "No pudimos guardar tu perfil. Intenta de nuevo.",
     },
     chips: {

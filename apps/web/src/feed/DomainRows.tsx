@@ -13,15 +13,18 @@ type DomainRowsProps = {
   readonly onChange: (domains: ReadonlyArray<DomainDraft>) => void;
 };
 
-/** The second axis of the card: the topics the person knows and how deeply. */
+/**
+ * The second axis of the card: the topics the person knows and how deeply. Rows are edited by
+ * position, because a card from the registration agent may repeat a topic name.
+ */
 export function DomainRows({ domains, onChange }: DomainRowsProps) {
   const add = (text: string) => {
     const name = text.trim();
     if (name === "" || domains.some((domain) => domain.name === name)) return;
     onChange([...domains, { name, depth: DEFAULT_DEPTH }]);
   };
-  const replace = (next: DomainDraft) => {
-    onChange(domains.map((domain) => (domain.name === next.name ? next : domain)));
+  const replaceAt = (position: number, next: DomainDraft) => {
+    onChange(domains.map((domain, index) => (index === position ? next : domain)));
   };
   return (
     <div className="web-feed-topics">
@@ -30,13 +33,15 @@ export function DomainRows({ domains, onChange }: DomainRowsProps) {
       </Field>
       {domains.length > 0 && (
         <ul className="web-feed-topic-list">
-          {domains.map((domain) => (
+          {domains.map((domain, position) => (
             <TopicRow
-              key={domain.name}
+              key={position}
               domain={domain}
-              onChange={replace}
+              onChange={(next) => {
+                replaceAt(position, next);
+              }}
               onRemove={() => {
-                onChange(domains.filter(({ name }) => name !== domain.name));
+                onChange(domains.filter((_, index) => index !== position));
               }}
             />
           ))}
