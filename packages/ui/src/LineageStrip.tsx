@@ -77,7 +77,7 @@ function renderSegment(segment: LineageSegment, index: number) {
           cx={x1}
           cy={STRIP_Y}
           r="3.5"
-          fill="var(--brand-paper, var(--surface-100))"
+          fill="var(--nd-glyph-halo, var(--brand-paper, var(--surface-100)))"
           stroke="var(--lineage-adapt, var(--accent))"
           strokeWidth="1.5"
         />

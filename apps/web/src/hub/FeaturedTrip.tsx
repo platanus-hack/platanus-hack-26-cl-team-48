@@ -7,7 +7,11 @@ import { lineageFromSummary } from "./hub-lineage.ts";
 const UPDATED = new Intl.DateTimeFormat("es", { month: "short", year: "numeric" });
 
 /** The newest real publication, shown beside the hero; nothing when the hub is empty. */
-export function FeaturedTrip({ publication }: { readonly publication?: PublicationSummary }) {
+export function FeaturedTrip({
+  publication,
+}: {
+  readonly publication: PublicationSummary | undefined;
+}) {
   if (publication === undefined) return null;
   const { owner, slug, kind, title, description, updatedAt } = publication;
   return (

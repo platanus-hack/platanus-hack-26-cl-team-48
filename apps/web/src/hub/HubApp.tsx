@@ -6,6 +6,7 @@ import { MESSAGES } from "../messages.ts";
 import { RouteLink } from "../routing/RouteLink.tsx";
 import type { EditorOpening, Route } from "../routing/routes.ts";
 import { navigate, useRoute } from "../routing/use-route.ts";
+import { StoredThemeControl } from "../theme/StoredThemeControl.tsx";
 import { AccountButton } from "./AccountButton.tsx";
 import { HubPage } from "./HubPage.tsx";
 import { ProfilePage } from "./ProfilePage.tsx";
@@ -69,6 +70,7 @@ function HubBar({
         />
       </search>
       <div className="web-hub-bar-end">
+        <StoredThemeControl />
         <AccountButton />
       </div>
     </header>

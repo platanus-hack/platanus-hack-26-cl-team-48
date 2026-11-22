@@ -35,10 +35,12 @@ const INITIAL_FILTERS: HubFilterState = {
 };
 
 const MAX_QUICK_TOPICS = 5;
+const ignoreSearch = () => undefined;
 
 type HubPageProps = {
   readonly text: string;
-  readonly onSearch: (text: string) => void;
+  /** Shares the hero search with the hub bar; without it the hero box only shows the text. */
+  readonly onSearch?: (text: string) => void;
   readonly onOpenEditor: (opening: EditorOpening) => void;
   readonly onOpenCopy: (flow: Flow) => void;
 };
@@ -82,7 +84,7 @@ export function HubPage({ text, onSearch, onOpenEditor }: HubPageProps) {
                 label={MESSAGES.hub.heroSearch}
                 placeholder={MESSAGES.hub.heroPlaceholder}
                 value={text}
-                onChange={onSearch}
+                onChange={onSearch ?? ignoreSearch}
               />
             </div>
             <QuickTopics

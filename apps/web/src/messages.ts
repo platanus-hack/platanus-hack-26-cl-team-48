@@ -40,6 +40,11 @@ export const MESSAGES = {
     title: "Hub",
     search: "Buscar en el hub",
     searchPlaceholder: "Buscar flujos, nodos o personas…",
+    heroTitle: "Encuentra lo que ya funcionó en otro lugar.",
+    heroSearch: "Busca un problema",
+    heroPlaceholder: "Busca un problema: controles atrasados, churn, limpiar un censo…",
+    quickTopics: "Temas rápidos",
+    featured: "Publicación más reciente",
     filters: "Filtros del hub",
     explore: "Explorar",
     views: {
