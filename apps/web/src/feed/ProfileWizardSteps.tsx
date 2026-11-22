@@ -3,7 +3,7 @@ import { Field, Icon, Input, type IconName } from "@nodomics/ui";
 import { Avatar } from "../hub/Avatar.tsx";
 import { MESSAGES } from "../messages.ts";
 import { CardTextArea } from "./CardTextArea.tsx";
-import { cardOfDraft, type CardDraft } from "./card-draft.ts";
+import { cardOfDraft, checkLink, type CardDraft } from "./card-draft.ts";
 import { ChipInput } from "./ChipInput.tsx";
 import { DomainRows } from "./DomainRows.tsx";
 import { CardDetails, CardSummary } from "./ProfileCardView.tsx";
@@ -117,7 +117,11 @@ export function SeekStep({ draft, change }: DraftStepProps) {
       <fieldset className="web-feed-links-fields">
         <legend>{TEXT.seek.links}</legend>
         {LINK_FIELDS.map((key) => (
-          <Field key={key} label={TEXT.seek[key]}>
+          <Field
+            key={key}
+            label={TEXT.seek[key]}
+            {...(checkLink(draft[key]).kind === "invalid" ? { error: TEXT.seek.invalidLink } : {})}
+          >
             <Input
               icon="globe"
               value={draft[key]}

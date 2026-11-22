@@ -3,6 +3,7 @@ import type { ProfileCard } from "@nodomics/profile";
 import { Button, Notice } from "@nodomics/ui";
 import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../messages.ts";
+import { hasInvalidLinks } from "./card-draft.ts";
 import type { FeedService } from "./feed-service.ts";
 import { RegistrationFields } from "./RegistrationFields.tsx";
 import { AboutStep, HelpStep, PreviewStep, SeekStep, StartStep } from "./ProfileWizardSteps.tsx";
@@ -65,6 +66,7 @@ export function ProfileWizard({ feed, profile, initial, onSaved, onCancel }: Pro
         step={step}
         entry={entry}
         busy={editor.busy}
+        canAdvance={!hasInvalidLinks(editor.draft)}
         onGo={goTo}
         onSave={() => void editor.save()}
         onCancel={onCancel}
@@ -164,6 +166,8 @@ type WizardFooterProps = {
   readonly step: Step;
   readonly entry: Step;
   readonly busy: Busy;
+  /** False while a link is not a web address, so it is fixed before the preview. */
+  readonly canAdvance: boolean;
   readonly onGo: (step: Step) => void;
   readonly onSave: () => void;
   readonly onCancel: () => void;
@@ -206,7 +210,7 @@ function PreviewButtons({ busy, onGo, onSave }: StepButtonsProps) {
   );
 }
 
-function StepButtons({ step, entry, busy, onGo }: StepButtonsProps) {
+function StepButtons({ step, entry, busy, canAdvance, onGo }: StepButtonsProps) {
   const back = previousStep(step, entry);
   const next = nextStep(step);
   return (
@@ -225,6 +229,7 @@ function StepButtons({ step, entry, busy, onGo }: StepButtonsProps) {
       {next !== undefined && (
         <Button
           variant="primary"
+          disabled={!canAdvance}
           onClick={() => {
             onGo(next);
           }}
