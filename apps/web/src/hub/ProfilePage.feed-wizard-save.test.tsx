@@ -1,0 +1,129 @@
+import type { ProfileCard } from "@nodomics/profile";
+import { err, ok } from "@nodomics/protocol";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { ANA_CARD, MINIMAL_CARD } from "../feed/feed-fixtures.ts";
+import type { FeedService } from "../feed/feed-service.ts";
+import {
+  clickInWizard,
+  clickNext,
+  deferred,
+  editCard,
+  isButtonDisabled,
+  startNewCard,
+  textbox,
+  wizard,
+  wizardIsOpen,
+} from "./profile-wizard-fixtures.tsx";
+
+const SAVE = "Guardar perfil";
+
+afterEach(() => {
+  window.history.replaceState(null, "", "/");
+});
+
+async function saveMinimalCard(overrides: Partial<FeedService> = {}) {
+  const rendered = await editCard(MINIMAL_CARD, overrides);
+  await clickNext(rendered.user, 3);
+  await clickInWizard(rendered.user, SAVE);
+  return rendered;
+}
+
+describe("ProfilePage wizard save", () => {
+  it("saves a card built from every step of the draft", async () => {
+    const { user, saveProfile } = await startNewCard();
+    await clickInWizard(user, "Lo escribo yo");
+    await user.type(textbox("Sobre ti"), "  Hola mundo  ");
+    await user.click(within(wizard()).getByRole("radio", { name: "Programo nodos nuevos" }));
+    await clickNext(user);
+    await user.type(textbox("Puedo ayudar con"), "modelos{Enter}datos,");
+    await user.type(textbox("Temas que conoces"), "estadística{Enter}");
+    await user.click(
+      within(within(wizard()).getByRole("radiogroup", { name: "Nivel en estadística" })).getByRole(
+        "radio",
+        { name: "Soy experto/a" },
+      ),
+    );
+    await clickNext(user);
+    await user.type(textbox("Busco"), "colaboradores{Enter}");
+    await user.type(textbox("GitHub"), "https://github.com/ana");
+    await clickNext(user);
+
+    await clickInWizard(user, SAVE);
+
+    await waitFor(() => {
+      expect(saveProfile).toHaveBeenCalledWith({
+        schemaVersion: 1,
+        about: "Hola mundo",
+        technical: "codes",
+        domains: [{ name: "estadística", depth: "expert" }],
+        offers: ["modelos", "datos"],
+        seeks: ["colaboradores"],
+        links: { github: "https://github.com/ana" },
+      });
+    });
+  });
+
+  it("saves an unchanged existing card as it was", async () => {
+    const { saveProfile } = await saveMinimalCard();
+
+    await waitFor(() => {
+      expect(saveProfile).toHaveBeenCalledWith(MINIMAL_CARD);
+    });
+  });
+
+  it("sends only the links that are filled", async () => {
+    const { user, saveProfile } = await editCard(MINIMAL_CARD);
+    await clickNext(user, 2);
+    await user.type(textbox("LinkedIn"), "   ");
+    await user.type(textbox("Sitio web"), "https://ana.example.com");
+    await clickNext(user);
+
+    await clickInWizard(user, SAVE);
+
+    await waitFor(() => {
+      expect(saveProfile).toHaveBeenCalledWith({
+        ...MINIMAL_CARD,
+        links: { website: "https://ana.example.com" },
+      });
+    });
+  });
+
+  it("closes the wizard and shows the saved card on success", async () => {
+    await saveMinimalCard({ saveProfile: () => Promise.resolve(ok(ANA_CARD)) });
+
+    expect(await screen.findByText(ANA_CARD.about)).toBeTruthy();
+    expect(wizardIsOpen()).toBe(false);
+  });
+
+  it("asks to review the fields and stays in the wizard on INVALID_CARD", async () => {
+    await saveMinimalCard({
+      saveProfile: () =>
+        Promise.resolve(err({ code: "INVALID_CARD", issues: [{ path: "/about", message: "x" }] })),
+    });
+
+    expect(await screen.findByText("Revisa los campos marcados.")).toBeTruthy();
+    expect(wizardIsOpen()).toBe(true);
+  });
+
+  it("asks to try again on any other failure", async () => {
+    await saveMinimalCard({ saveProfile: () => Promise.resolve(err({ code: "UNAVAILABLE" })) });
+
+    expect(await screen.findByText("No pudimos guardar tu perfil. Intenta de nuevo.")).toBeTruthy();
+    expect(wizardIsOpen()).toBe(true);
+  });
+
+  it("disables Guardar perfil while saving", async () => {
+    const pending = deferred<ProfileCard>();
+
+    await saveMinimalCard({ saveProfile: () => pending.promise });
+
+    await waitFor(() => {
+      expect(isButtonDisabled(SAVE)).toBe(true);
+    });
+    await act(async () => {
+      pending.resolve(err({ code: "UNAVAILABLE" }));
+      await pending.promise;
+    });
+  });
+});
