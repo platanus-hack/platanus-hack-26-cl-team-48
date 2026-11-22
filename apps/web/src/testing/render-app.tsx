@@ -1,4 +1,7 @@
 import type { Hub } from "@nodomics/hub";
+import { AgentContext } from "../agent/agent-context.ts";
+import type { AgentService } from "../agent/agent-service.ts";
+import { createMemoryAgentService } from "../agent/memory-agent-service.ts";
 import { App } from "../App.tsx";
 import { createAppStores, type AppStores } from "../app-stores.ts";
 import type { EngineEntry } from "../engine/engine-entry.ts";
@@ -30,6 +33,7 @@ type RenderAppOptions = {
   readonly path?: string;
   readonly stores?: AppStores;
   readonly hub?: Hub;
+  readonly agent?: AgentService;
   readonly handlers?: FakeHandlers;
   readonly preferences?: Partial<WorkspacePreferences>;
 };
@@ -46,12 +50,14 @@ export function renderApp(options: RenderAppOptions = {}) {
   const preferences = createMemoryPreferences(options.preferences);
   const rendered = renderWithStores(
     <HubContext value={options.hub ?? createTestHub()}>
-      <App
-        engines={[engine]}
-        defaultEngine={engine}
-        shouldRunOnConnect={false}
-        preferenceStorage={preferences.storage}
-      />
+      <AgentContext value={options.agent ?? createMemoryAgentService()}>
+        <App
+          engines={[engine]}
+          defaultEngine={engine}
+          shouldRunOnConnect={false}
+          preferenceStorage={preferences.storage}
+        />
+      </AgentContext>
     </HubContext>,
     options.stores ?? createAppStores(),
   );

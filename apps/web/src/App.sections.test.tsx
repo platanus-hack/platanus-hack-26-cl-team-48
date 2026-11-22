@@ -243,74 +243,19 @@ describe("Credenciales section", () => {
   });
 });
 
-describe("Agente section mockup", () => {
-  it("says the agent is a mockup", async () => {
+describe("Agente section", () => {
+  it("no longer says the agent is a mockup", async () => {
     await renderSection("agent");
 
-    expect(
-      within(panel("Agente")).getByText(/Maqueta: el agente todavía no está conectado\./),
-    ).toBeTruthy();
+    expect(within(panel("Agente")).queryByText(/Maqueta/)).toBeNull();
   });
 
-  it("shows proposals whose Aceptar and Rechazar buttons are disabled", async () => {
+  it("offers a field to write to the agent and an Enviar button", async () => {
     await renderSection("agent");
 
-    const buttons = [
-      ...within(panel("Agente")).getAllByRole("button", { name: "Aceptar" }),
-      ...within(panel("Agente")).getAllByRole("button", { name: "Rechazar" }),
-    ];
-
-    expect(buttons.map((button) => button.hasAttribute("disabled"))).toEqual(
-      buttons.map(() => true),
-    );
+    expect([
+      within(panel("Agente")).queryByRole("textbox", { name: "Escribe al agente" }),
+      within(panel("Agente")).queryByRole("button", { name: "Enviar" }),
+    ]).not.toContain(null);
   });
-
-  it("pairs each proposal's Aceptar with a Rechazar", async () => {
-    await renderSection("agent");
-
-    expect(within(panel("Agente")).getAllByRole("button", { name: "Aceptar" }).length).toBe(
-      within(panel("Agente")).getAllByRole("button", { name: "Rechazar" }).length,
-    );
-  });
-
-  it("disables the message field", async () => {
-    await renderSection("agent");
-
-    expect(
-      within(panel("Agente"))
-        .getByRole("textbox", { name: "Escribe al agente" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
-  });
-
-  it("says the agent works on a draft", async () => {
-    await renderSection("agent");
-
-    expect(within(panel("Agente")).getByText(/Trabaja en un borrador/)).toBeTruthy();
-  });
-
-  it("offers a disabled Ver en el lienzo for each proposal", async () => {
-    await renderSection("agent");
-
-    const show = within(panel("Agente")).getAllByRole("button", { name: "Ver en el lienzo" });
-
-    expect({
-      count: show.length,
-      disabled: show.map((button) => button.hasAttribute("disabled")),
-    }).toEqual({
-      count: within(panel("Agente")).getAllByRole("button", { name: "Aceptar" }).length,
-      disabled: show.map(() => true),
-    });
-  });
-
-  it.each(["Aceptar los 3", "Descartar borrador"])(
-    "offers a disabled %s button for the whole draft",
-    async (name) => {
-      await renderSection("agent");
-
-      expect(within(panel("Agente")).getByRole("button", { name }).hasAttribute("disabled")).toBe(
-        true,
-      );
-    },
-  );
 });

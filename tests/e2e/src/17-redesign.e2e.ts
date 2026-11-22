@@ -53,18 +53,13 @@ test("shows Nodos instead of a remembered section that needs an account while si
   await expect(sidePanelOf(page, "Agente")).toHaveCount(0);
 });
 
-test("shows the agent as a mockup that cannot act", async ({ page }) => {
+test("shows the agent connected, with no mockup note", async ({ page }) => {
   await openEmptyApp(page);
   await signInLocally(page);
   const agent = await showSidePanel(page, "Agente");
-  await expect(agent.getByText("Maqueta: el agente todavía no está conectado.")).toBeVisible();
-  await expect(agent.getByRole("button", { name: "Aceptar" }).first()).toBeDisabled();
-  await expect(agent.getByRole("button", { name: "Rechazar" }).first()).toBeDisabled();
-  await expect(agent.getByRole("textbox", { name: "Escribe al agente" })).toBeDisabled();
-  await expect(agent.getByText(/Trabaja en un borrador/)).toBeVisible();
-  await expect(agent.getByRole("button", { name: "Ver en el lienzo" }).first()).toBeDisabled();
-  await expect(agent.getByRole("button", { name: "Aceptar los 3" })).toBeDisabled();
-  await expect(agent.getByRole("button", { name: "Descartar borrador" })).toBeDisabled();
+  await expect(agent.getByText(/Maqueta/)).toHaveCount(0);
+  await expect(agent.getByRole("textbox", { name: "Escribe al agente" })).toBeVisible();
+  await expect(agent.getByRole("button", { name: "Enviar" })).toBeDisabled();
 });
 
 test("shows a node's history as a mockup tab of the parameters", async ({ page }) => {
