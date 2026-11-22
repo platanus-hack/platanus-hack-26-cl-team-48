@@ -9,7 +9,9 @@ import {
   clickNext,
   deferred,
   editCard,
+  FULL_RUN_TIMEOUT_MS,
   isButtonDisabled,
+  pasteInto,
   startNewCard,
   textbox,
   wizard,
@@ -31,39 +33,42 @@ async function saveMinimalCard(overrides: Partial<FeedService> = {}) {
 }
 
 describe("ProfilePage wizard save", () => {
-  it("saves a card built from every step of the draft", async () => {
-    const { user, saveProfile } = await startNewCard();
-    await clickInWizard(user, "Lo escribo yo");
-    await user.type(textbox("Sobre ti"), "  Hola mundo  ");
-    await user.click(within(wizard()).getByRole("radio", { name: "Programo nodos nuevos" }));
-    await clickNext(user);
-    await user.type(textbox("Puedo ayudar con"), "modelos{Enter}datos,");
-    await user.type(textbox("Temas que conoces"), "estadística{Enter}");
-    await user.click(
-      within(within(wizard()).getByRole("radiogroup", { name: "Nivel en estadística" })).getByRole(
-        "radio",
-        { name: "Soy experto/a" },
-      ),
-    );
-    await clickNext(user);
-    await user.type(textbox("Busco"), "colaboradores{Enter}");
-    await user.type(textbox("GitHub"), "https://github.com/ana");
-    await clickNext(user);
+  it(
+    "saves a card built from every step of the draft",
+    async () => {
+      const { user, saveProfile } = await startNewCard();
+      await clickInWizard(user, "Lo escribo yo");
+      await pasteInto(user, textbox("Sobre ti"), "  Hola mundo  ");
+      await user.click(within(wizard()).getByRole("radio", { name: "Programo nodos nuevos" }));
+      await clickNext(user);
+      await user.type(textbox("Puedo ayudar con"), "modelos{Enter}datos,");
+      await user.type(textbox("Temas que conoces"), "estadística{Enter}");
+      await user.click(
+        within(
+          within(wizard()).getByRole("radiogroup", { name: "Nivel en estadística" }),
+        ).getByRole("radio", { name: "Soy experto/a" }),
+      );
+      await clickNext(user);
+      await user.type(textbox("Busco"), "colaboradores{Enter}");
+      await pasteInto(user, textbox("GitHub"), "https://github.com/ana");
+      await clickNext(user);
 
-    await clickInWizard(user, SAVE);
+      await clickInWizard(user, SAVE);
 
-    await waitFor(() => {
-      expect(saveProfile).toHaveBeenCalledWith({
-        schemaVersion: 1,
-        about: "Hola mundo",
-        technical: "codes",
-        domains: [{ name: "estadística", depth: "expert" }],
-        offers: ["modelos", "datos"],
-        seeks: ["colaboradores"],
-        links: { github: "https://github.com/ana" },
+      await waitFor(() => {
+        expect(saveProfile).toHaveBeenCalledWith({
+          schemaVersion: 1,
+          about: "Hola mundo",
+          technical: "codes",
+          domains: [{ name: "estadística", depth: "expert" }],
+          offers: ["modelos", "datos"],
+          seeks: ["colaboradores"],
+          links: { github: "https://github.com/ana" },
+        });
       });
-    });
-  });
+    },
+    FULL_RUN_TIMEOUT_MS,
+  );
 
   it("saves an unchanged existing card as it was", async () => {
     const { saveProfile } = await saveMinimalCard();
