@@ -3,6 +3,8 @@
 
 create role anon nologin;
 create role authenticated nologin;
+-- Supabase's service role skips Row Level Security.
+create role service_role nologin bypassrls;
 
 create schema extensions;
 create schema auth;

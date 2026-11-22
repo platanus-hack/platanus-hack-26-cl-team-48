@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the SQL tests against a throwaway pgvector Postgres: stub, migrations in order, then tests.
+# Runs the SQL tests against a throwaway pgvector Postgres: stub, migrations in order, then every *.test.sql.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,10 +31,15 @@ for f in $(ls "$migrations"/*.sql | sort); do
   psql_file "$f" || { echo "FAIL: migration $(basename "$f")"; exit 1; }
 done
 
-echo "== tests"
-if psql_file "$here/feed_profile_cards.test.sql"; then
-  echo "PASS"
-else
-  echo "FAIL"
-  exit 1
-fi
+failed=0
+for t in $(ls "$here"/*.test.sql | sort); do
+  echo "== test $(basename "$t")"
+  if psql_file "$t"; then
+    echo "PASS $(basename "$t")"
+  else
+    echo "FAIL $(basename "$t")"
+    failed=1
+  fi
+done
+
+[ "$failed" = 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }

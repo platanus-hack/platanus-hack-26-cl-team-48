@@ -1,4 +1,4 @@
-# Render blueprint: web interface, agent service and MCP engine server.
+# Render blueprint: web interface, agent service, MCP engine server and hosting service.
 services:
   - type: web
     name: nodomics-web
@@ -13,6 +13,9 @@ services:
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      # The hosting service (ADR 0027). Without it, the Despliegue tab says hosting is unavailable.
+      - key: VITE_DEPLOY_URL
         sync: false
     # The app routes /hub, /u/<handle> and /hub/<handle>/<slug> in the browser.
     routes:
@@ -68,4 +71,28 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
+        sync: false
+  # Deploys hosting nodes (ADR 0027). RENDER_API_KEY belongs to a dedicated Render account that
+  # does not host these services; SUPABASE_SERVICE_ROLE_KEY writes the deployments table.
+  - type: web
+    name: nodomics-deploy
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: node apps/deploy/src/start.ts
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_OWNER_ID
+        sync: false
+      - key: DEPLOY_ALLOWED_ORIGINS
         sync: false
