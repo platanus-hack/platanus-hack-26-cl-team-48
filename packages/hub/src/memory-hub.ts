@@ -128,9 +128,9 @@ export function createMemoryHub({
 }
 
 function profileFor(method: SignInMethod, profiles: ReadonlyArray<HubProfile>) {
-  return method.kind === "email"
-    ? profiles.find(({ handle }) => handle === method.email)
-    : profiles[0];
+  return method.kind === "provider"
+    ? profiles[0]
+    : profiles.find(({ handle }) => handle === method.email);
 }
 
 function withVersion(

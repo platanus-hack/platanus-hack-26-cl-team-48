@@ -1,7 +1,8 @@
 import { err, ok } from "@nodomics/protocol";
-import type { PostgrestError } from "@supabase/supabase-js";
+import type { AuthError, PostgrestError } from "@supabase/supabase-js";
 import type {
   Hub,
+  HubError,
   HubProfile,
   HubResult,
   PublicationDetail,
@@ -118,14 +119,38 @@ async function signIn(
   method: SignInMethod,
   redirectTo: string,
 ): Promise<HubResult<void>> {
-  const { error } =
-    method.kind === "email"
-      ? await client.auth.signInWithOtp({
-          email: method.email,
-          options: { emailRedirectTo: redirectTo },
-        })
-      : await client.auth.signInWithOAuth({ provider: method.provider, options: { redirectTo } });
-  return error === null ? ok(undefined) : err({ kind: "unavailable", detail: error.message });
+  const { error } = await authenticate(client, method, redirectTo);
+  return error === null ? ok(undefined) : err(toSignInError(error));
+}
+
+function authenticate(client: HubClient, method: SignInMethod, redirectTo: string) {
+  switch (method.kind) {
+    case "provider":
+      return client.auth.signInWithOAuth({ provider: method.provider, options: { redirectTo } });
+    case "email":
+      return client.auth.signInWithOtp({
+        email: method.email,
+        options: { emailRedirectTo: redirectTo },
+      });
+    case "password":
+      return client.auth.signInWithPassword({ email: method.email, password: method.password });
+    case "sign-up":
+      return client.auth.signUp({
+        email: method.email,
+        password: method.password,
+        options: { emailRedirectTo: redirectTo },
+      });
+  }
+}
+
+/** How Supabase Auth answers wrong credentials, a taken email or a weak password. */
+const REJECTED_STATUSES: ReadonlySet<number | undefined> = new Set([400, 422]);
+
+function toSignInError(error: AuthError): HubError {
+  return {
+    kind: REJECTED_STATUSES.has(error.status) ? "invalid" : "unavailable",
+    detail: error.message,
+  };
 }
 
 async function search(client: HubClient, { text, kind }: SearchQuery) {
