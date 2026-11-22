@@ -27,3 +27,7 @@ export const findNode = (graph: FlatGraph, nodeId: string): FlatNode | undefined
 
 export const incomingEdges = (graph: FlatGraph, nodeId: string): ReadonlyArray<FlowEdge> =>
   graph.edges.filter((edge) => edge.to.node === nodeId);
+
+/** A resource node (ADR 0027) describes something to deploy: no executor runs it. */
+export const isResourceNode = (graph: FlatGraph, nodeId: string): boolean =>
+  findNode(graph, nodeId)?.manifest.impl.kind === "resource";

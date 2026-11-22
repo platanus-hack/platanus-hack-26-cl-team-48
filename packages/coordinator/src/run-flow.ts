@@ -4,7 +4,7 @@ import { withCompositeEvents } from "./composite-events.ts";
 import { diffAgainstCache } from "./diff-against-cache.ts";
 import { executorAt, type EngineState, type RunContext } from "./engine-state.ts";
 import { executeTask } from "./execute-task.ts";
-import { findNode, incomingEdges } from "./flat-graph.ts";
+import { findNode, incomingEdges, isResourceNode, type FlatGraph } from "./flat-graph.ts";
 import { checkOutputContract } from "./output-contract.ts";
 import { planExecution, type PlannedStep } from "./plan-execution.ts";
 import type { Evictions, NodeRun } from "./result-store.ts";
@@ -36,9 +36,11 @@ export async function runFlow(
   const startedAt = engine.now();
   const keys = selectTargets(run.analysis, targets);
   const state = withCompositeEvents(engine, run, keys);
-  const { stale, cached } = diffAgainstCache(keys, state.store);
+  const { stale: outdated, cached } = diffAgainstCache(keys, state.store);
+  const { resources, stale } = splitResources(run.analysis.graph, outdated);
   const unplannable = reportUnplannable(state, run);
   reportCached(state, run, { nodeIds: cached, keys });
+  reportResources(state, run, resources);
   stale.forEach((nodeId) => {
     emitStatus(state, run, { nodeId, state: "queued" });
   });
@@ -133,6 +135,22 @@ const readsFromUnavailable = (context: StepContext, nodeId: string) =>
   incomingEdges(context.run.analysis.graph, nodeId).some((edge) =>
     context.unavailable.has(edge.from.node),
   );
+
+/** Resource nodes stay out of the plan: they never reach an executor (ADR 0027). */
+const splitResources = (graph: FlatGraph, nodeIds: ReadonlyArray<string>) => ({
+  resources: nodeIds.filter((nodeId) => isResourceNode(graph, nodeId)),
+  stale: nodeIds.filter((nodeId) => !isResourceNode(graph, nodeId)),
+});
+
+function reportResources(
+  state: EngineState,
+  run: RunContext,
+  nodeIds: ReadonlyArray<string>,
+): void {
+  nodeIds.forEach((nodeId) => {
+    emitStatus(state, run, { nodeId, state: "done" });
+  });
+}
 
 /** Nodes that could not even be planned (unknown type, cycle) fail with their issue. */
 function reportUnplannable(state: EngineState, run: RunContext): number {

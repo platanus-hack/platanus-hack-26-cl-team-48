@@ -48,6 +48,7 @@ const COMPILERS: Record<ImplKind, Compiler> = {
   },
   flow: { runtime: "sql", compile: rejectUnexpanded },
   builtin: { runtime: "sql", compile: compileBuiltin },
+  resource: { runtime: "sql", compile: rejectResource },
 };
 
 /** The runtime a node needs: declared in `requires`, or implied by its implementation. */
@@ -89,6 +90,10 @@ function compileBuiltin(node: FlatNode, graph: FlatGraph): Result<CompiledTask, 
 
 function rejectUnexpanded(node: FlatNode): never {
   throw new Error(`Node ${node.id} should have been expanded before planning`);
+}
+
+function rejectResource(node: FlatNode): never {
+  throw new Error(`Resource node ${node.id} is never planned: no executor runs it (ADR 0027)`);
 }
 
 /** Each input port is visible to the task under its own id. */

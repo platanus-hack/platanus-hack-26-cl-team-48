@@ -148,6 +148,7 @@ const EXPANDERS: Expanders = {
   sql: expandSimple,
   python: expandSimple,
   view: expandSimple,
+  resource: expandSimple,
   builtin: (node, manifest, level) => BOUNDARIES[manifest.impl.name](node, manifest, level),
   flow: (node, manifest, level) => {
     return {
