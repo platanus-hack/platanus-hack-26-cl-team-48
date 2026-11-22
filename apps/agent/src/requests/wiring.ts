@@ -15,6 +15,7 @@ import {
 } from "../http/guards/rate-limit.ts";
 import { buildFeedRoutes } from "../feed/feed-wiring.ts";
 import { createServer } from "../server.ts";
+import { createStructuredLogger } from "../http/guards/logger.ts";
 import { buildMemoryDeps } from "../memory/recording-mcp-deps.ts";
 import type { MemoryPort } from "../memory/memory-port.ts";
 import { createFakeMemory } from "../memory/fake-memory.ts";
@@ -129,6 +130,7 @@ export function buildRequestDeps(config: AgentConfig): RequestDeps {
   return {
     identity: selectIdentity(config),
     llm: createAnthropicLlm({ apiKey: config.anthropicApiKey }),
+    logger: createStructuredLogger(),
     mcp: selectMcp(config.mcpUrl),
     proposals: selectProposalStore(config),
     search: selectSearch(config),
@@ -229,7 +231,11 @@ export function assembleServer(
     rateLimiter: createRateLimiter({ perMinute: ROUTES_PER_MINUTE }),
   });
   const rateLimiter = createRateLimiter({ perMinute: REQUESTS_PER_MINUTE });
-  return createServer({ handleRequest: createHandleRequest({ ...recorded, rateLimiter }), router });
+  return createServer({
+    handleRequest: createHandleRequest({ ...recorded, rateLimiter }),
+    router,
+    ...(deps.logger ? { logger: deps.logger } : {}),
+  });
 }
 
 /** The LLM, identity and memory are created once and shared by /agent/requests and the router. */
