@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { PreviewLocationContext } from "../layout/preview-location.ts";
 import { renderWithEngine } from "../testing/render-with-engine.tsx";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
-import { nodeOf } from "./canvas-fixtures.ts";
+import { createAppStores } from "../app-stores.ts";
+import { CATALOG, FILTER, flowOf, manifestOf, nodeOf } from "./canvas-fixtures.ts";
 import { NodeActionToolbar } from "./NodeActionToolbar.tsx";
 
 function setup(opened: string[] = []) {
@@ -103,5 +104,54 @@ it("runs the selected node through the engine connection", async () => {
       method: "flow.run",
       params: { rev: 0, targets: ["a"] },
     });
+  });
+});
+
+describe("node actions of a resource node", () => {
+  const REPO = manifestOf("core.deploy.repo", {
+    name: "Repo",
+    category: "Hosteo",
+    inputs: [],
+    outputs: [{ id: "repo", type: "repo" }],
+    impl: { kind: "resource", resource: "repo" },
+  });
+  const SERVICE = manifestOf("core.deploy.service", {
+    name: "Servicio",
+    category: "Hosteo",
+    inputs: [{ id: "repo", type: "repo" }],
+    outputs: [{ id: "service", type: "service" }],
+    impl: { kind: "resource", resource: "service" },
+  });
+
+  function setupNodeOfType(type: string) {
+    const stores = createAppStores(flowOf([nodeOf("a", type)]));
+    stores.engineStore
+      .getState()
+      .dispatch({ type: "catalog.loaded", nodes: [...CATALOG, REPO, SERVICE] });
+    return renderWithEngine(
+      <PreviewLocationContext value={{ location: "nodes", openInPanel: () => undefined }}>
+        <NodeActionToolbar nodeId="a" />
+      </PreviewLocationContext>,
+      { stores },
+    );
+  }
+
+  it.each([REPO.id, SERVICE.id])("does not offer to run a %s node", (type) => {
+    setupNodeOfType(type);
+
+    expect(screen.queryByRole("button", { name: "Ejecutar este nodo" })).toBeNull();
+  });
+
+  it("keeps the other actions of a resource node", () => {
+    setupNodeOfType(REPO.id);
+
+    expect(screen.getByRole("button", { name: "Desactivar nodo" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Más acciones" })).toBeDefined();
+  });
+
+  it("still offers to run a data node", () => {
+    setupNodeOfType(FILTER.id);
+
+    expect(screen.getByRole("button", { name: "Ejecutar este nodo" })).toBeDefined();
   });
 });

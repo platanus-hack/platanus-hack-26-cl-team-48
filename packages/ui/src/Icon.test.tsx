@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Icon, type IconName } from "./index.ts";
+import { Icon, ICONS, type IconName } from "./index.ts";
 
 const REQUESTED_ICONS: ReadonlyArray<IconName> = [
   "chevron-left",
@@ -38,6 +38,22 @@ const FLOATING_LAYOUT_ICONS = [
   "log-in",
   "log-out",
 ] as const satisfies ReadonlyArray<IconName>;
+
+const HOSTING_NODE_ICONS = ["git-branch", "server"] as const satisfies ReadonlyArray<IconName>;
+
+it.each(HOSTING_NODE_ICONS)("includes the %s icon of the hosting nodes in the catalog", (name) => {
+  const names: ReadonlyArray<string> = Object.keys(ICONS);
+
+  expect(names).toContain(name);
+});
+
+it.each(HOSTING_NODE_ICONS)("draws the %s icon of the hosting nodes as an svg", (name) => {
+  render(<Icon name={name} label={name} />);
+
+  const icon = screen.getByRole("img", { name });
+  expect(icon.tagName.toLowerCase()).toBe("svg");
+  expect(icon.children.length).toBeGreaterThan(0);
+});
 
 it.each(FLOATING_LAYOUT_ICONS)("draws the %s icon of the floating layout", (name) => {
   render(<Icon name={name} label={name} />);

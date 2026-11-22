@@ -4,7 +4,15 @@ import { statusLabel } from "@nodomics/ui";
 import { useState } from "react";
 import { expect, it } from "vitest";
 import { createAppStores } from "../app-stores.ts";
-import { CATALOG, edgeOf, FILTER, flowOf, nodeOf, SAMPLE } from "../canvas/canvas-fixtures.ts";
+import {
+  CATALOG,
+  edgeOf,
+  FILTER,
+  flowOf,
+  manifestOf,
+  nodeOf,
+  SAMPLE,
+} from "../canvas/canvas-fixtures.ts";
 import { renderWithStores } from "../testing/render-with-stores.tsx";
 import { ParamsPanel } from "./ParamsPanel.tsx";
 
@@ -283,4 +291,58 @@ it("does not offer to run a node without a selected node", () => {
   renderWithStores(<Panel />, stores);
 
   expect(screen.queryByRole("button", { name: "Ejecutar este nodo" })).toBeNull();
+});
+
+const REPO = manifestOf("core.deploy.repo", {
+  name: "Repo",
+  category: "Hosteo",
+  inputs: [],
+  outputs: [{ id: "repo", type: "repo" }],
+  params: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
+  impl: { kind: "resource", resource: "repo" },
+});
+
+function renderSelectedOfType(type: string) {
+  const stores = createAppStores(flowOf([nodeOf("n", type)]));
+  const { dispatch } = stores.engineStore.getState();
+  dispatch({ type: "catalog.loaded", nodes: [...CATALOG, REPO] });
+  stores.selectionStore.getState().select(["n"]);
+  renderWithStores(<Panel />, stores);
+  return dispatch;
+}
+
+function reportStale(dispatch: ReturnType<typeof renderSelectedOfType>) {
+  act(() => {
+    dispatch({ type: "run.requested", rev: 0 });
+    dispatch({ type: "run.started", rev: 0, runId: "r" });
+    dispatch({ type: "node.status", payload: { rev: 0, runId: "r", nodeId: "n", state: "stale" } });
+  });
+}
+
+it("does not offer to run a selected resource node", () => {
+  renderSelectedOfType(REPO.id);
+
+  expect(screen.queryByRole("button", { name: "Ejecutar este nodo" })).toBeNull();
+});
+
+it("never shows a stale resource node as Desactualizado", () => {
+  const dispatch = renderSelectedOfType(REPO.id);
+
+  reportStale(dispatch);
+
+  expect(screen.queryByText(statusLabel("stale"))).toBeNull();
+});
+
+it("still offers to run a selected data node", () => {
+  renderSelectedOfType(FILTER.id);
+
+  expect(screen.getByRole("button", { name: "Ejecutar este nodo" })).toBeDefined();
+});
+
+it("still shows a stale data node as Desactualizado", () => {
+  const dispatch = renderSelectedOfType(FILTER.id);
+
+  reportStale(dispatch);
+
+  expect(screen.getByText(statusLabel("stale"))).toBeDefined();
 });
