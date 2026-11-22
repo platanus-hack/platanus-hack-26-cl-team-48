@@ -225,6 +225,7 @@ function resolveProposalRoutes(deps: RequestDeps, memory: MemoryPort): readonly 
   return createProposalRoutes({
     store,
     mcp: deps.mcp,
+    ...(deps.logger ? { logger: deps.logger } : {}),
     recordDecision: (decision, identity) =>
       buildMemoryDeps(resolveMemory(deps, memory, identity)).recordDecision(decision),
     onAccepted: (proposal, _acceptedIds, identity) => maybeIndexFlow(deps, proposal, identity),

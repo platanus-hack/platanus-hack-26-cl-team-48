@@ -2,6 +2,7 @@ import { parse } from "@nodomics/protocol";
 import { Type, type Static } from "@sinclair/typebox";
 import type { Proposal } from "../../contracts/proposal.ts";
 import type { McpPort, UserIdentity } from "../../mcp/mcp-port.ts";
+import type { StructuredLogger } from "../guards/logger.ts";
 import { decideProposal, type DecisionError } from "../../proposals/decide.ts";
 import type { ProposalStorePort } from "../../proposals/proposal-store-port.ts";
 import type { Route, RouteReply, RouteRequest } from "../route.ts";
@@ -15,6 +16,7 @@ export type DecisionNotification = {
 export type ProposalRouteDeps = {
   readonly store: ProposalStorePort | ((identity: UserIdentity) => ProposalStorePort);
   readonly mcp: McpPort;
+  readonly logger?: StructuredLogger;
   readonly recordDecision?: (
     decision: DecisionNotification,
     identity: UserIdentity,
@@ -67,6 +69,11 @@ async function getProposal(deps: ProposalRouteDeps, request: RouteRequest): Prom
   const store = resolveStore(deps.store, request.identity);
   const result = await store.get(request.params["id"] ?? "", request.identity.userId);
   if (result.ok) return reply(200, { proposal: result.value.proposal, cards: result.value.cards });
+  if (result.error.code !== "NOT_FOUND")
+    deps.logger?.warn("proposal not read", {
+      code: result.error.code,
+      message: result.error.message,
+    });
   return reply(result.error.code === "NOT_FOUND" ? 404 : 500, {
     error: result.error.code.toLowerCase(),
   });
